@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StatStack - NBA Higher or Lower</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; display: flex; justify-content: center; align-items: flex-start; padding: 20px; }
+.game-container { background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 960px; width: 100%; overflow: hidden; }
+.header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 22px 25px 18px; text-align: center; }
+.header h1 { font-size: 2.2em; margin-bottom: 4px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+.header-btns { display: flex; justify-content: center; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.header-btn { background: rgba(255,255,255,0.2); color: white; border: 2px solid rgba(255,255,255,0.6); padding: 8px 20px; border-radius: 20px; cursor: pointer; font-size: 0.9em; font-weight: bold; transition: all 0.3s; }
+.header-btn:hover { background: white; color: #667eea; }
+
+.season-bar { background: #2c3e50; padding: 12px 20px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap; justify-content: center; }
+.season-bar label { color: #ecf0f1; font-weight: bold; font-size: 0.95em; }
+.season-select { background: #34495e; color: white; border: 2px solid #667eea; border-radius: 8px; padding: 7px 14px; font-size: 0.95em; cursor: pointer; outline: none; }
+.season-select:focus { border-color: #a78bfa; }
+.season-info { color: #aaa; font-size: 0.85em; }
+
+.score-board { display: flex; justify-content: space-around; padding: 14px 20px; background: #34495e; color: white; }
+.score-item { text-align: center; }
+.score-item .label { font-size: 0.8em; opacity: 0.8; margin-bottom: 3px; }
+.score-item .value { font-size: 1.8em; font-weight: bold; }
+.multiplier { color: #f39c12; }
+
+.hook-banner { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 13px 25px; text-align: center; font-size: 1.1em; font-weight: bold; }
+.hook-icon { margin-right: 8px; }
+
+.stat-display { padding: 12px 24px; background: #f8f9fa; border-bottom: 1px solid #e0e0e0; display: flex; gap: 12px; flex-wrap: wrap; }
+.stat-pill { background: white; border: 1.5px solid #667eea; padding: 7px 16px; border-radius: 20px; font-size: 0.9em; color: #2c3e50; }
+.stat-pill span { font-weight: bold; color: #667eea; }
+
+.players-container { display: flex; gap: 20px; padding: 24px; }
+.player-card { flex: 1; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 15px; padding: 24px 20px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); transition: transform 0.3s; }
+.player-card:hover { transform: translateY(-4px); }
+.player-image { width: 130px; height: 130px; border-radius: 50%; margin: 0 auto 14px; border: 4px solid #667eea; object-fit: cover; background: #667eea; display: block; }
+.player-card h2 { color: #2c3e50; font-size: 1.45em; margin-bottom: 4px; }
+.player-card .team { color: #7f8c8d; font-size: 0.95em; margin-bottom: 14px; }
+.stat-value { font-size: 3em; font-weight: bold; color: #667eea; margin: 14px 0; }
+.hidden-stat { font-size: 3em; color: #bdc3c7; margin: 14px 0; }
+.stat-label { color: #888; font-size: 0.9em; }
+.buttons { display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+button { padding: 12px 28px; font-size: 1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; }
+.higher-btn { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white; }
+.higher-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(56,239,125,0.4); }
+.lower-btn { background: linear-gradient(135deg, #ee0979 0%, #ff6a00 100%); color: white; }
+.lower-btn:hover { transform: scale(1.05); box-shadow: 0 5px 20px rgba(255,106,0,0.4); }
+.next-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: none; }
+.next-btn:hover { transform: scale(1.05); }
+.result { text-align: center; padding: 16px; font-size: 1.35em; font-weight: bold; min-height: 55px; }
+.result.correct { color: #27ae60; }
+.result.incorrect { color: #e74c3c; }
+
+.modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); overflow-y: auto; }
+.modal-content { background: white; margin: 4% auto; padding: 0; border-radius: 20px; max-width: 820px; width: 92%; animation: slideDown 0.3s; }
+@keyframes slideDown { from{transform:translateY(-40px);opacity:0}to{transform:translateY(0);opacity:1} }
+.modal-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 22px 25px; border-radius: 20px 20px 0 0; position: relative; }
+.modal-header h2 { margin: 0; font-size: 1.8em; }
+.close-btn { position: absolute; right: 20px; top: 18px; font-size: 2em; color: white; cursor: pointer; background: none; border: none; line-height: 1; }
+.shop-content { padding: 28px; }
+.coin-balance { text-align: center; font-size: 1.8em; color: #f39c12; font-weight: bold; margin-bottom: 24px; }
+
+.pack-section { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 15px; padding: 26px; margin-bottom: 24px; text-align: center; }
+.pack-section h3 { font-size: 1.6em; color: #2c3e50; margin-bottom: 10px; }
+.pack-price { font-size: 1.4em; color: #f39c12; margin-bottom: 10px; }
+.pack-odds { font-size: 0.85em; color: #7f8c8d; margin-bottom: 18px; }
+.pack-odds span { margin: 0 6px; }
+.buy-pack-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 13px 36px; font-size: 1.1em; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
+.buy-pack-btn:hover:not(:disabled) { transform: scale(1.05); }
+.buy-pack-btn:disabled { background: #95a5a6; cursor: not-allowed; }
+.pack-opening { text-align: center; padding: 30px; }
+.pack-animation { font-size: 4.5em; animation: bounce 0.5s infinite; display: block; }
+@keyframes bounce { 0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)} }
+.revealed-card { color: white; padding: 32px; border-radius: 15px; margin: 16px auto; max-width: 360px; animation: cardReveal 0.5s; position: relative; }
+.revealed-card.legendary { background: linear-gradient(135deg, #f5af19 0%, #f12711 100%); border: 4px solid gold; box-shadow: 0 10px 40px rgba(245,175,25,0.6); }
+.revealed-card.epic { background: linear-gradient(135deg, #a445b2 0%, #d41872 100%); }
+.revealed-card.rare { background: linear-gradient(135deg, #4776e6 0%, #8e54e9 100%); }
+.revealed-card.common { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.revealed-card-img { width: 150px; height: 150px; border-radius: 50%; margin: 0 auto 14px; border: 4px solid rgba(255,255,255,0.5); object-fit: cover; background: rgba(255,255,255,0.1); display: block; }
+@keyframes cardReveal { from{transform:rotateY(90deg);opacity:0}to{transform:rotateY(0);opacity:1} }
+.revealed-card h3 { font-size: 1.8em; margin-bottom: 4px; }
+.card-rarity-badge { position: absolute; top: 10px; right: 12px; padding: 4px 10px; border-radius: 5px; font-size: 0.7em; font-weight: bold; background: rgba(0,0,0,0.3); }
+.revealed-stats { font-size: 0.95em; line-height: 2; margin-top: 12px; }
+
+.coll-stats { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; justify-content: center; }
+.stat-box { background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 14px 10px; border-radius: 10px; text-align: center; flex: 1; min-width: 80px; }
+.stat-box-label { font-size: 0.78em; color: #7f8c8d; margin-bottom: 4px; }
+.stat-box-val { font-size: 2em; font-weight: bold; color: #2c3e50; }
+.filter-buttons { display: flex; gap: 8px; margin-bottom: 22px; flex-wrap: wrap; justify-content: center; }
+.filter-btn { padding: 7px 16px; border: 2px solid #667eea; background: white; color: #667eea; border-radius: 18px; cursor: pointer; font-weight: bold; font-size: 0.84em; transition: all 0.3s; }
+.filter-btn:hover, .filter-btn.active { background: #667eea; color: white; }
+.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+.card-small { color: white; padding: 14px; border-radius: 10px; text-align: center; position: relative; overflow: hidden; }
+.card-small.legendary { background: linear-gradient(135deg, #f5af19 0%, #f12711 100%); border: 3px solid gold; animation: glow 2s ease-in-out infinite; }
+.card-small.epic { background: linear-gradient(135deg, #a445b2 0%, #d41872 100%); }
+.card-small.rare { background: linear-gradient(135deg, #4776e6 0%, #8e54e9 100%); }
+.card-small.common { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+@keyframes glow { 0%,100%{box-shadow:0 5px 15px rgba(245,175,25,0.4)}50%{box-shadow:0 10px 30px rgba(245,175,25,0.8)} }
+.card-img { width: 90px; height: 90px; border-radius: 50%; margin: 0 auto 8px; border: 3px solid rgba(255,255,255,0.3); object-fit: cover; background: rgba(255,255,255,0.1); display: block; }
+.card-small h4 { font-size: 0.95em; margin-bottom: 2px; }
+.card-team { font-size: 0.75em; opacity: 0.8; margin-bottom: 6px; }
+.card-stats { font-size: 0.72em; line-height: 1.6; }
+
+@media (max-width: 680px) {
+  .players-container { flex-direction: column; }
+  .player-image { width: 100px; height: 100px; }
+  .stat-value, .hidden-stat { font-size: 2.4em; }
+  .header h1 { font-size: 1.7em; }
+}
+</style>
+</head>
+<body>
+<div class="game-container">
+  <div class="header">
+    <h1>🏀 StatStack</h1>
+    <p>NBA Higher or Lower</p>
+    <div class="header-btns">
+      <button class="header-btn" onclick="openShop()">🛒 Card Shop</button>
+      <button class="header-btn" onclick="openCollection()">📚 Collection</button>
+    </div>
+  </div>
+
+  <div class="season-bar">
+    <label>🗓️ Season:</label>
+    <select class="season-select" id="seasonSelect" onchange="changeSeason()">
+      <option value="2025-26">2025-26 (Current)</option>
+      <option value="2024-25">2024-25</option>
+      <option value="2023-24">2023-24</option>
+      <option value="2022-23">2022-23</option>
+      <option value="2021-22">2021-22</option>
+      <option value="2019-20">2019-20</option>
+      <option value="2017-18">2017-18</option>
+      <option value="2015-16">2015-16</option>
+      <option value="2012-13">2012-13</option>
+      <option value="2009-10">2009-10</option>
+      <option value="2007-08">2007-08</option>
+      <option value="2004-05">2004-05</option>
+      <option value="2001-02">2001-02</option>
+      <option value="1999-00">1999-00</option>
+      <option value="1996-97">1996-97</option>
+      <option value="1993-94">1993-94</option>
+      <option value="1991-92">1991-92</option>
+      <option value="1989-90">1989-90</option>
+      <option value="1986-87">1986-87</option>
+      <option value="1984-85">1984-85</option>
+    </select>
+    <span class="season-info" id="playerCountInfo">Loading...</span>
+  </div>
+
+  <div class="score-board">
+    <div class="score-item"><div class="label">💰 Coins</div><div class="value" id="coins">0</div></div>
+    <div class="score-item"><div class="label">🔥 Streak</div><div class="value" id="streak">0</div></div>
+    <div class="score-item"><div class="label">⚡ Multiplier</div><div class="value multiplier" id="multiplier">1x</div></div>
+    <div class="score-item"><div class="label">🏆 Best</div><div class="value" id="bestStreak">0</div></div>
+    <div class="score-item"><div class="label">🎯 Round</div><div class="value" id="roundDisplay">1</div></div>
+  </div>
+
+  <div class="hook-banner" id="hookBanner">
+    <span class="hook-icon">⚠️</span><span id="hookText">90% of players get this wrong!</span>
+  </div>
+
+  <div class="stat-display">
+    <div class="stat-pill">Comparing: <span id="currentStatLabel">Points Per Game</span></div>
+    <div class="stat-pill">Does <span id="p2NameInline">Player 2</span> score <span>HIGHER</span> or <span>LOWER</span>?</div>
+  </div>
+
+  <div class="players-container">
+    <div class="player-card">
+      <img id="player1Image" class="player-image" src="" alt="Player 1" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2238%22 r=%2222%22 fill=%22%23fff%22 opacity=%220.5%22/%3E%3Cellipse cx=%2250%22 cy=%2285%22 rx=%2228%22 ry=%2218%22 fill=%22%23fff%22 opacity=%220.5%22/%3E%3C/svg%3E'">
+      <h2 id="player1Name">Loading...</h2>
+      <div class="team" id="player1Team">—</div>
+      <div class="stat-value" id="player1Stat">—</div>
+      <div class="stat-label" id="player1StatLabel">PPG</div>
+    </div>
+    <div class="player-card">
+      <img id="player2Image" class="player-image" src="" alt="Player 2" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2238%22 r=%2222%22 fill=%22%23fff%22 opacity=%220.5%22/%3E%3Cellipse cx=%2250%22 cy=%2285%22 rx=%2228%22 ry=%2218%22 fill=%22%23fff%22 opacity=%220.5%22/%3E%3C/svg%3E'">
+      <h2 id="player2Name">Loading...</h2>
+      <div class="team" id="player2Team">—</div>
+      <div class="hidden-stat" id="player2Stat">???</div>
+      <div class="stat-label" id="player2StatLabel">PPG</div>
+      <div class="buttons">
+        <button class="higher-btn" id="higherBtn" onclick="makeGuess('higher')">⬆️ Higher</button>
+        <button class="lower-btn" id="lowerBtn" onclick="makeGuess('lower')">⬇️ Lower</button>
+        <button class="next-btn" id="nextBtn" onclick="nextRound()">Next ➡️</button>
+      </div>
+    </div>
+  </div>
+  <div class="result" id="result"></div>
+</div>
+
+<!-- Shop Modal -->
+<div id="shopModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>🛒 Card Shop</h2>
+      <button class="close-btn" onclick="closeShop()">×</button>
+    </div>
+    <div class="shop-content">
+      <div class="coin-balance">💰 <span id="modalCoins">0</span> Coins</div>
+      <div class="pack-section">
+        <h3>🎁 Player Pack</h3>
+        <div class="pack-price">2,000 Coins per Pack</div>
+        <div class="pack-odds">
+          <span>⭐ Legendary 2%</span><span>💜 Epic 8%</span><span>💎 Rare 20%</span><span>🔷 Common 70%</span>
+        </div>
+        <button class="buy-pack-btn" id="buyPackBtn" onclick="buyPack()">Open Pack</button>
+      </div>
+      <div id="packOpening" style="display:none">
+        <div class="pack-opening"><span class="pack-animation">📦</span><h3>Opening...</h3></div>
+      </div>
+      <div id="revealedCard" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Collection Modal -->
+<div id="collectionModal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>📚 My Collection</h2>
+      <button class="close-btn" onclick="closeCollection()">×</button>
+    </div>
+    <div class="shop-content">
+      <div class="coll-stats">
+        <div class="stat-box"><div class="stat-box-label">Total</div><div class="stat-box-val" id="totalCards">0</div></div>
+        <div class="stat-box"><div class="stat-box-label">⭐ Legendary</div><div class="stat-box-val" style="color:#f5af19" id="legendaryCount">0</div></div>
+        <div class="stat-box"><div class="stat-box-label">💜 Epic</div><div class="stat-box-val" style="color:#d41872" id="epicCount">0</div></div>
+        <div class="stat-box"><div class="stat-box-label">💎 Rare</div><div class="stat-box-val" style="color:#8e54e9" id="rareCount">0</div></div>
+        <div class="stat-box"><div class="stat-box-label">🔷 Common</div><div class="stat-box-val" style="color:#667eea" id="commonCount">0</div></div>
+      </div>
+      <div class="filter-buttons">
+        <button class="filter-btn active" onclick="filterCollection('all',this)">All</button>
+        <button class="filter-btn" onclick="filterCollection('legendary',this)">⭐ Legendary</button>
+        <button class="filter-btn" onclick="filterCollection('epic',this)">💜 Epic</button>
+        <button class="filter-btn" onclick="filterCollection('rare',this)">💎 Rare</button>
+        <button class="filter-btn" onclick="filterCollection('common',this)">🔷 Common</button>
+      </div>
+      <div class="cards-grid" id="collectionGrid">
+        <p style="text-align:center;grid-column:1/-1;color:#95a5a6;padding:20px;">No cards yet. Buy a pack!</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── SEASON DATABASE ───────────────────────────────────────────────────────
+// Rarity tiers based on era-relative dominance:
+//   legendary = all-time greats / MVP-level seasons
+//   epic      = all-stars / elite starters
+//   rare      = solid starters / rotation contributors
+//   common    = role players / bench players
+// img = NBA CDN player ID (null = silhouette fallback)
+// ───────────────────────────────────────────────────────────────────────────
+const SEASONS = {
+
+"2025-26": { label:"2025-26 (Current)", players:[
+  {name:"Luka Dončić",team:"LAL",ppg:35.3,rpg:7.5,apg:8.9,spg:1.4,bpg:0.5,rarity:"legendary",img:"1629029"},
+  {name:"Shai Gilgeous-Alexander",team:"OKC",ppg:32.8,rpg:5.4,apg:6.4,spg:2.1,bpg:1.1,rarity:"legendary",img:"1628983"},
+  {name:"Tyrese Maxey",team:"PHI",ppg:32.5,rpg:3.8,apg:6.9,spg:1.0,bpg:0.3,rarity:"legendary",img:"1630178"},
+  {name:"Donovan Mitchell",team:"CLE",ppg:30.7,rpg:4.8,apg:5.7,spg:1.5,bpg:0.4,rarity:"legendary",img:"1628378"},
+  {name:"Anthony Edwards",team:"MIN",ppg:29.8,rpg:5.7,apg:4.5,spg:1.3,bpg:0.6,rarity:"epic",img:"1630162"},
+  {name:"Nikola Jokic",team:"DEN",ppg:29.5,rpg:12.6,apg:11.1,spg:1.4,bpg:0.9,rarity:"epic",img:"203999"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:29.2,rpg:11.2,apg:6.5,spg:0.9,bpg:1.2,rarity:"epic",img:"203507"},
+  {name:"Jaylen Brown",team:"BOS",ppg:28.8,rpg:6.6,apg:4.7,spg:1.2,bpg:0.5,rarity:"epic",img:"1627759"},
+  {name:"Jalen Brunson",team:"NYK",ppg:27.8,rpg:3.4,apg:7.2,spg:0.9,bpg:0.2,rarity:"epic",img:"1628973"},
+  {name:"Kevin Durant",team:"HOU",ppg:26.8,rpg:6.4,apg:4.2,spg:0.8,bpg:1.1,rarity:"epic",img:"201142"},
+  {name:"Anthony Davis",team:"LAL",ppg:25.4,rpg:11.3,apg:3.5,spg:1.3,bpg:2.1,rarity:"epic",img:"203076"},
+  {name:"Damian Lillard",team:"MIL",ppg:25.7,rpg:4.5,apg:7.5,spg:1.0,bpg:0.4,rarity:"epic",img:"203081"},
+  {name:"Jayson Tatum",team:"BOS",ppg:26.9,rpg:8.1,apg:4.9,spg:1.0,bpg:0.6,rarity:"rare",img:"1628369"},
+  {name:"De'Aaron Fox",team:"SAC",ppg:25.2,rpg:4.8,apg:6.2,spg:1.5,bpg:0.4,rarity:"rare",img:"1628368"},
+  {name:"Franz Wagner",team:"ORL",ppg:24.9,rpg:5.6,apg:5.7,spg:1.8,bpg:0.6,rarity:"rare",img:"1630532"},
+  {name:"Devin Booker",team:"PHX",ppg:24.6,rpg:4.2,apg:6.7,spg:0.9,bpg:0.4,rarity:"rare",img:"1626164"},
+  {name:"Cade Cunningham",team:"DET",ppg:24.5,rpg:6.5,apg:9.2,spg:1.4,bpg:0.8,rarity:"rare",img:"1630595"},
+  {name:"Karl-Anthony Towns",team:"NYK",ppg:24.4,rpg:12.0,apg:3.1,spg:1.0,bpg:0.7,rarity:"rare",img:"1626157"},
+  {name:"Victor Wembanyama",team:"SAS",ppg:23.9,rpg:10.8,apg:3.9,spg:1.1,bpg:3.6,rarity:"rare",img:"1641705"},
+  {name:"Lauri Markkanen",team:"UTA",ppg:23.4,rpg:8.2,apg:2.8,spg:0.8,bpg:0.6,rarity:"rare",img:"1628374"},
+  {name:"LeBron James",team:"LAL",ppg:23.1,rpg:7.8,apg:8.5,spg:1.2,bpg:0.6,rarity:"rare",img:"2544"},
+  {name:"Stephen Curry",team:"GSW",ppg:22.8,rpg:4.3,apg:5.4,spg:1.0,bpg:0.3,rarity:"rare",img:"201939"},
+  {name:"Zion Williamson",team:"NOP",ppg:22.8,rpg:6.8,apg:5.3,spg:1.1,bpg:0.7,rarity:"rare",img:"1629627"},
+  {name:"Paolo Banchero",team:"ORL",ppg:22.6,rpg:6.9,apg:5.4,spg:0.9,bpg:0.8,rarity:"rare",img:"1631094"},
+  {name:"Kawhi Leonard",team:"LAC",ppg:22.4,rpg:6.2,apg:3.6,spg:1.6,bpg:0.5,rarity:"rare",img:"202695"},
+  {name:"Trae Young",team:"ATL",ppg:21.8,rpg:3.1,apg:10.5,spg:1.2,bpg:0.2,rarity:"rare",img:"1629027"},
+  {name:"Ja Morant",team:"MEM",ppg:21.2,rpg:4.3,apg:7.6,spg:0.9,bpg:0.3,rarity:"rare",img:"1629630"},
+  {name:"Brandon Ingram",team:"NOP",ppg:22.1,rpg:5.8,apg:5.0,spg:0.9,bpg:0.5,rarity:"rare",img:"1627742"},
+  {name:"James Harden",team:"LAC",ppg:20.4,rpg:4.9,apg:8.4,spg:1.1,bpg:0.5,rarity:"rare",img:"201935"},
+  {name:"Darius Garland",team:"CLE",ppg:20.1,rpg:3.5,apg:7.7,spg:1.3,bpg:0.2,rarity:"rare",img:"1629636"},
+  {name:"Tyrese Haliburton",team:"IND",ppg:19.8,rpg:4.4,apg:9.9,spg:1.6,bpg:0.4,rarity:"rare",img:"1630169"},
+  {name:"DeMar DeRozan",team:"SAC",ppg:22.3,rpg:4.8,apg:5.3,spg:0.9,bpg:0.3,rarity:"rare",img:"201942"},
+  {name:"Zach LaVine",team:"CHI",ppg:21.9,rpg:4.5,apg:4.5,spg:0.8,bpg:0.4,rarity:"rare",img:"203897"},
+  {name:"Jalen Williams",team:"OKC",ppg:22.0,rpg:4.5,apg:5.5,spg:1.2,bpg:0.6,rarity:"rare",img:"1631108"},
+  {name:"Jaren Jackson Jr.",team:"MEM",ppg:21.0,rpg:6.1,apg:2.0,spg:0.8,bpg:3.2,rarity:"rare",img:"1628991"},
+  {name:"Julius Randle",team:"MIN",ppg:22.4,rpg:9.2,apg:4.5,spg:0.9,bpg:0.4,rarity:"rare",img:"203994"},
+  {name:"Pascal Siakam",team:"IND",ppg:19.5,rpg:7.7,apg:4.4,spg:1.1,bpg:0.7,rarity:"rare",img:"1627783"},
+  {name:"Bam Adebayo",team:"MIA",ppg:18.0,rpg:10.4,apg:4.1,spg:1.2,bpg:0.8,rarity:"rare",img:"1628389"},
+  {name:"Jimmy Butler",team:"GSW",ppg:17.3,rpg:5.7,apg:5.0,spg:1.5,bpg:0.3,rarity:"rare",img:"202710"},
+  {name:"Paul George",team:"PHI",ppg:16.5,rpg:5.3,apg:3.6,spg:1.3,bpg:0.5,rarity:"rare",img:"202331"},
+  {name:"Scottie Barnes",team:"TOR",ppg:20.6,rpg:8.4,apg:6.1,spg:1.5,bpg:1.3,rarity:"common",img:"1630567"},
+  {name:"Evan Mobley",team:"CLE",ppg:18.3,rpg:9.4,apg:3.3,spg:1.2,bpg:1.9,rarity:"common",img:"1630596"},
+  {name:"Jalen Johnson",team:"ATL",ppg:19.7,rpg:10.0,apg:5.6,spg:1.3,bpg:0.9,rarity:"common",img:"1630556"},
+  {name:"Alperen Sengun",team:"HOU",ppg:19.1,rpg:10.3,apg:5.1,spg:1.2,bpg:0.9,rarity:"common",img:"1630578"},
+  {name:"Mikal Bridges",team:"NYK",ppg:18.6,rpg:4.2,apg:3.8,spg:2.1,bpg:0.5,rarity:"common",img:"1628969"},
+  {name:"OG Anunoby",team:"NYK",ppg:17.4,rpg:5.3,apg:2.1,spg:1.7,bpg:0.6,rarity:"common",img:"1628384"},
+  {name:"Kristaps Porzingis",team:"BOS",ppg:20.1,rpg:7.2,apg:2.0,spg:0.7,bpg:1.9,rarity:"common",img:"204001"},
+  {name:"Chet Holmgren",team:"OKC",ppg:17.5,rpg:7.5,apg:2.0,spg:0.8,bpg:2.8,rarity:"common",img:"1631096"},
+  {name:"Domantas Sabonis",team:"SAC",ppg:19.8,rpg:13.5,apg:7.5,spg:0.8,bpg:0.4,rarity:"common",img:"1627734"},
+  {name:"Devin Vassell",team:"SAS",ppg:18.0,rpg:3.8,apg:4.5,spg:0.9,bpg:0.4,rarity:"common",img:"1630170"},
+  {name:"Norman Powell",team:"LAC",ppg:17.8,rpg:3.2,apg:2.0,spg:1.0,bpg:0.3,rarity:"common",img:"1626181"},
+  {name:"Anfernee Simons",team:"POR",ppg:20.5,rpg:3.5,apg:5.5,spg:0.8,bpg:0.3,rarity:"common",img:"1629014"},
+  {name:"Jordan Poole",team:"WAS",ppg:19.5,rpg:3.0,apg:5.0,spg:0.8,bpg:0.2,rarity:"common",img:"1629673"},
+  {name:"Kyle Kuzma",team:"WAS",ppg:22.5,rpg:7.5,apg:3.8,spg:0.7,bpg:0.5,rarity:"common",img:"1628398"},
+  {name:"Cam Thomas",team:"BKN",ppg:22.0,rpg:3.5,apg:3.5,spg:0.7,bpg:0.4,rarity:"common",img:"1631119"},
+  {name:"LaMelo Ball",team:"CHA",ppg:23.5,rpg:5.2,apg:8.5,spg:1.5,bpg:0.4,rarity:"common",img:"1630163"},
+  {name:"Miles Bridges",team:"CHA",ppg:21.5,rpg:6.5,apg:3.5,spg:0.9,bpg:0.5,rarity:"common",img:"1628970"},
+  {name:"Immanuel Quickley",team:"TOR",ppg:18.5,rpg:4.8,apg:6.8,spg:1.0,bpg:0.3,rarity:"common",img:"1630193"},
+  {name:"Coby White",team:"CHI",ppg:20.8,rpg:4.0,apg:4.5,spg:0.9,bpg:0.3,rarity:"common",img:"1629632"},
+  {name:"Patrick Williams",team:"CHI",ppg:14.5,rpg:5.0,apg:2.5,spg:1.0,bpg:0.6,rarity:"common",img:"1630172"},
+  {name:"Nikola Vucevic",team:"CHI",ppg:16.5,rpg:11.2,apg:3.5,spg:0.6,bpg:0.9,rarity:"common",img:"202696"},
+  {name:"Josh Giddey",team:"CHI",ppg:13.2,rpg:6.8,apg:9.2,spg:0.9,bpg:0.7,rarity:"common",img:"1630581"},
+  {name:"Dejounte Murray",team:"ATL",ppg:20.5,rpg:5.3,apg:6.1,spg:1.5,bpg:0.4,rarity:"common",img:"1627749"},
+  {name:"Bogdan Bogdanovic",team:"ATL",ppg:14.5,rpg:3.5,apg:4.0,spg:0.8,bpg:0.3,rarity:"common",img:"203992"},
+  {name:"Draymond Green",team:"GSW",ppg:9.0,rpg:7.3,apg:6.9,spg:1.4,bpg:0.8,rarity:"common",img:"203110"},
+  {name:"Klay Thompson",team:"DAL",ppg:16.1,rpg:3.3,apg:2.2,spg:0.7,bpg:0.4,rarity:"common",img:"202691"},
+  {name:"Rudy Gobert",team:"MIN",ppg:14.1,rpg:12.4,apg:1.3,spg:0.7,bpg:2.0,rarity:"common",img:"203497"},
+  {name:"Mike Conley",team:"MIN",ppg:10.5,rpg:3.0,apg:6.5,spg:1.0,bpg:0.2,rarity:"common",img:"201144"},
+  {name:"Jerami Grant",team:"POR",ppg:19.5,rpg:4.3,apg:2.5,spg:1.0,bpg:0.8,rarity:"common",img:"203924"},
+  {name:"Deni Avdija",team:"POR",ppg:17.0,rpg:7.5,apg:5.0,spg:1.2,bpg:0.5,rarity:"common",img:"1630166"},
+  {name:"Scoot Henderson",team:"POR",ppg:15.2,rpg:3.8,apg:6.5,spg:1.0,bpg:0.3,rarity:"common",img:"1641706"},
+  {name:"Jonathan Kuminga",team:"GSW",ppg:16.5,rpg:4.8,apg:2.2,spg:0.8,bpg:0.6,rarity:"common",img:"1630228"},
+  {name:"Andrew Wiggins",team:"GSW",ppg:18.1,rpg:5.0,apg:2.5,spg:0.9,bpg:0.7,rarity:"common",img:"203952"},
+  {name:"Chris Paul",team:"GSW",ppg:9.4,rpg:3.9,apg:8.8,spg:1.2,bpg:0.2,rarity:"common",img:"101108"},
+  {name:"Brook Lopez",team:"MIL",ppg:12.5,rpg:5.0,apg:2.0,spg:0.6,bpg:2.5,rarity:"common",img:"201572"},
+  {name:"Khris Middleton",team:"MIL",ppg:15.8,rpg:5.0,apg:5.0,spg:1.1,bpg:0.3,rarity:"common",img:"203114"},
+  {name:"Myles Turner",team:"IND",ppg:14.3,rpg:6.8,apg:1.5,spg:0.9,bpg:2.7,rarity:"common",img:"1626167"},
+  {name:"Bennedict Mathurin",team:"IND",ppg:15.5,rpg:4.5,apg:2.2,spg:0.8,bpg:0.3,rarity:"common",img:"1631104"},
+  {name:"Jordan Clarkson",team:"UTA",ppg:16.5,rpg:3.2,apg:3.8,spg:0.8,bpg:0.2,rarity:"common",img:"203903"},
+  {name:"John Collins",team:"UTA",ppg:14.5,rpg:7.5,apg:1.5,spg:0.6,bpg:0.7,rarity:"common",img:"1628381"},
+  {name:"Keyonte George",team:"UTA",ppg:14.5,rpg:3.5,apg:5.8,spg:0.8,bpg:0.2,rarity:"common",img:"1641710"},
+  {name:"Aaron Gordon",team:"DEN",ppg:13.7,rpg:6.8,apg:3.4,spg:0.9,bpg:0.5,rarity:"common",img:"203932"},
+  {name:"Michael Porter Jr.",team:"DEN",ppg:16.7,rpg:7.5,apg:2.0,spg:0.5,bpg:0.7,rarity:"common",img:"1629008"},
+  {name:"Kentavious Caldwell-Pope",team:"ORL",ppg:13.5,rpg:3.8,apg:2.5,spg:1.3,bpg:0.3,rarity:"common",img:"203484"},
+  {name:"Clint Capela",team:"ATL",ppg:10.8,rpg:10.5,apg:1.0,spg:0.8,bpg:1.3,rarity:"common",img:"203991"},
+  {name:"Bradley Beal",team:"PHX",ppg:18.2,rpg:4.2,apg:5.0,spg:0.9,bpg:0.3,rarity:"common",img:"203078"},
+  {name:"Naz Reid",team:"MIN",ppg:14.2,rpg:6.0,apg:1.8,spg:0.7,bpg:1.1,rarity:"common",img:"1629675"},
+  {name:"Isaiah Hartenstein",team:"OKC",ppg:11.0,rpg:9.5,apg:3.5,spg:0.8,bpg:1.2,rarity:"common",img:"1629631"},
+  {name:"Luguentz Dort",team:"OKC",ppg:14.5,rpg:3.8,apg:2.0,spg:1.5,bpg:0.5,rarity:"common",img:"1629652"},
+  {name:"Josh Hart",team:"NYK",ppg:11.5,rpg:8.5,apg:4.5,spg:1.2,bpg:0.4,rarity:"common",img:"1628404"},
+  {name:"Derrick White",team:"BOS",ppg:15.3,rpg:4.2,apg:5.5,spg:1.2,bpg:1.0,rarity:"common",img:"1628401"},
+  {name:"Al Horford",team:"BOS",ppg:9.5,rpg:6.5,apg:3.2,spg:0.8,bpg:1.1,rarity:"common",img:"201143"},
+  {name:"Herb Jones",team:"NOP",ppg:11.0,rpg:4.8,apg:2.5,spg:1.8,bpg:0.5,rarity:"common",img:"1630529"},
+  {name:"Jose Alvarado",team:"NOP",ppg:10.5,rpg:3.0,apg:4.5,spg:2.0,bpg:0.2,rarity:"common",img:"1630631"},
+  {name:"Tari Eason",team:"HOU",ppg:14.0,rpg:5.5,apg:1.8,spg:1.5,bpg:0.6,rarity:"common",img:"1631124"},
+  {name:"Amen Thompson",team:"HOU",ppg:12.0,rpg:5.8,apg:3.5,spg:1.3,bpg:0.5,rarity:"common",img:"1641708"},
+  {name:"Jabari Smith Jr.",team:"HOU",ppg:14.5,rpg:6.5,apg:2.0,spg:1.0,bpg:0.9,rarity:"common",img:"1631095"},
+  {name:"Keldon Johnson",team:"SAS",ppg:15.5,rpg:5.0,apg:2.5,spg:0.9,bpg:0.4,rarity:"common",img:"1629640"},
+  {name:"Malaki Branham",team:"SAS",ppg:12.5,rpg:3.0,apg:2.5,spg:0.6,bpg:0.2,rarity:"common",img:"1631111"},
+  {name:"Stephon Castle",team:"SAS",ppg:12.5,rpg:4.0,apg:4.5,spg:1.3,bpg:0.4,rarity:"common",img:"1641716"},
+  {name:"Tobias Harris",team:"DET",ppg:16.0,rpg:6.5,apg:2.8,spg:0.7,bpg:0.5,rarity:"common",img:"202699"},
+  {name:"Ausar Thompson",team:"DET",ppg:12.5,rpg:5.5,apg:3.0,spg:1.5,bpg:0.8,rarity:"common",img:"1641707"},
+  {name:"Dyson Daniels",team:"ATL",ppg:13.0,rpg:4.5,apg:4.0,spg:2.3,bpg:0.5,rarity:"common",img:"1631099"},
+  {name:"Zaccharie Risacher",team:"ATL",ppg:12.0,rpg:4.0,apg:2.0,spg:0.7,bpg:0.6,rarity:"common",img:"1641717"},
+  {name:"Ben Simmons",team:"BKN",ppg:9.0,rpg:6.5,apg:6.5,spg:1.3,bpg:0.5,rarity:"common",img:"1627732"},
+  {name:"Nic Claxton",team:"BKN",ppg:11.0,rpg:8.5,apg:2.0,spg:0.8,bpg:2.5,rarity:"common",img:"1629651"},
+  {name:"Wendell Carter Jr.",team:"ORL",ppg:12.0,rpg:9.2,apg:2.5,spg:0.8,bpg:1.2,rarity:"common",img:"1629028"},
+  {name:"Robert Williams III",team:"POR",ppg:9.5,rpg:9.0,apg:1.5,spg:0.8,bpg:2.0,rarity:"common",img:"1629057"},
+  {name:"Moritz Wagner",team:"ORL",ppg:13.5,rpg:5.5,apg:1.8,spg:0.5,bpg:0.7,rarity:"common",img:"1629021"},
+  {name:"Ivica Zubac",team:"LAC",ppg:12.5,rpg:10.0,apg:2.0,spg:0.6,bpg:1.5,rarity:"common",img:"1627826"},
+  {name:"Jonas Valanciunas",team:"NOP",ppg:14.0,rpg:11.8,apg:2.2,spg:0.5,bpg:1.0,rarity:"common",img:"202685"},
+  {name:"Rudy Gay",team:"UTA",ppg:9.5,rpg:4.5,apg:1.8,spg:0.8,bpg:0.5,rarity:"common",img:"200762"},
+  {name:"Gary Trent Jr.",team:"TOR",ppg:14.5,rpg:2.5,apg:2.0,spg:1.0,bpg:0.2,rarity:"common",img:"1629055"},
+  {name:"RJ Barrett",team:"TOR",ppg:20.0,rpg:5.5,apg:4.0,spg:1.0,bpg:0.4,rarity:"common",img:"1629628"},
+  {name:"Precious Achiuwa",team:"TOR",ppg:12.0,rpg:7.5,apg:1.5,spg:0.7,bpg:1.0,rarity:"common",img:"1630173"},
+  {name:"Moses Moody",team:"GSW",ppg:12.5,rpg:3.5,apg:2.0,spg:0.8,bpg:0.3,rarity:"common",img:"1630541"},
+  {name:"Gradey Dick",team:"TOR",ppg:11.5,rpg:3.2,apg:2.0,spg:0.5,bpg:0.3,rarity:"common",img:"1641709"},
+  {name:"Kyle Anderson",team:"MIN",ppg:8.5,rpg:5.2,apg:4.5,spg:1.0,bpg:0.5,rarity:"common",img:"203937"},
+  {name:"Ochai Agbaji",team:"TOR",ppg:10.0,rpg:3.5,apg:1.5,spg:0.7,bpg:0.3,rarity:"common",img:"1631112"},
+  {name:"Kris Dunn",team:"ATL",ppg:9.5,rpg:3.5,apg:5.8,spg:2.0,bpg:0.3,rarity:"common",img:"1627739"},
+  {name:"Kevon Looney",team:"GSW",ppg:7.0,rpg:8.0,apg:2.5,spg:0.6,bpg:0.5,rarity:"common",img:"1626172"},
+  {name:"Alex Sarr",team:"WAS",ppg:14.0,rpg:7.0,apg:2.5,spg:0.8,bpg:2.5,rarity:"common",img:null},
+  {name:"Bilal Coulibaly",team:"WAS",ppg:13.0,rpg:5.0,apg:3.5,spg:1.5,bpg:0.8,rarity:"common",img:null},
+  {name:"Donovan Clingan",team:"POR",ppg:12.0,rpg:9.5,apg:2.0,spg:0.5,bpg:2.8,rarity:"common",img:null},
+  {name:"Reed Sheppard",team:"HOU",ppg:13.5,rpg:3.5,apg:4.5,spg:1.5,bpg:0.3,rarity:"common",img:null},
+  {name:"Dalton Knecht",team:"LAL",ppg:11.0,rpg:3.5,apg:1.5,spg:0.6,bpg:0.3,rarity:"common",img:null},
+]},
+
+"2022-23": { label:"2022-23", players:[
+  {name:"Joel Embiid",team:"PHI",ppg:33.1,rpg:10.2,apg:4.2,spg:1.0,bpg:1.7,rarity:"legendary",img:"203954"},
+  {name:"Luka Dončić",team:"DAL",ppg:32.4,rpg:8.6,apg:8.0,spg:1.4,bpg:0.5,rarity:"legendary",img:"1629029"},
+  {name:"Shai Gilgeous-Alexander",team:"OKC",ppg:31.4,rpg:5.5,apg:6.2,spg:2.0,bpg:0.9,rarity:"legendary",img:"1628983"},
+  {name:"Damian Lillard",team:"POR",ppg:32.2,rpg:4.8,apg:7.3,spg:0.9,bpg:0.3,rarity:"legendary",img:"203081"},
+  {name:"Jayson Tatum",team:"BOS",ppg:30.1,rpg:8.8,apg:4.6,spg:1.1,bpg:0.7,rarity:"epic",img:"1628369"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:31.1,rpg:11.8,apg:5.7,spg:0.8,bpg:0.8,rarity:"epic",img:"203507"},
+  {name:"Stephen Curry",team:"GSW",ppg:29.4,rpg:6.1,apg:6.3,spg:0.9,bpg:0.4,rarity:"epic",img:"201939"},
+  {name:"Kevin Durant",team:"BKN",ppg:29.7,rpg:6.7,apg:5.3,spg:0.8,bpg:1.4,rarity:"epic",img:"201142"},
+  {name:"LeBron James",team:"LAL",ppg:28.9,rpg:8.3,apg:6.8,spg:0.9,bpg:0.6,rarity:"epic",img:"2544"},
+  {name:"Nikola Jokic",team:"DEN",ppg:24.5,rpg:11.8,apg:9.8,spg:1.3,bpg:0.7,rarity:"epic",img:"203999"},
+  {name:"Devin Booker",team:"PHX",ppg:27.8,rpg:4.7,apg:6.9,spg:0.8,bpg:0.5,rarity:"epic",img:"1626164"},
+  {name:"Donovan Mitchell",team:"CLE",ppg:28.1,rpg:4.4,apg:4.4,spg:1.5,bpg:0.4,rarity:"epic",img:"1628378"},
+  {name:"Kyrie Irving",team:"DAL",ppg:27.1,rpg:5.3,apg:5.5,spg:1.3,bpg:0.4,rarity:"rare",img:"202681"},
+  {name:"Kawhi Leonard",team:"LAC",ppg:23.8,rpg:6.5,apg:3.9,spg:1.6,bpg:0.4,rarity:"rare",img:"202695"},
+  {name:"Ja Morant",team:"MEM",ppg:26.2,rpg:5.9,apg:8.1,spg:1.1,bpg:0.3,rarity:"rare",img:"1629630"},
+  {name:"Trae Young",team:"ATL",ppg:26.2,rpg:3.0,apg:10.2,spg:1.1,bpg:0.1,rarity:"rare",img:"1629027"},
+  {name:"Anthony Davis",team:"LAL",ppg:25.9,rpg:12.5,apg:2.6,spg:1.1,bpg:2.0,rarity:"rare",img:"203076"},
+  {name:"Paul George",team:"LAC",ppg:23.8,rpg:6.6,apg:5.3,spg:1.5,bpg:0.6,rarity:"rare",img:"202331"},
+  {name:"Jaylen Brown",team:"BOS",ppg:26.6,rpg:6.9,apg:3.5,spg:1.1,bpg:0.4,rarity:"rare",img:"1627759"},
+  {name:"Jalen Brunson",team:"NYK",ppg:24.0,rpg:3.5,apg:6.2,spg:0.9,bpg:0.2,rarity:"rare",img:"1628973"},
+  {name:"Karl-Anthony Towns",team:"MIN",ppg:20.8,rpg:8.1,apg:4.8,spg:0.7,bpg:0.5,rarity:"rare",img:"1626157"},
+  {name:"Anthony Edwards",team:"MIN",ppg:24.6,rpg:5.8,apg:4.4,spg:1.5,bpg:0.6,rarity:"rare",img:"1630162"},
+  {name:"Lauri Markkanen",team:"UTA",ppg:25.6,rpg:8.6,apg:1.9,spg:0.5,bpg:0.8,rarity:"rare",img:"1628374"},
+  {name:"De'Aaron Fox",team:"SAC",ppg:25.2,rpg:4.3,apg:6.1,spg:1.3,bpg:0.4,rarity:"rare",img:"1628368"},
+  {name:"Domantas Sabonis",team:"SAC",ppg:19.1,rpg:12.3,apg:7.3,spg:1.1,bpg:0.4,rarity:"rare",img:"1627734"},
+  {name:"Tyrese Haliburton",team:"IND",ppg:20.7,rpg:4.0,apg:10.4,spg:1.6,bpg:0.3,rarity:"rare",img:"1630169"},
+  {name:"Tyrese Maxey",team:"PHI",ppg:20.3,rpg:3.2,apg:4.3,spg:1.0,bpg:0.4,rarity:"rare",img:"1630178"},
+  {name:"Scottie Barnes",team:"TOR",ppg:15.3,rpg:6.6,apg:4.8,spg:1.1,bpg:0.8,rarity:"rare",img:"1630567"},
+  {name:"Paolo Banchero",team:"ORL",ppg:20.0,rpg:6.9,apg:3.7,spg:0.7,bpg:0.5,rarity:"rare",img:"1631094"},
+  {name:"Franz Wagner",team:"ORL",ppg:18.6,rpg:4.1,apg:3.5,spg:1.0,bpg:0.3,rarity:"rare",img:"1630532"},
+  {name:"Jimmy Butler",team:"MIA",ppg:22.9,rpg:5.8,apg:5.3,spg:1.8,bpg:0.3,rarity:"rare",img:"202710"},
+  {name:"Bam Adebayo",team:"MIA",ppg:20.4,rpg:10.0,apg:3.2,spg:1.2,bpg:0.8,rarity:"rare",img:"1628389"},
+  {name:"Jaren Jackson Jr.",team:"MEM",ppg:18.6,rpg:3.8,apg:1.1,spg:0.8,bpg:3.0,rarity:"rare",img:"1628991"},
+  {name:"Darius Garland",team:"CLE",ppg:21.7,rpg:2.7,apg:7.8,spg:1.3,bpg:0.2,rarity:"rare",img:"1629636"},
+  {name:"Pascal Siakam",team:"TOR",ppg:24.2,rpg:7.8,apg:5.8,spg:1.1,bpg:0.6,rarity:"rare",img:"1627783"},
+  {name:"DeMar DeRozan",team:"CHI",ppg:24.5,rpg:4.3,apg:5.1,spg:0.9,bpg:0.3,rarity:"rare",img:"201942"},
+  {name:"Bradley Beal",team:"WAS",ppg:23.2,rpg:4.0,apg:5.4,spg:1.0,bpg:0.4,rarity:"rare",img:"203078"},
+  {name:"Zach LaVine",team:"CHI",ppg:24.8,rpg:4.5,apg:4.5,spg:0.8,bpg:0.5,rarity:"rare",img:"203897"},
+  {name:"Victor Oladipo",team:"MIA",ppg:13.5,rpg:4.0,apg:4.3,spg:1.5,bpg:0.4,rarity:"rare",img:"203506"},
+  {name:"LaMelo Ball",team:"CHA",ppg:23.3,rpg:6.4,apg:8.4,spg:1.6,bpg:0.3,rarity:"rare",img:"1630163"},
+  {name:"Jalen Williams",team:"OKC",ppg:20.8,rpg:4.4,apg:4.5,spg:1.4,bpg:0.6,rarity:"rare",img:"1631108"},
+  {name:"Chet Holmgren",team:"OKC",ppg:16.5,rpg:7.9,apg:2.4,spg:0.9,bpg:2.3,rarity:"common",img:"1631096"},
+  {name:"Evan Mobley",team:"CLE",ppg:16.2,rpg:9.0,apg:2.7,spg:1.2,bpg:1.7,rarity:"common",img:"1630596"},
+  {name:"Cade Cunningham",team:"DET",ppg:19.9,rpg:4.4,apg:6.2,spg:0.9,bpg:0.5,rarity:"common",img:"1630595"},
+  {name:"Klay Thompson",team:"GSW",ppg:21.9,rpg:4.1,apg:2.4,spg:0.7,bpg:0.4,rarity:"common",img:"202691"},
+  {name:"Draymond Green",team:"GSW",ppg:8.5,rpg:7.3,apg:6.8,spg:1.5,bpg:0.8,rarity:"common",img:"203110"},
+  {name:"Andrew Wiggins",team:"GSW",ppg:17.1,rpg:5.0,apg:2.5,spg:1.0,bpg:0.8,rarity:"common",img:"203952"},
+  {name:"Jonathan Kuminga",team:"GSW",ppg:9.7,rpg:3.5,apg:1.6,spg:0.7,bpg:0.5,rarity:"common",img:"1630228"},
+  {name:"Khris Middleton",team:"MIL",ppg:15.1,rpg:4.2,apg:5.0,spg:0.9,bpg:0.2,rarity:"common",img:"203114"},
+  {name:"Brook Lopez",team:"MIL",ppg:12.8,rpg:5.1,apg:2.1,spg:0.7,bpg:2.8,rarity:"common",img:"201572"},
+  {name:"Bobby Portis",team:"MIL",ppg:14.6,rpg:9.1,apg:1.9,spg:0.8,bpg:0.4,rarity:"common",img:"1626171"},
+  {name:"Jrue Holiday",team:"MIL",ppg:19.3,rpg:5.8,apg:7.4,spg:1.7,bpg:0.3,rarity:"common",img:"203200"},
+  {name:"Kristaps Porzingis",team:"WAS",ppg:23.2,rpg:8.4,apg:2.3,spg:0.7,bpg:1.5,rarity:"common",img:"204001"},
+  {name:"Marcus Smart",team:"MEM",ppg:12.0,rpg:3.6,apg:7.4,spg:2.0,bpg:0.3,rarity:"common",img:"203935"},
+  {name:"Steven Adams",team:"MEM",ppg:7.7,rpg:10.0,apg:3.1,spg:0.8,bpg:0.6,rarity:"common",img:"203500"},
+  {name:"Desmond Bane",team:"MEM",ppg:21.5,rpg:4.4,apg:4.4,spg:0.9,bpg:0.4,rarity:"common",img:"1630217"},
+  {name:"Rudy Gobert",team:"MIN",ppg:13.4,rpg:11.5,apg:1.5,spg:0.8,bpg:1.4,rarity:"common",img:"203497"},
+  {name:"Mike Conley",team:"MIN",ppg:11.0,rpg:2.7,apg:7.1,spg:1.0,bpg:0.2,rarity:"common",img:"201144"},
+  {name:"Jordan Clarkson",team:"UTA",ppg:20.0,rpg:3.7,apg:3.9,spg:0.8,bpg:0.3,rarity:"common",img:"203903"},
+  {name:"Collin Sexton",team:"UTA",ppg:14.3,rpg:2.3,apg:2.6,spg:0.8,bpg:0.2,rarity:"common",img:"1629012"},
+  {name:"Bogdan Bogdanovic",team:"ATL",ppg:17.7,rpg:3.5,apg:4.4,spg:0.8,bpg:0.3,rarity:"common",img:"203992"},
+  {name:"Clint Capela",team:"ATL",ppg:14.0,rpg:11.8,apg:1.4,spg:0.8,bpg:1.0,rarity:"common",img:"203991"},
+  {name:"Onyeka Okongwu",team:"ATL",ppg:12.4,rpg:7.8,apg:1.6,spg:1.3,bpg:1.6,rarity:"common",img:"1630168"},
+  {name:"Alperen Sengun",team:"HOU",ppg:14.4,rpg:9.4,apg:3.8,spg:1.0,bpg:0.8,rarity:"common",img:"1630578"},
+  {name:"Jabari Smith Jr.",team:"HOU",ppg:12.5,rpg:6.2,apg:1.6,spg:0.9,bpg:0.7,rarity:"common",img:"1631095"},
+  {name:"Jalen Green",team:"HOU",ppg:22.1,rpg:4.2,apg:3.8,spg:0.7,bpg:0.4,rarity:"common",img:"1630224"},
+  {name:"Chris Paul",team:"PHX",ppg:13.9,rpg:4.3,apg:8.9,spg:1.5,bpg:0.3,rarity:"common",img:"101108"},
+  {name:"Deandre Ayton",team:"PHX",ppg:18.0,rpg:10.0,apg:1.7,spg:0.7,bpg:0.7,rarity:"common",img:"1629028"},
+  {name:"Anfernee Simons",team:"POR",ppg:21.1,rpg:3.8,apg:4.3,spg:0.8,bpg:0.2,rarity:"common",img:"1629014"},
+  {name:"Jerami Grant",team:"POR",ppg:20.5,rpg:3.5,apg:2.5,spg:1.1,bpg:0.8,rarity:"common",img:"203924"},
+  {name:"Norman Powell",team:"LAC",ppg:17.4,rpg:2.8,apg:1.8,spg:1.1,bpg:0.3,rarity:"common",img:"1626181"},
+  {name:"Ivica Zubac",team:"LAC",ppg:12.3,rpg:9.3,apg:1.6,spg:0.5,bpg:1.1,rarity:"common",img:"1627826"},
+  {name:"Nic Claxton",team:"BKN",ppg:12.5,rpg:8.8,apg:2.4,spg:1.1,bpg:2.7,rarity:"common",img:"1629651"},
+  {name:"Ben Simmons",team:"BKN",ppg:6.9,rpg:6.3,apg:6.1,spg:1.5,bpg:0.6,rarity:"common",img:"1627732"},
+  {name:"Mikal Bridges",team:"BKN",ppg:26.1,rpg:4.5,apg:3.6,spg:1.1,bpg:0.5,rarity:"rare",img:"1628969"},
+  {name:"OG Anunoby",team:"TOR",ppg:16.8,rpg:5.5,apg:2.3,spg:1.5,bpg:0.6,rarity:"common",img:"1628384"},
+  {name:"Fred VanVleet",team:"TOR",ppg:19.3,rpg:4.1,apg:7.2,spg:1.8,bpg:0.3,rarity:"common",img:"1627832"},
+  {name:"Dejounte Murray",team:"ATL",ppg:20.5,rpg:5.3,apg:6.1,spg:1.5,bpg:0.4,rarity:"common",img:"1627749"},
+  {name:"Harrison Barnes",team:"SAC",ppg:15.3,rpg:5.5,apg:2.4,spg:0.7,bpg:0.4,rarity:"common",img:"203490"},
+  {name:"Kevin Huerter",team:"SAC",ppg:15.8,rpg:4.4,apg:3.7,spg:0.9,bpg:0.3,rarity:"common",img:"1628989"},
+  {name:"Spencer Dinwiddie",team:"DAL",ppg:14.6,rpg:3.6,apg:5.8,spg:0.7,bpg:0.2,rarity:"common",img:"203915"},
+  {name:"Christian Wood",team:"DAL",ppg:16.6,rpg:7.3,apg:1.8,spg:0.5,bpg:0.9,rarity:"common",img:"1626174"},
+  {name:"Josh Green",team:"DAL",ppg:9.5,rpg:4.2,apg:2.5,spg:1.2,bpg:0.4,rarity:"common",img:"1630182"},
+  {name:"Immanuel Quickley",team:"NYK",ppg:14.9,rpg:3.5,apg:3.3,spg:0.8,bpg:0.3,rarity:"common",img:"1630193"},
+  {name:"RJ Barrett",team:"NYK",ppg:21.5,rpg:5.3,apg:3.9,spg:0.8,bpg:0.6,rarity:"common",img:"1629628"},
+  {name:"Julius Randle",team:"NYK",ppg:25.1,rpg:10.0,apg:4.1,spg:0.8,bpg:0.3,rarity:"rare",img:"203994"},
+  {name:"Miles Bridges",team:"CHA",ppg:14.4,rpg:5.2,apg:2.7,spg:0.8,bpg:0.4,rarity:"common",img:"1628970"},
+  {name:"Jordan Nwora",team:"MIL",ppg:8.5,rpg:3.5,apg:1.2,spg:0.5,bpg:0.3,rarity:"common",img:"1629638"},
+  {name:"Aaron Gordon",team:"DEN",ppg:16.2,rpg:6.8,apg:4.2,spg:1.0,bpg:0.5,rarity:"common",img:"203932"},
+  {name:"Michael Porter Jr.",team:"DEN",ppg:13.4,rpg:6.9,apg:1.4,spg:0.5,bpg:0.6,rarity:"common",img:"1629008"},
+  {name:"Bruce Brown",team:"DEN",ppg:11.0,rpg:4.7,apg:3.4,spg:0.9,bpg:0.4,rarity:"common",img:"1628971"},
+]},
+
+"2017-18": { label:"2017-18", players:[
+  {name:"James Harden",team:"HOU",ppg:30.4,rpg:5.4,apg:8.8,spg:1.8,bpg:0.7,rarity:"legendary",img:"201935"},
+  {name:"LeBron James",team:"CLE",ppg:27.5,rpg:8.6,apg:9.1,spg:1.4,bpg:0.9,rarity:"legendary",img:"2544"},
+  {name:"Anthony Davis",team:"NOP",ppg:28.1,rpg:11.1,apg:2.3,spg:1.5,bpg:2.6,rarity:"legendary",img:"203076"},
+  {name:"Stephen Curry",team:"GSW",ppg:26.4,rpg:5.1,apg:6.1,spg:1.6,bpg:0.2,rarity:"legendary",img:"201939"},
+  {name:"Kevin Durant",team:"GSW",ppg:26.4,rpg:6.8,apg:5.4,spg:0.7,bpg:1.8,rarity:"epic",img:"201142"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:26.9,rpg:10.0,apg:4.8,spg:1.5,bpg:1.9,rarity:"epic",img:"203507"},
+  {name:"Russell Westbrook",team:"OKC",ppg:25.4,rpg:10.1,apg:10.3,spg:1.7,bpg:0.4,rarity:"epic",img:"200794"},
+  {name:"Damian Lillard",team:"POR",ppg:26.9,rpg:4.6,apg:6.6,spg:1.1,bpg:0.4,rarity:"epic",img:"203081"},
+  {name:"Karl-Anthony Towns",team:"MIN",ppg:21.3,rpg:12.3,apg:2.4,spg:0.7,bpg:1.4,rarity:"epic",img:"1626157"},
+  {name:"Kyrie Irving",team:"BOS",ppg:24.4,rpg:3.8,apg:5.1,spg:1.2,bpg:0.4,rarity:"epic",img:"202681"},
+  {name:"DeMar DeRozan",team:"TOR",ppg:23.0,rpg:3.9,apg:5.2,spg:1.1,bpg:0.3,rarity:"epic",img:"201942"},
+  {name:"Joel Embiid",team:"PHI",ppg:22.9,rpg:11.0,apg:3.2,spg:0.6,bpg:1.8,rarity:"epic",img:"203954"},
+  {name:"Paul George",team:"OKC",ppg:21.9,rpg:5.7,apg:3.3,spg:2.1,bpg:0.4,rarity:"rare",img:"202331"},
+  {name:"Jimmy Butler",team:"MIN",ppg:22.2,rpg:5.3,apg:4.9,spg:2.0,bpg:0.4,rarity:"rare",img:"202710"},
+  {name:"Klay Thompson",team:"GSW",ppg:20.0,rpg:3.8,apg:2.5,spg:0.8,bpg:0.5,rarity:"rare",img:"202691"},
+  {name:"Victor Oladipo",team:"IND",ppg:23.1,rpg:5.2,apg:4.3,spg:2.4,bpg:0.8,rarity:"rare",img:"203506"},
+  {name:"Kristaps Porzingis",team:"NYK",ppg:22.7,rpg:6.2,apg:1.2,spg:0.8,bpg:2.4,rarity:"rare",img:"204001"},
+  {name:"Blake Griffin",team:"DET",ppg:21.4,rpg:7.4,apg:4.9,spg:0.9,bpg:0.4,rarity:"rare",img:"201933"},
+  {name:"Nikola Jokic",team:"DEN",ppg:18.5,rpg:10.7,apg:6.1,spg:1.2,bpg:0.8,rarity:"rare",img:"203999"},
+  {name:"Chris Paul",team:"HOU",ppg:18.6,rpg:5.4,apg:9.2,spg:2.0,bpg:0.3,rarity:"rare",img:"101108"},
+  {name:"Kawhi Leonard",team:"SAS",ppg:16.2,rpg:4.7,apg:2.3,spg:1.8,bpg:0.6,rarity:"rare",img:"202695"},
+  {name:"LaMarcus Aldridge",team:"SAS",ppg:23.1,rpg:8.5,apg:2.3,spg:0.7,bpg:1.3,rarity:"rare",img:"200746"},
+  {name:"Kemba Walker",team:"CHA",ppg:22.1,rpg:3.8,apg:5.8,spg:1.4,bpg:0.4,rarity:"rare",img:"202689"},
+  {name:"Draymond Green",team:"GSW",ppg:11.0,rpg:7.9,apg:7.3,spg:1.6,bpg:1.4,rarity:"rare",img:"203110"},
+  {name:"Jayson Tatum",team:"BOS",ppg:13.9,rpg:5.0,apg:1.6,spg:0.9,bpg:0.9,rarity:"rare",img:"1628369"},
+  {name:"Jaylen Brown",team:"BOS",ppg:14.5,rpg:4.4,apg:1.6,spg:1.0,bpg:0.3,rarity:"rare",img:"1627759"},
+  {name:"Ben Simmons",team:"PHI",ppg:15.8,rpg:8.1,apg:8.2,spg:1.7,bpg:0.9,rarity:"rare",img:"1627732"},
+  {name:"Rudy Gobert",team:"UTA",ppg:14.3,rpg:12.0,apg:1.5,spg:0.8,bpg:2.3,rarity:"rare",img:"203497"},
+  {name:"Donovan Mitchell",team:"UTA",ppg:20.5,rpg:3.7,apg:3.7,spg:1.5,bpg:0.4,rarity:"rare",img:"1628378"},
+  {name:"Kyle Lowry",team:"TOR",ppg:16.2,rpg:4.8,apg:6.9,spg:1.5,bpg:0.3,rarity:"rare",img:"200768"},
+  {name:"Khris Middleton",team:"MIL",ppg:20.1,rpg:6.0,apg:4.4,spg:1.3,bpg:0.3,rarity:"rare",img:"203114"},
+  {name:"John Wall",team:"WAS",ppg:19.4,rpg:4.5,apg:9.5,spg:2.0,bpg:0.6,rarity:"rare",img:"202322"},
+  {name:"Bradley Beal",team:"WAS",ppg:23.1,rpg:4.2,apg:4.4,spg:1.4,bpg:0.4,rarity:"rare",img:"203078"},
+  {name:"Devin Booker",team:"PHX",ppg:24.9,rpg:3.8,apg:4.7,spg:0.9,bpg:0.4,rarity:"rare",img:"1626164"},
+  {name:"De'Aaron Fox",team:"SAC",ppg:11.6,rpg:3.1,apg:4.4,spg:1.5,bpg:0.2,rarity:"common",img:"1628368"},
+  {name:"Buddy Hield",team:"SAC",ppg:13.5,rpg:4.5,apg:2.6,spg:1.2,bpg:0.2,rarity:"common",img:"1626169"},
+  {name:"Mike Conley",team:"MEM",ppg:16.2,rpg:3.5,apg:5.5,spg:1.9,bpg:0.4,rarity:"common",img:"201144"},
+  {name:"Marc Gasol",team:"MEM",ppg:19.5,rpg:8.2,apg:4.6,spg:1.1,bpg:1.4,rarity:"common",img:"201188"},
+  {name:"Zach Randolph",team:"SAC",ppg:14.5,rpg:8.7,apg:2.2,spg:0.7,bpg:0.2,rarity:"common",img:"102321"},
+  {name:"DeMarcus Cousins",team:"NOP",ppg:25.2,rpg:12.9,apg:5.4,spg:1.3,bpg:1.6,rarity:"rare",img:"202326"},
+  {name:"Jrue Holiday",team:"NOP",ppg:23.0,rpg:5.3,apg:7.4,spg:1.6,bpg:0.5,rarity:"rare",img:"203200"},
+  {name:"Rajon Rondo",team:"NOP",ppg:8.7,rpg:4.8,apg:8.3,spg:1.4,bpg:0.2,rarity:"common",img:null},
+  {name:"Al Horford",team:"BOS",ppg:13.0,rpg:6.7,apg:5.0,spg:0.9,bpg:1.3,rarity:"common",img:"201143"},
+  {name:"Marcus Smart",team:"BOS",ppg:10.2,rpg:4.2,apg:4.4,spg:1.7,bpg:0.4,rarity:"common",img:"203935"},
+  {name:"Isaiah Thomas",team:"CLE",ppg:14.7,rpg:2.4,apg:5.4,spg:0.7,bpg:0.1,rarity:"common",img:null},
+  {name:"Kevin Love",team:"CLE",ppg:17.6,rpg:9.3,apg:1.7,spg:0.7,bpg:0.5,rarity:"common",img:"201567"},
+  {name:"Tristan Thompson",team:"CLE",ppg:13.7,rpg:10.1,apg:1.4,spg:0.5,bpg:0.5,rarity:"common",img:"202684"},
+  {name:"J.R. Smith",team:"CLE",ppg:8.3,rpg:2.6,apg:1.4,spg:0.6,bpg:0.1,rarity:"common",img:"2747"},
+  {name:"Clint Capela",team:"HOU",ppg:13.9,rpg:10.8,apg:1.0,spg:0.8,bpg:1.9,rarity:"common",img:"203991"},
+  {name:"Eric Gordon",team:"HOU",ppg:16.2,rpg:2.8,apg:2.5,spg:0.9,bpg:0.2,rarity:"common",img:"201569"},
+  {name:"Trevor Ariza",team:"HOU",ppg:11.9,rpg:4.5,apg:2.0,spg:1.7,bpg:0.5,rarity:"common",img:"2397"},
+  {name:"Dwight Howard",team:"HOU",ppg:12.5,rpg:12.3,apg:1.4,spg:0.7,bpg:1.2,rarity:"common",img:"2730"},
+  {name:"Manu Ginobili",team:"SAS",ppg:10.7,rpg:3.4,apg:4.1,spg:1.3,bpg:0.2,rarity:"common",img:"1938"},
+  {name:"Tony Parker",team:"SAS",ppg:8.8,rpg:2.7,apg:4.4,spg:0.5,bpg:0.1,rarity:"common",img:"2225"},
+  {name:"Danny Green",team:"SAS",ppg:10.6,rpg:3.7,apg:2.3,spg:1.6,bpg:0.4,rarity:"common",img:"202331"},
+  {name:"Pau Gasol",team:"SAS",ppg:12.4,rpg:7.8,apg:3.0,spg:0.5,bpg:1.5,rarity:"common",img:"2200"},
+  {name:"Ricky Rubio",team:"UTA",ppg:13.1,rpg:3.9,apg:9.4,spg:1.8,bpg:0.2,rarity:"common",img:"201937"},
+  {name:"Joe Ingles",team:"UTA",ppg:12.1,rpg:3.7,apg:4.3,spg:1.2,bpg:0.2,rarity:"common",img:null},
+  {name:"Thaddeus Young",team:"IND",ppg:12.0,rpg:7.4,apg:2.6,spg:2.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Myles Turner",team:"IND",ppg:12.7,rpg:6.4,apg:1.4,spg:0.9,bpg:2.2,rarity:"common",img:"1626167"},
+  {name:"Nerlens Noel",team:"OKC",ppg:5.9,rpg:6.7,apg:1.4,spg:1.0,bpg:2.0,rarity:"common",img:null},
+  {name:"Andre Roberson",team:"OKC",ppg:5.8,rpg:5.3,apg:1.5,spg:1.3,bpg:0.5,rarity:"common",img:"203460"},
+  {name:"Otto Porter Jr.",team:"WAS",ppg:13.4,rpg:6.7,apg:2.4,spg:1.3,bpg:0.5,rarity:"common",img:"203490"},
+  {name:"Thomas Bryant",team:"WAS",ppg:7.2,rpg:5.4,apg:0.9,spg:0.4,bpg:1.0,rarity:"common",img:null},
+  {name:"Nikola Mirotic",team:"CHI",ppg:16.0,rpg:6.8,apg:1.4,spg:0.7,bpg:0.7,rarity:"common",img:null},
+  {name:"Zach LaVine",team:"CHI",ppg:16.7,rpg:3.4,apg:3.0,spg:0.8,bpg:0.3,rarity:"common",img:"203897"},
+  {name:"Lauri Markkanen",team:"CHI",ppg:15.2,rpg:7.6,apg:0.9,spg:0.5,bpg:0.5,rarity:"common",img:"1628374"},
+  {name:"Kris Dunn",team:"CHI",ppg:8.4,rpg:4.2,apg:5.0,spg:2.0,bpg:0.4,rarity:"common",img:"1627739"},
+  {name:"Andrew Wiggins",team:"MIN",ppg:17.7,rpg:4.0,apg:2.2,spg:1.0,bpg:0.6,rarity:"common",img:"203952"},
+  {name:"Jeff Teague",team:"MIN",ppg:13.0,rpg:3.3,apg:7.7,spg:1.0,bpg:0.3,rarity:"common",img:null},
+  {name:"Dario Saric",team:"PHI",ppg:12.5,rpg:6.4,apg:2.4,spg:0.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Robert Covington",team:"PHI",ppg:13.2,rpg:6.0,apg:1.5,spg:1.9,bpg:0.9,rarity:"common",img:null},
+  {name:"Marquese Chriss",team:"PHX",ppg:10.9,rpg:5.8,apg:1.2,spg:0.7,bpg:0.9,rarity:"common",img:null},
+  {name:"TJ Warren",team:"PHX",ppg:18.9,rpg:5.0,apg:1.7,spg:0.7,bpg:0.5,rarity:"common",img:"203933"},
+  {name:"De'Angelo Russell",team:"BKN",ppg:15.5,rpg:3.3,apg:5.2,spg:1.0,bpg:0.2,rarity:"common",img:"1626156"},
+  {name:"Brook Lopez",team:"LAL",ppg:13.1,rpg:4.5,apg:1.8,spg:0.5,bpg:1.4,rarity:"common",img:"201572"},
+  {name:"Lonzo Ball",team:"LAL",ppg:10.2,rpg:6.9,apg:7.7,spg:1.8,bpg:0.8,rarity:"common",img:"1628366"},
+  {name:"Brandon Ingram",team:"LAL",ppg:16.1,rpg:5.3,apg:3.3,spg:0.7,bpg:0.5,rarity:"common",img:"1627742"},
+  {name:"Julius Randle",team:"LAL",ppg:16.1,rpg:8.0,apg:2.9,spg:0.8,bpg:0.4,rarity:"common",img:"203994"},
+  {name:"Kyle Kuzma",team:"LAL",ppg:13.7,rpg:6.3,apg:1.8,spg:0.5,bpg:0.4,rarity:"common",img:"1628398"},
+]},
+
+"2012-13": { label:"2012-13", players:[
+  {name:"LeBron James",team:"MIA",ppg:26.8,rpg:8.0,apg:7.3,spg:1.7,bpg:0.9,rarity:"legendary",img:"2544"},
+  {name:"Kevin Durant",team:"OKC",ppg:28.1,rpg:7.9,apg:4.6,spg:1.4,bpg:1.3,rarity:"legendary",img:"201142"},
+  {name:"Carmelo Anthony",team:"NYK",ppg:28.7,rpg:6.9,apg:2.6,spg:0.8,bpg:0.5,rarity:"legendary",img:"2546"},
+  {name:"Kobe Bryant",team:"LAL",ppg:27.3,rpg:5.6,apg:6.0,spg:1.4,bpg:0.3,rarity:"legendary",img:"977"},
+  {name:"Russell Westbrook",team:"OKC",ppg:23.2,rpg:5.2,apg:7.4,spg:1.8,bpg:0.3,rarity:"epic",img:"200794"},
+  {name:"Chris Paul",team:"LAC",ppg:16.9,rpg:3.7,apg:9.7,spg:2.4,bpg:0.1,rarity:"epic",img:"101108"},
+  {name:"James Harden",team:"HOU",ppg:25.9,rpg:4.9,apg:5.8,spg:1.8,bpg:0.5,rarity:"epic",img:"201935"},
+  {name:"Stephen Curry",team:"GSW",ppg:22.9,rpg:4.0,apg:6.9,spg:1.6,bpg:0.2,rarity:"epic",img:"201939"},
+  {name:"Dwyane Wade",team:"MIA",ppg:21.2,rpg:5.0,apg:5.1,spg:1.9,bpg:0.6,rarity:"epic",img:"2548"},
+  {name:"Kevin Garnett",team:"BKN",ppg:14.8,rpg:8.2,apg:3.7,spg:1.0,bpg:0.8,rarity:"epic",img:"708"},
+  {name:"Tony Parker",team:"SAS",ppg:20.3,rpg:3.5,apg:7.6,spg:1.1,bpg:0.1,rarity:"epic",img:"2225"},
+  {name:"Tim Duncan",team:"SAS",ppg:17.8,rpg:9.9,apg:2.7,spg:0.6,bpg:2.7,rarity:"epic",img:"1495"},
+  {name:"Kyrie Irving",team:"CLE",ppg:22.5,rpg:3.7,apg:5.9,spg:1.5,bpg:0.4,rarity:"rare",img:"202681"},
+  {name:"Paul George",team:"IND",ppg:17.4,rpg:7.6,apg:3.9,spg:1.9,bpg:0.4,rarity:"rare",img:"202331"},
+  {name:"Dirk Nowitzki",team:"DAL",ppg:21.8,rpg:6.8,apg:2.9,spg:0.8,bpg:0.7,rarity:"rare",img:"1717"},
+  {name:"Paul Pierce",team:"BOS",ppg:18.6,rpg:5.8,apg:4.5,spg:1.5,bpg:0.4,rarity:"rare",img:"1718"},
+  {name:"Dwight Howard",team:"LAL",ppg:17.1,rpg:12.4,apg:1.4,spg:0.9,bpg:2.4,rarity:"rare",img:"2730"},
+  {name:"Manu Ginobili",team:"SAS",ppg:14.4,rpg:4.5,apg:4.2,spg:1.5,bpg:0.2,rarity:"rare",img:"1938"},
+  {name:"Kawhi Leonard",team:"SAS",ppg:11.9,rpg:6.0,apg:1.4,spg:1.6,bpg:0.6,rarity:"rare",img:"202695"},
+  {name:"Marc Gasol",team:"MEM",ppg:14.9,rpg:7.8,apg:3.8,spg:0.7,bpg:1.8,rarity:"rare",img:"201188"},
+  {name:"Zach Randolph",team:"MEM",ppg:15.3,rpg:11.2,apg:2.2,spg:0.6,bpg:0.4,rarity:"rare",img:"102321"},
+  {name:"Damian Lillard",team:"POR",ppg:19.0,rpg:3.1,apg:6.5,spg:0.9,bpg:0.3,rarity:"rare",img:"203081"},
+  {name:"Serge Ibaka",team:"OKC",ppg:13.2,rpg:8.8,apg:0.6,spg:0.8,bpg:3.0,rarity:"rare",img:"201586"},
+  {name:"Blake Griffin",team:"LAC",ppg:18.0,rpg:8.3,apg:3.9,spg:0.7,bpg:0.4,rarity:"rare",img:"201933"},
+  {name:"DeAndre Jordan",team:"LAC",ppg:9.4,rpg:12.5,apg:0.8,spg:0.5,bpg:2.8,rarity:"rare",img:"201599"},
+  {name:"LaMarcus Aldridge",team:"POR",ppg:21.0,rpg:11.1,apg:2.0,spg:0.7,bpg:1.2,rarity:"rare",img:"200746"},
+  {name:"Nikola Vucevic",team:"ORL",ppg:12.0,rpg:11.0,apg:1.5,spg:0.5,bpg:0.5,rarity:"rare",img:null},
+  {name:"Jrue Holiday",team:"PHI",ppg:17.7,rpg:4.2,apg:8.0,spg:1.7,bpg:0.5,rarity:"rare",img:"203200"},
+  {name:"Mike Conley",team:"MEM",ppg:15.0,rpg:3.4,apg:6.1,spg:1.8,bpg:0.3,rarity:"rare",img:"201144"},
+  {name:"David Lee",team:"GSW",ppg:18.5,rpg:11.2,apg:3.0,spg:0.8,bpg:0.3,rarity:"rare",img:null},
+  {name:"Kevin Love",team:"MIN",ppg:18.3,rpg:14.0,apg:2.3,spg:0.6,bpg:0.5,rarity:"rare",img:"201567"},
+  {name:"Ricky Rubio",team:"MIN",ppg:9.0,rpg:4.0,apg:8.5,spg:2.1,bpg:0.2,rarity:"common",img:"201937"},
+  {name:"Derrick Rose",team:"CHI",ppg:0.0,rpg:0.0,apg:0.0,spg:0.0,bpg:0.0,rarity:"common",img:"201565"},
+  {name:"Luol Deng",team:"CHI",ppg:16.5,rpg:6.8,apg:3.1,spg:1.7,bpg:0.5,rarity:"common",img:"2736"},
+  {name:"Joakim Noah",team:"CHI",ppg:11.1,rpg:11.0,apg:4.1,spg:0.9,bpg:1.4,rarity:"common",img:"201980"},
+  {name:"Jimmy Butler",team:"CHI",ppg:8.6,rpg:2.6,apg:1.3,spg:0.9,bpg:0.2,rarity:"common",img:"202710"},
+  {name:"Carlos Boozer",team:"CHI",ppg:13.0,rpg:9.1,apg:2.0,spg:0.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Al Horford",team:"ATL",ppg:15.9,rpg:9.1,apg:2.7,spg:0.8,bpg:1.5,rarity:"common",img:"201143"},
+  {name:"Paul Millsap",team:"ATL",ppg:17.0,rpg:8.6,apg:2.5,spg:1.3,bpg:1.0,rarity:"common",img:"200794"},
+  {name:"Josh Smith",team:"ATL",ppg:14.5,rpg:8.5,apg:3.5,spg:1.3,bpg:1.5,rarity:"common",img:null},
+  {name:"Jeff Teague",team:"ATL",ppg:14.4,rpg:3.2,apg:7.2,spg:1.6,bpg:0.2,rarity:"common",img:null},
+  {name:"Rajon Rondo",team:"BOS",ppg:13.7,rpg:5.6,apg:11.1,spg:1.8,bpg:0.1,rarity:"common",img:null},
+  {name:"Courtney Lee",team:"MEM",ppg:11.7,rpg:3.2,apg:2.4,spg:0.9,bpg:0.5,rarity:"common",img:null},
+  {name:"Klay Thompson",team:"GSW",ppg:16.6,rpg:3.7,apg:2.5,spg:1.2,bpg:0.5,rarity:"common",img:"202691"},
+  {name:"Draymond Green",team:"GSW",ppg:3.2,rpg:3.6,apg:0.9,spg:0.5,bpg:0.3,rarity:"common",img:"203110"},
+  {name:"Brook Lopez",team:"NJN",ppg:19.4,rpg:7.8,apg:1.6,spg:0.5,bpg:1.5,rarity:"common",img:"201572"},
+  {name:"Deron Williams",team:"NJN",ppg:19.0,rpg:4.2,apg:7.7,spg:0.7,bpg:0.3,rarity:"common",img:"2733"},
+  {name:"Joe Johnson",team:"NJN",ppg:14.9,rpg:4.0,apg:3.4,spg:0.8,bpg:0.3,rarity:"common",img:"2209"},
+  {name:"Vince Carter",team:"DAL",ppg:12.8,rpg:3.6,apg:1.8,spg:0.7,bpg:0.5,rarity:"common",img:"1713"},
+  {name:"Shawn Marion",team:"DAL",ppg:13.6,rpg:7.5,apg:2.0,spg:1.4,bpg:0.7,rarity:"common",img:null},
+  {name:"Ty Lawson",team:"DEN",ppg:16.7,rpg:3.3,apg:9.6,spg:1.5,bpg:0.2,rarity:"common",img:"201951"},
+  {name:"Danilo Gallinari",team:"DEN",ppg:16.2,rpg:5.9,apg:2.5,spg:0.8,bpg:0.3,rarity:"common",img:"201706"},
+  {name:"Kenneth Faried",team:"DEN",ppg:11.4,rpg:8.3,apg:0.7,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Andre Iguodala",team:"DEN",ppg:13.0,rpg:5.3,apg:5.4,spg:1.7,bpg:0.5,rarity:"common",img:null},
+  {name:"Amar'e Stoudemire",team:"NYK",ppg:14.2,rpg:5.8,apg:0.7,spg:0.6,bpg:0.7,rarity:"common",img:"2405"},
+  {name:"Ray Allen",team:"MIA",ppg:10.9,rpg:2.6,apg:1.6,spg:0.6,bpg:0.2,rarity:"common",img:"951"},
+  {name:"Chris Bosh",team:"MIA",ppg:18.0,rpg:7.9,apg:1.6,spg:0.9,bpg:0.8,rarity:"common",img:"2547"},
+  {name:"Luol Deng",team:"CHI",ppg:16.5,rpg:6.8,apg:3.1,spg:1.7,bpg:0.5,rarity:"common",img:"2736"},
+  {name:"Ryan Anderson",team:"NOP",ppg:16.8,rpg:7.9,apg:1.6,spg:0.5,bpg:0.5,rarity:"common",img:null},
+  {name:"Anthony Davis",team:"NOP",ppg:13.5,rpg:8.2,apg:1.0,spg:1.2,bpg:1.8,rarity:"rare",img:"203076"},
+  {name:"Eric Gordon",team:"NOP",ppg:13.7,rpg:2.5,apg:3.1,spg:0.8,bpg:0.3,rarity:"common",img:"201569"},
+  {name:"Jeff Green",team:"BOS",ppg:13.1,rpg:4.2,apg:1.3,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Rudy Gay",team:"TOR",ppg:19.5,rpg:6.2,apg:2.8,spg:1.3,bpg:0.6,rarity:"common",img:"200762"},
+  {name:"DeMar DeRozan",team:"TOR",ppg:18.1,rpg:3.8,apg:3.0,spg:0.9,bpg:0.3,rarity:"common",img:"201942"},
+  {name:"Kyle Lowry",team:"TOR",ppg:11.6,rpg:4.0,apg:6.4,spg:1.5,bpg:0.3,rarity:"common",img:"200768"},
+  {name:"Kemba Walker",team:"CHA",ppg:17.1,rpg:3.9,apg:5.8,spg:1.4,bpg:0.3,rarity:"common",img:"202689"},
+  {name:"Al Jefferson",team:"UTA",ppg:17.8,rpg:10.3,apg:2.0,spg:0.5,bpg:0.9,rarity:"common",img:"2398"},
+  {name:"Mo Williams",team:"UTA",ppg:14.3,rpg:3.1,apg:6.1,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"Gordon Hayward",team:"UTA",ppg:11.4,rpg:4.7,apg:3.5,spg:0.7,bpg:0.3,rarity:"common",img:"202330"},
+  {name:"Paul Millsap",team:"UTA",ppg:14.3,rpg:8.6,apg:2.0,spg:1.2,bpg:0.7,rarity:"common",img:"200794"},
+]},
+
+"2007-08": { label:"2007-08", players:[
+  {name:"LeBron James",team:"CLE",ppg:30.0,rpg:7.9,apg:7.2,spg:1.8,bpg:1.1,rarity:"legendary",img:"2544"},
+  {name:"Kobe Bryant",team:"LAL",ppg:28.3,rpg:6.3,apg:5.4,spg:1.8,bpg:0.5,rarity:"legendary",img:"977"},
+  {name:"Allen Iverson",team:"DEN",ppg:26.4,rpg:3.6,apg:6.3,spg:1.7,bpg:0.2,rarity:"legendary",img:"947"},
+  {name:"Kevin Garnett",team:"BOS",ppg:18.8,rpg:9.2,apg:3.4,spg:1.3,bpg:1.4,rarity:"legendary",img:"708"},
+  {name:"Dirk Nowitzki",team:"DAL",ppg:23.6,rpg:8.6,apg:3.5,spg:0.7,bpg:0.8,rarity:"epic",img:"1717"},
+  {name:"Carmelo Anthony",team:"DEN",ppg:25.7,rpg:7.8,apg:3.4,spg:1.2,bpg:0.6,rarity:"epic",img:"2546"},
+  {name:"Chris Paul",team:"NOP",ppg:21.1,rpg:4.0,apg:11.6,spg:2.7,bpg:0.1,rarity:"epic",img:"101108"},
+  {name:"Dwight Howard",team:"ORL",ppg:20.7,rpg:14.2,apg:1.3,spg:0.8,bpg:2.9,rarity:"epic",img:"2730"},
+  {name:"Tim Duncan",team:"SAS",ppg:19.3,rpg:11.4,apg:3.0,spg:0.7,bpg:2.4,rarity:"epic",img:"1495"},
+  {name:"Steve Nash",team:"PHX",ppg:16.9,rpg:3.8,apg:11.1,spg:0.7,bpg:0.1,rarity:"epic",img:"959"},
+  {name:"Dwyane Wade",team:"MIA",ppg:24.6,rpg:4.7,apg:6.0,spg:2.0,bpg:0.7,rarity:"epic",img:"2548"},
+  {name:"Amar'e Stoudemire",team:"PHX",ppg:25.2,rpg:9.1,apg:1.3,spg:0.9,bpg:1.3,rarity:"rare",img:"2405"},
+  {name:"Tracy McGrady",team:"HOU",ppg:21.6,rpg:5.8,apg:4.8,spg:1.3,bpg:1.0,rarity:"rare",img:"1503"},
+  {name:"Paul Pierce",team:"BOS",ppg:19.6,rpg:5.1,apg:4.5,spg:1.3,bpg:0.4,rarity:"rare",img:"1718"},
+  {name:"Vince Carter",team:"NJN",ppg:21.3,rpg:5.5,apg:3.6,spg:1.3,bpg:0.8,rarity:"rare",img:"1713"},
+  {name:"Kevin Durant",team:"SEA",ppg:20.0,rpg:4.4,apg:2.4,spg:1.0,bpg:0.9,rarity:"rare",img:"201142"},
+  {name:"Tony Parker",team:"SAS",ppg:18.6,rpg:3.4,apg:6.6,spg:1.1,bpg:0.1,rarity:"rare",img:"2225"},
+  {name:"Manu Ginobili",team:"SAS",ppg:19.5,rpg:4.3,apg:4.6,spg:1.5,bpg:0.3,rarity:"rare",img:"1938"},
+  {name:"Yao Ming",team:"HOU",ppg:22.0,rpg:10.8,apg:2.0,spg:0.4,bpg:2.0,rarity:"rare",img:"2399"},
+  {name:"Ray Allen",team:"BOS",ppg:17.4,rpg:3.7,apg:3.0,spg:0.9,bpg:0.2,rarity:"rare",img:"951"},
+  {name:"Gilbert Arenas",team:"WAS",ppg:19.6,rpg:4.0,apg:5.7,spg:1.5,bpg:0.4,rarity:"rare",img:"2420"},
+  {name:"Antawn Jamison",team:"WAS",ppg:22.2,rpg:8.4,apg:2.4,spg:0.9,bpg:0.5,rarity:"rare",img:null},
+  {name:"David West",team:"NOP",ppg:15.5,rpg:7.2,apg:2.2,spg:0.8,bpg:0.7,rarity:"common",img:null},
+  {name:"Peja Stojakovic",team:"NOP",ppg:16.5,rpg:4.2,apg:2.0,spg:0.8,bpg:0.2,rarity:"common",img:"2437"},
+  {name:"Rashard Lewis",team:"ORL",ppg:17.3,rpg:6.0,apg:2.2,spg:0.8,bpg:0.7,rarity:"common",img:null},
+  {name:"Hedo Turkoglu",team:"ORL",ppg:13.4,rpg:5.3,apg:3.9,spg:1.2,bpg:0.3,rarity:"common",img:null},
+  {name:"Jameer Nelson",team:"ORL",ppg:16.7,rpg:3.3,apg:6.3,spg:1.5,bpg:0.3,rarity:"common",img:null},
+  {name:"Carlos Boozer",team:"UTA",ppg:18.6,rpg:10.4,apg:2.6,spg:0.8,bpg:0.5,rarity:"common",img:null},
+  {name:"Deron Williams",team:"UTA",ppg:18.8,rpg:4.0,apg:10.5,spg:1.0,bpg:0.4,rarity:"rare",img:"2733"},
+  {name:"Andrei Kirilenko",team:"UTA",ppg:11.7,rpg:6.3,apg:3.5,spg:1.5,bpg:1.6,rarity:"common",img:null},
+  {name:"Paul Millsap",team:"UTA",ppg:8.7,rpg:7.3,apg:1.2,spg:1.1,bpg:0.7,rarity:"common",img:null},
+  {name:"Michael Redd",team:"MIL",ppg:22.7,rpg:3.5,apg:2.8,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Luol Deng",team:"CHI",ppg:19.1,rpg:7.5,apg:2.7,spg:1.4,bpg:0.5,rarity:"common",img:"2736"},
+  {name:"Derrick Rose",team:"CHI",ppg:0.0,rpg:0.0,apg:0.0,spg:0.0,bpg:0.0,rarity:"common",img:"201565"},
+  {name:"Joakim Noah",team:"CHI",ppg:5.2,rpg:4.4,apg:0.9,spg:0.6,bpg:0.9,rarity:"common",img:"201980"},
+  {name:"Joe Johnson",team:"ATL",ppg:21.0,rpg:4.4,apg:4.7,spg:1.5,bpg:0.5,rarity:"rare",img:"2209"},
+  {name:"Josh Smith",team:"ATL",ppg:14.4,rpg:8.3,apg:2.0,spg:1.5,bpg:2.8,rarity:"common",img:null},
+  {name:"Al Horford",team:"ATL",ppg:10.1,rpg:9.7,apg:1.4,spg:0.7,bpg:1.1,rarity:"common",img:"201143"},
+  {name:"Caron Butler",team:"WAS",ppg:19.3,rpg:5.4,apg:4.0,spg:1.2,bpg:0.3,rarity:"common",img:null},
+  {name:"Brendan Haywood",team:"WAS",ppg:8.3,rpg:7.2,apg:0.8,spg:0.5,bpg:2.1,rarity:"common",img:null},
+  {name:"Shawn Marion",team:"PHX",ppg:15.6,rpg:8.7,apg:1.9,spg:1.8,bpg:0.8,rarity:"common",img:null},
+  {name:"Leandro Barbosa",team:"PHX",ppg:16.4,rpg:2.6,apg:3.6,spg:1.0,bpg:0.2,rarity:"common",img:null},
+  {name:"Boris Diaw",team:"PHX",ppg:9.4,rpg:4.7,apg:4.2,spg:0.9,bpg:0.4,rarity:"common",img:null},
+  {name:"Pau Gasol",team:"LAL",ppg:18.8,rpg:9.8,apg:3.0,spg:0.9,bpg:1.4,rarity:"rare",img:"2200"},
+  {name:"Derek Fisher",team:"LAL",ppg:9.6,rpg:2.8,apg:2.9,spg:0.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Lamar Odom",team:"LAL",ppg:12.5,rpg:8.8,apg:2.7,spg:1.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Vladimir Radmanovic",team:"LAL",ppg:8.3,rpg:3.9,apg:1.2,spg:0.4,bpg:0.4,rarity:"common",img:null},
+  {name:"Richard Jefferson",team:"SAS",ppg:14.0,rpg:4.9,apg:2.1,spg:0.7,bpg:0.4,rarity:"common",img:null},
+  {name:"Rajon Rondo",team:"BOS",ppg:10.6,rpg:4.2,apg:5.1,spg:1.5,bpg:0.1,rarity:"common",img:null},
+  {name:"Sam Cassell",team:"BOS",ppg:7.2,rpg:2.5,apg:3.7,spg:0.5,bpg:0.1,rarity:"common",img:null},
+  {name:"Luke Walton",team:"LAL",ppg:5.4,rpg:3.6,apg:3.1,spg:0.8,bpg:0.1,rarity:"common",img:null},
+  {name:"Jason Kidd",team:"DAL",ppg:10.8,rpg:6.2,apg:8.0,spg:1.5,bpg:0.2,rarity:"rare",img:"1070"},
+  {name:"Josh Howard",team:"DAL",ppg:16.0,rpg:6.6,apg:2.0,spg:1.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Eddie Jones",team:"MEM",ppg:11.2,rpg:4.4,apg:3.6,spg:1.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Mike Conley",team:"MEM",ppg:9.0,rpg:2.9,apg:4.0,spg:1.3,bpg:0.3,rarity:"common",img:"201144"},
+  {name:"Rudy Gay",team:"MEM",ppg:11.7,rpg:4.8,apg:1.8,spg:1.0,bpg:0.5,rarity:"common",img:"200762"},
+  {name:"Zach Randolph",team:"MEM",ppg:18.0,rpg:10.2,apg:2.3,spg:0.5,bpg:0.2,rarity:"common",img:"102321"},
+  {name:"Baron Davis",team:"GSW",ppg:20.3,rpg:4.3,apg:6.8,spg:1.8,bpg:0.4,rarity:"common",img:null},
+  {name:"Stephen Jackson",team:"GSW",ppg:19.9,rpg:5.4,apg:3.8,spg:1.3,bpg:0.3,rarity:"common",img:null},
+  {name:"Andris Biedrins",team:"GSW",ppg:11.4,rpg:10.6,apg:0.8,spg:0.4,bpg:1.0,rarity:"common",img:null},
+  {name:"Andre Iguodala",team:"PHI",ppg:19.9,rpg:6.6,apg:6.0,spg:2.1,bpg:0.7,rarity:"rare",img:null},
+  {name:"Elton Brand",team:"PHI",ppg:13.4,rpg:8.8,apg:2.3,spg:0.9,bpg:1.6,rarity:"common",img:null},
+  {name:"Wally Szczerbiak",team:"CLE",ppg:9.4,rpg:3.0,apg:1.3,spg:0.6,bpg:0.2,rarity:"common",img:null},
+  {name:"Zydrunas Ilgauskas",team:"CLE",ppg:13.5,rpg:7.3,apg:1.2,spg:0.3,bpg:1.1,rarity:"common",img:null},
+  {name:"Joe Smith",team:"CLE",ppg:7.7,rpg:4.7,apg:0.7,spg:0.4,bpg:0.5,rarity:"common",img:null},
+  {name:"Richard Hamilton",team:"DET",ppg:20.1,rpg:3.5,apg:3.8,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Tayshaun Prince",team:"DET",ppg:14.2,rpg:5.7,apg:3.1,spg:1.4,bpg:0.6,rarity:"common",img:null},
+  {name:"Chauncey Billups",team:"DET",ppg:17.1,rpg:3.5,apg:6.2,spg:1.2,bpg:0.3,rarity:"common",img:"1497"},
+  {name:"Antonio McDyess",team:"DET",ppg:11.0,rpg:7.9,apg:1.0,spg:0.7,bpg:1.0,rarity:"common",img:null},
+  {name:"Rasheed Wallace",team:"DET",ppg:12.7,rpg:6.7,apg:1.6,spg:0.5,bpg:1.2,rarity:"common",img:null},
+]},
+
+"1991-92": { label:"1991-92", players:[
+  {name:"Michael Jordan",team:"CHI",ppg:30.1,rpg:6.4,apg:6.1,spg:2.0,bpg:0.8,rarity:"legendary",img:"893"},
+  {name:"Karl Malone",team:"UTA",ppg:28.0,rpg:11.2,apg:3.0,spg:1.4,bpg:0.8,rarity:"legendary",img:"252"},
+  {name:"Clyde Drexler",team:"POR",ppg:25.0,rpg:6.6,apg:6.7,spg:2.0,bpg:0.5,rarity:"legendary",img:"184"},
+  {name:"Patrick Ewing",team:"NYK",ppg:24.0,rpg:11.2,apg:2.0,spg:1.1,bpg:2.1,rarity:"legendary",img:"255"},
+  {name:"Charles Barkley",team:"PHI",ppg:23.1,rpg:11.1,apg:4.1,spg:1.5,bpg:0.7,rarity:"epic",img:"787"},
+  {name:"David Robinson",team:"SAS",ppg:23.2,rpg:12.2,apg:3.0,spg:1.8,bpg:4.5,rarity:"epic",img:"278"},
+  {name:"Dominique Wilkins",team:"ATL",ppg:28.1,rpg:6.8,apg:2.4,spg:1.1,bpg:0.5,rarity:"epic",img:"785"},
+  {name:"Magic Johnson",team:"LAL",ppg:19.4,rpg:7.0,apg:12.4,spg:1.5,bpg:0.3,rarity:"epic",img:"1020"},
+  {name:"Scottie Pippen",team:"CHI",ppg:21.0,rpg:7.7,apg:7.0,spg:1.9,bpg:0.9,rarity:"epic",img:"1738"},
+  {name:"John Stockton",team:"UTA",ppg:17.2,rpg:2.7,apg:13.7,spg:2.8,bpg:0.2,rarity:"epic",img:"304"},
+  {name:"Hakeem Olajuwon",team:"HOU",ppg:21.6,rpg:12.1,apg:2.7,spg:1.7,bpg:3.4,rarity:"epic",img:"165"},
+  {name:"Larry Bird",team:"BOS",ppg:20.2,rpg:9.5,apg:5.2,spg:0.9,bpg:0.4,rarity:"rare",img:"1449"},
+  {name:"Reggie Miller",team:"IND",ppg:18.5,rpg:3.3,apg:2.6,spg:1.0,bpg:0.3,rarity:"rare",img:"245"},
+  {name:"Shawn Kemp",team:"SEA",ppg:15.0,rpg:8.4,apg:2.0,spg:0.9,bpg:1.3,rarity:"rare",img:"323"},
+  {name:"Dikembe Mutombo",team:"DEN",ppg:16.6,rpg:12.3,apg:1.3,spg:0.4,bpg:3.0,rarity:"rare",img:"305"},
+  {name:"Mitch Richmond",team:"SAC",ppg:23.0,rpg:4.0,apg:3.8,spg:1.4,bpg:0.3,rarity:"rare",img:"195"},
+  {name:"Kevin Johnson",team:"PHX",ppg:19.7,rpg:3.4,apg:10.7,spg:1.7,bpg:0.1,rarity:"rare",img:null},
+  {name:"Mark Price",team:"CLE",ppg:17.3,rpg:2.7,apg:10.0,spg:1.3,bpg:0.1,rarity:"rare",img:null},
+  {name:"Dan Majerle",team:"PHX",ppg:15.5,rpg:4.6,apg:4.2,spg:1.8,bpg:0.3,rarity:"rare",img:null},
+  {name:"James Worthy",team:"LAL",ppg:21.4,rpg:4.9,apg:3.3,spg:1.1,bpg:0.7,rarity:"rare",img:null},
+  {name:"Brad Daugherty",team:"CLE",ppg:21.5,rpg:10.9,apg:3.5,spg:0.6,bpg:0.6,rarity:"rare",img:null},
+  {name:"Gary Payton",team:"SEA",ppg:13.8,rpg:3.5,apg:6.1,spg:1.8,bpg:0.2,rarity:"rare",img:"800"},
+  {name:"Alonzo Mourning",team:"CHA",ppg:21.0,rpg:10.3,apg:1.8,spg:0.8,bpg:3.5,rarity:"rare",img:"396"},
+  {name:"Larry Johnson",team:"CHA",ppg:19.2,rpg:10.1,apg:3.9,spg:0.9,bpg:0.7,rarity:"rare",img:null},
+  {name:"Kevin Willis",team:"ATL",ppg:15.0,rpg:11.3,apg:1.3,spg:0.9,bpg:0.6,rarity:"common",img:null},
+  {name:"Horace Grant",team:"CHI",ppg:14.2,rpg:10.0,apg:3.0,spg:1.0,bpg:1.1,rarity:"common",img:null},
+  {name:"John Paxson",team:"CHI",ppg:9.5,rpg:1.9,apg:3.3,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"BJ Armstrong",team:"CHI",ppg:8.0,rpg:1.6,apg:2.7,spg:0.5,bpg:0.1,rarity:"common",img:null},
+  {name:"Dennis Rodman",team:"DET",ppg:8.0,rpg:18.7,apg:1.7,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Joe Dumars",team:"DET",ppg:18.2,rpg:2.9,apg:4.8,spg:1.4,bpg:0.1,rarity:"common",img:null},
+  {name:"Isiah Thomas",team:"DET",ppg:18.5,rpg:3.5,apg:8.8,spg:1.5,bpg:0.2,rarity:"rare",img:"216"},
+  {name:"Bill Laimbeer",team:"DET",ppg:12.7,rpg:9.2,apg:2.1,spg:0.5,bpg:1.2,rarity:"common",img:null},
+  {name:"Mark Aguirre",team:"DET",ppg:8.9,rpg:2.8,apg:1.3,spg:0.4,bpg:0.2,rarity:"common",img:null},
+  {name:"Chuck Person",team:"IND",ppg:17.4,rpg:7.8,apg:2.8,spg:0.8,bpg:0.5,rarity:"common",img:null},
+  {name:"Detlef Schrempf",team:"IND",ppg:20.0,rpg:9.5,apg:4.6,spg:0.7,bpg:0.4,rarity:"common",img:null},
+  {name:"Herb Williams",team:"IND",ppg:10.2,rpg:6.2,apg:1.3,spg:0.5,bpg:1.2,rarity:"common",img:null},
+  {name:"Xavier McDaniel",team:"BOS",ppg:15.0,rpg:7.0,apg:2.3,spg:0.9,bpg:0.5,rarity:"common",img:null},
+  {name:"Kevin McHale",team:"BOS",ppg:18.9,rpg:8.1,apg:1.7,spg:0.5,bpg:1.7,rarity:"common",img:null},
+  {name:"Robert Parish",team:"BOS",ppg:16.1,rpg:10.4,apg:1.6,spg:0.6,bpg:1.1,rarity:"common",img:null},
+  {name:"Sherman Douglas",team:"MIA",ppg:15.3,rpg:3.3,apg:8.3,spg:1.2,bpg:0.1,rarity:"common",img:null},
+  {name:"Glen Rice",team:"MIA",ppg:15.5,rpg:4.6,apg:2.0,spg:0.8,bpg:0.4,rarity:"common",img:null},
+  {name:"Rony Seikaly",team:"MIA",ppg:17.1,rpg:10.9,apg:1.4,spg:0.8,bpg:1.1,rarity:"common",img:null},
+  {name:"Drazen Petrovic",team:"NJN",ppg:20.6,rpg:2.5,apg:3.5,spg:0.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Kenny Anderson",team:"NJN",ppg:14.5,rpg:3.9,apg:8.8,spg:1.5,bpg:0.1,rarity:"common",img:null},
+  {name:"Derrick Coleman",team:"NJN",ppg:18.4,rpg:11.2,apg:3.1,spg:0.9,bpg:1.1,rarity:"common",img:null},
+  {name:"Buck Williams",team:"POR",ppg:9.8,rpg:8.8,apg:1.3,spg:0.7,bpg:0.8,rarity:"common",img:null},
+  {name:"Terry Porter",team:"POR",ppg:14.8,rpg:3.6,apg:7.1,spg:1.4,bpg:0.3,rarity:"common",img:null},
+  {name:"Kevin Duckworth",team:"POR",ppg:13.6,rpg:6.9,apg:0.9,spg:0.4,bpg:0.7,rarity:"common",img:null},
+  {name:"Jerome Kersey",team:"POR",ppg:12.0,rpg:7.3,apg:2.7,spg:1.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Sam Perkins",team:"LAL",ppg:11.9,rpg:6.5,apg:1.8,spg:0.8,bpg:0.7,rarity:"common",img:null},
+  {name:"Byron Scott",team:"LAL",ppg:12.6,rpg:2.4,apg:2.2,spg:0.8,bpg:0.1,rarity:"common",img:null},
+  {name:"AC Green",team:"LAL",ppg:9.2,rpg:9.3,apg:1.2,spg:0.9,bpg:0.4,rarity:"common",img:null},
+  {name:"Vlade Divac",team:"LAL",ppg:11.0,rpg:8.7,apg:3.0,spg:1.4,bpg:1.6,rarity:"common",img:null},
+  {name:"Xavier McDaniel",team:"PHX",ppg:11.9,rpg:5.1,apg:1.5,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Tom Chambers",team:"PHX",ppg:14.9,rpg:5.8,apg:2.8,spg:0.5,bpg:0.5,rarity:"common",img:null},
+  {name:"Cedric Ceballos",team:"PHX",ppg:12.0,rpg:5.7,apg:0.7,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Fat Lever",team:"DAL",ppg:12.5,rpg:7.0,apg:7.5,spg:2.5,bpg:0.3,rarity:"common",img:null},
+  {name:"Derek Harper",team:"DAL",ppg:15.0,rpg:3.2,apg:6.3,spg:2.1,bpg:0.2,rarity:"common",img:null},
+  {name:"Rolando Blackman",team:"DAL",ppg:14.2,rpg:2.8,apg:2.5,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Rod Strickland",team:"SAS",ppg:14.7,rpg:4.4,apg:9.1,spg:1.7,bpg:0.2,rarity:"common",img:null},
+  {name:"Terry Cummings",team:"SAS",ppg:11.1,rpg:5.2,apg:1.5,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Avery Johnson",team:"SAS",ppg:7.7,rpg:2.2,apg:4.5,spg:1.1,bpg:0.1,rarity:"common",img:null},
+  {name:"Willie Anderson",team:"SAS",ppg:16.7,rpg:5.7,apg:5.8,spg:1.5,bpg:0.5,rarity:"common",img:null},
+  {name:"Detlef Schrempf",team:"IND",ppg:20.0,rpg:9.5,apg:4.6,spg:0.7,bpg:0.4,rarity:"common",img:null},
+  {name:"Stacey Augmon",team:"ATL",ppg:10.5,rpg:3.9,apg:2.6,spg:2.1,bpg:0.4,rarity:"common",img:null},
+  {name:"Mookie Blaylock",team:"ATL",ppg:12.9,rpg:5.3,apg:7.3,spg:2.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Danny Manning",team:"LAC",ppg:18.9,rpg:7.5,apg:3.3,spg:1.2,bpg:0.8,rarity:"common",img:null},
+  {name:"Ron Harper",team:"LAC",ppg:18.2,rpg:4.6,apg:4.9,spg:2.1,bpg:0.5,rarity:"common",img:null},
+  {name:"Benoit Benjamin",team:"SEA",ppg:10.0,rpg:8.0,apg:1.5,spg:0.6,bpg:2.2,rarity:"common",img:null},
+  {name:"Dale Ellis",team:"SEA",ppg:13.5,rpg:3.5,apg:1.5,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Ricky Pierce",team:"SEA",ppg:14.4,rpg:2.3,apg:2.0,spg:0.8,bpg:0.1,rarity:"common",img:null},
+  {name:"Hersey Hawkins",team:"PHI",ppg:20.3,rpg:4.3,apg:3.8,spg:2.2,bpg:0.3,rarity:"common",img:null},
+  {name:"Charles Shackleford",team:"PHI",ppg:9.1,rpg:6.6,apg:0.7,spg:0.5,bpg:0.8,rarity:"common",img:null},
+  {name:"Mahmoud Abdul-Rauf",team:"DEN",ppg:11.2,rpg:2.0,apg:4.9,spg:0.5,bpg:0.1,rarity:"common",img:null},
+  {name:"Chris Jackson",team:"DEN",ppg:15.3,rpg:2.2,apg:4.5,spg:1.0,bpg:0.2,rarity:"common",img:null},
+  {name:"Reggie Williams",team:"DEN",ppg:13.0,rpg:5.0,apg:3.5,spg:1.3,bpg:0.6,rarity:"common",img:null},
+  {name:"Vernon Maxwell",team:"HOU",ppg:15.6,rpg:2.9,apg:4.1,spg:1.4,bpg:0.3,rarity:"common",img:null},
+  {name:"Otis Thorpe",team:"HOU",ppg:17.2,rpg:9.0,apg:2.3,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Kenny Smith",team:"HOU",ppg:9.0,rpg:2.4,apg:5.6,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"Chris Morris",team:"NJN",ppg:14.0,rpg:6.0,apg:2.2,spg:1.2,bpg:0.9,rarity:"common",img:null},
+]},
+
+"1984-85": { label:"1984-85", players:[
+  {name:"Bernard King",team:"NYK",ppg:32.9,rpg:5.8,apg:3.7,spg:0.9,bpg:0.5,rarity:"legendary",img:null},
+  {name:"Larry Bird",team:"BOS",ppg:28.7,rpg:10.5,apg:6.6,spg:1.6,bpg:1.2,rarity:"legendary",img:"1449"},
+  {name:"Kareem Abdul-Jabbar",team:"LAL",ppg:22.0,rpg:7.9,apg:2.5,spg:0.9,bpg:1.9,rarity:"legendary",img:null},
+  {name:"Magic Johnson",team:"LAL",ppg:18.3,rpg:6.2,apg:12.6,spg:2.0,bpg:0.5,rarity:"legendary",img:"1020"},
+  {name:"Dominique Wilkins",team:"ATL",ppg:21.8,rpg:6.4,apg:2.4,spg:1.1,bpg:0.6,rarity:"epic",img:"785"},
+  {name:"Alex English",team:"DEN",ppg:27.9,rpg:6.0,apg:4.5,spg:1.1,bpg:0.5,rarity:"epic",img:null},
+  {name:"Moses Malone",team:"PHI",ppg:24.6,rpg:13.1,apg:1.3,spg:0.7,bpg:1.4,rarity:"epic",img:null},
+  {name:"Isiah Thomas",team:"DET",ppg:21.2,rpg:4.5,apg:13.9,spg:1.8,bpg:0.2,rarity:"epic",img:"216"},
+  {name:"Charles Barkley",team:"PHI",ppg:14.0,rpg:8.6,apg:1.9,spg:1.3,bpg:0.5,rarity:"epic",img:"787"},
+  {name:"Hakeem Olajuwon",team:"HOU",ppg:20.6,rpg:11.9,apg:2.5,spg:2.0,bpg:2.7,rarity:"epic",img:"165"},
+  {name:"Patrick Ewing",team:"NYK",ppg:20.0,rpg:9.0,apg:2.0,spg:1.1,bpg:2.1,rarity:"epic",img:"255"},
+  {name:"Michael Jordan",team:"CHI",ppg:28.2,rpg:6.5,apg:5.9,spg:2.4,bpg:1.0,rarity:"rare",img:"893"},
+  {name:"Kevin McHale",team:"BOS",ppg:19.8,rpg:9.0,apg:2.0,spg:0.7,bpg:2.0,rarity:"rare",img:null},
+  {name:"Clyde Drexler",team:"POR",ppg:17.2,rpg:6.1,apg:5.0,spg:2.0,bpg:0.5,rarity:"rare",img:"184"},
+  {name:"Mark Aguirre",team:"DAL",ppg:25.7,rpg:5.7,apg:3.3,spg:1.0,bpg:0.4,rarity:"rare",img:null},
+  {name:"Robert Parish",team:"BOS",ppg:19.8,rpg:10.7,apg:1.6,spg:0.6,bpg:1.5,rarity:"rare",img:null},
+  {name:"Jack Sikma",team:"SEA",ppg:17.8,rpg:10.0,apg:3.8,spg:1.2,bpg:0.8,rarity:"rare",img:null},
+  {name:"Fat Lever",team:"DEN",ppg:12.4,rpg:6.4,apg:6.5,spg:2.4,bpg:0.2,rarity:"rare",img:null},
+  {name:"Karl Malone",team:"UTA",ppg:14.9,rpg:8.9,apg:1.9,spg:1.0,bpg:0.6,rarity:"rare",img:"252"},
+  {name:"John Stockton",team:"UTA",ppg:13.1,rpg:2.7,apg:13.8,spg:2.7,bpg:0.1,rarity:"rare",img:"304"},
+  {name:"Terry Cummings",team:"MIL",ppg:23.6,rpg:8.7,apg:2.5,spg:1.0,bpg:0.6,rarity:"rare",img:null},
+  {name:"George Gervin",team:"SAS",ppg:21.4,rpg:3.4,apg:3.5,spg:1.0,bpg:0.2,rarity:"rare",img:null},
+  {name:"Walter Davis",team:"PHX",ppg:22.1,rpg:3.3,apg:3.9,spg:1.5,bpg:0.2,rarity:"rare",img:null},
+  {name:"Tom Chambers",team:"SEA",ppg:18.3,rpg:7.2,apg:2.3,spg:0.6,bpg:0.5,rarity:"common",img:null},
+  {name:"Alvin Robertson",team:"SAS",ppg:12.5,rpg:4.1,apg:4.7,spg:3.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Dennis Johnson",team:"BOS",ppg:14.7,rpg:4.0,apg:6.1,spg:1.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Danny Ainge",team:"BOS",ppg:10.5,rpg:2.7,apg:4.0,spg:1.2,bpg:0.1,rarity:"common",img:null},
+  {name:"Bill Walton",team:"BOS",ppg:7.6,rpg:6.8,apg:2.5,spg:0.6,bpg:1.3,rarity:"common",img:null},
+  {name:"Scott Wedman",team:"BOS",ppg:10.7,rpg:3.9,apg:1.5,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Rolando Blackman",team:"DAL",ppg:19.0,rpg:3.5,apg:3.8,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Derek Harper",team:"DAL",ppg:13.3,rpg:2.9,apg:6.1,spg:2.3,bpg:0.2,rarity:"common",img:null},
+  {name:"Sam Perkins",team:"DAL",ppg:11.5,rpg:7.9,apg:1.6,spg:0.7,bpg:1.1,rarity:"common",img:null},
+  {name:"James Worthy",team:"LAL",ppg:21.1,rpg:5.5,apg:2.9,spg:1.1,bpg:0.5,rarity:"common",img:null},
+  {name:"Byron Scott",team:"LAL",ppg:14.7,rpg:2.7,apg:3.1,spg:1.0,bpg:0.2,rarity:"common",img:null},
+  {name:"AC Green",team:"LAL",ppg:8.7,rpg:7.4,apg:1.2,spg:0.8,bpg:0.5,rarity:"common",img:null},
+  {name:"Michael Cooper",team:"LAL",ppg:8.9,rpg:3.4,apg:4.2,spg:1.3,bpg:0.4,rarity:"common",img:null},
+  {name:"Vlade Divac",team:"LAL",ppg:0.0,rpg:0.0,apg:0.0,spg:0.0,bpg:0.0,rarity:"common",img:null},
+  {name:"Xavier McDaniel",team:"SEA",ppg:17.1,rpg:7.6,apg:2.7,spg:1.3,bpg:0.4,rarity:"common",img:null},
+  {name:"Dale Ellis",team:"SEA",ppg:14.4,rpg:4.4,apg:2.2,spg:1.0,bpg:0.2,rarity:"common",img:null},
+  {name:"Purvis Short",team:"GSW",ppg:22.8,rpg:4.3,apg:3.1,spg:1.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Sleepy Floyd",team:"GSW",ppg:18.0,rpg:4.2,apg:7.0,spg:1.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Larry Smith",team:"GSW",ppg:7.7,rpg:10.7,apg:1.3,spg:0.9,bpg:0.8,rarity:"common",img:null},
+  {name:"Mike Gminski",team:"NJN",ppg:15.7,rpg:8.6,apg:1.3,spg:0.3,bpg:1.0,rarity:"common",img:null},
+  {name:"Buck Williams",team:"NJN",ppg:18.0,rpg:12.3,apg:1.5,spg:0.8,bpg:0.7,rarity:"common",img:null},
+  {name:"Micheal Ray Richardson",team:"NJN",ppg:18.5,rpg:5.1,apg:8.6,spg:2.6,bpg:0.5,rarity:"common",img:null},
+  {name:"Julius Erving",team:"PHI",ppg:22.4,rpg:6.8,apg:3.9,spg:1.7,bpg:0.8,rarity:"rare",img:null},
+  {name:"Andrew Toney",team:"PHI",ppg:14.7,rpg:2.8,apg:5.1,spg:1.3,bpg:0.3,rarity:"common",img:null},
+  {name:"Bobby Jones",team:"PHI",ppg:9.2,rpg:4.9,apg:2.0,spg:1.1,bpg:0.7,rarity:"common",img:null},
+  {name:"Artis Gilmore",team:"SAS",ppg:14.1,rpg:8.0,apg:1.6,spg:0.6,bpg:1.2,rarity:"common",img:null},
+  {name:"Johnny Moore",team:"SAS",ppg:9.8,rpg:3.5,apg:9.6,spg:1.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Mike Mitchell",team:"SAS",ppg:23.4,rpg:4.6,apg:1.6,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Kiki Vandeweghe",team:"POR",ppg:24.8,rpg:5.0,apg:2.3,spg:0.6,bpg:0.5,rarity:"common",img:null},
+  {name:"Terry Porter",team:"POR",ppg:8.1,rpg:3.0,apg:5.0,spg:1.3,bpg:0.2,rarity:"common",img:null},
+  {name:"Calvin Natt",team:"POR",ppg:18.4,rpg:6.8,apg:2.8,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Mitchell Wiggins",team:"CHI",ppg:11.5,rpg:3.1,apg:2.7,spg:1.5,bpg:0.3,rarity:"common",img:null},
+  {name:"Orlando Woolridge",team:"CHI",ppg:22.0,rpg:5.3,apg:2.0,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Charles Oakley",team:"CHI",ppg:8.4,rpg:8.9,apg:1.6,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Mike Dunleavy",team:"MIL",ppg:7.5,rpg:2.4,apg:4.5,spg:0.8,bpg:0.1,rarity:"common",img:null},
+  {name:"Junior Bridgeman",team:"MIL",ppg:10.4,rpg:2.9,apg:2.1,spg:0.6,bpg:0.1,rarity:"common",img:null},
+  {name:"Sidney Moncrief",team:"MIL",ppg:20.1,rpg:5.4,apg:4.9,spg:1.5,bpg:0.2,rarity:"rare",img:null},
+  {name:"Ricky Pierce",team:"MIL",ppg:15.6,rpg:3.0,apg:2.4,spg:0.8,bpg:0.1,rarity:"common",img:null},
+  {name:"Danny Vranes",team:"SEA",ppg:7.3,rpg:5.4,apg:1.8,spg:1.0,bpg:1.0,rarity:"common",img:null},
+  {name:"Vinnie Johnson",team:"DET",ppg:15.6,rpg:3.3,apg:4.1,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Bill Laimbeer",team:"DET",ppg:13.1,rpg:11.3,apg:2.3,spg:0.6,bpg:1.0,rarity:"common",img:null},
+  {name:"Kelly Tripucka",team:"DET",ppg:17.4,rpg:3.9,apg:3.3,spg:0.6,bpg:0.2,rarity:"common",img:null},
+  {name:"Rick Mahorn",team:"DET",ppg:10.7,rpg:8.4,apg:1.7,spg:0.6,bpg:1.1,rarity:"common",img:null},
+  {name:"Reggie Theus",team:"SAC",ppg:20.4,rpg:4.3,apg:8.5,spg:1.2,bpg:0.2,rarity:"common",img:null},
+  {name:"LaSalle Thompson",team:"SAC",ppg:10.1,rpg:8.2,apg:1.1,spg:0.7,bpg:1.5,rarity:"common",img:null},
+  {name:"Joe Barry Carroll",team:"GSW",ppg:22.0,rpg:7.7,apg:1.9,spg:0.7,bpg:1.5,rarity:"common",img:null},
+  {name:"World B. Free",team:"CLE",ppg:23.4,rpg:3.0,apg:4.0,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"Roy Hinson",team:"CLE",ppg:13.7,rpg:7.5,apg:0.9,spg:0.6,bpg:1.7,rarity:"common",img:null},
+  {name:"Marques Johnson",team:"LAC",ppg:15.4,rpg:6.5,apg:3.1,spg:1.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Michael Cooper",team:"LAL",ppg:8.9,rpg:3.4,apg:4.2,spg:1.3,bpg:0.4,rarity:"common",img:null},
+  {name:"Otis Birdsong",team:"NJN",ppg:18.2,rpg:3.0,apg:2.9,spg:0.7,bpg:0.2,rarity:"common",img:null},
+  {name:"Albert King",team:"NJN",ppg:13.8,rpg:4.8,apg:2.1,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Dan Roundfield",team:"WAS",ppg:10.3,rpg:7.7,apg:1.7,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Jeff Ruland",team:"WAS",ppg:18.8,rpg:12.2,apg:4.0,spg:0.8,bpg:1.0,rarity:"common",img:null},
+]},
+};
+
+// PATCH: Add missing seasons to SEASONS object
+Object.assign(SEASONS, {
+
+"2024-25": { label:"2024-25", players:[
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:32.7,rpg:11.6,apg:6.0,spg:0.8,bpg:1.1,rarity:"legendary",img:"203507"},
+  {name:"Shai Gilgeous-Alexander",team:"OKC",ppg:31.4,rpg:5.5,apg:6.4,spg:2.1,bpg:1.0,rarity:"legendary",img:"1628983"},
+  {name:"Nikola Jokic",team:"DEN",ppg:29.6,rpg:13.0,apg:10.2,spg:1.4,bpg:0.9,rarity:"legendary",img:"203999"},
+  {name:"Luka Doncic",team:"DAL",ppg:28.1,rpg:8.7,apg:8.5,spg:1.2,bpg:0.5,rarity:"legendary",img:"1629029"},
+  {name:"Jayson Tatum",team:"BOS",ppg:27.0,rpg:8.2,apg:5.1,spg:1.0,bpg:0.6,rarity:"epic",img:"1628369"},
+  {name:"Joel Embiid",team:"PHI",ppg:26.8,rpg:11.0,apg:4.4,spg:1.1,bpg:1.7,rarity:"epic",img:"203954"},
+  {name:"Kevin Durant",team:"PHX",ppg:26.6,rpg:6.3,apg:4.0,spg:0.9,bpg:1.1,rarity:"epic",img:"201142"},
+  {name:"Devin Booker",team:"PHX",ppg:25.7,rpg:4.3,apg:6.2,spg:1.0,bpg:0.4,rarity:"epic",img:"1626164"},
+  {name:"Anthony Edwards",team:"MIN",ppg:25.9,rpg:5.8,apg:5.1,spg:1.3,bpg:0.5,rarity:"epic",img:"1630162"},
+  {name:"LeBron James",team:"LAL",ppg:24.5,rpg:8.0,apg:9.0,spg:1.1,bpg:0.4,rarity:"epic",img:"2544"},
+  {name:"Donovan Mitchell",team:"CLE",ppg:26.1,rpg:4.5,apg:5.9,spg:1.6,bpg:0.4,rarity:"epic",img:"1628378"},
+  {name:"Tyrese Maxey",team:"PHI",ppg:25.4,rpg:3.9,apg:5.6,spg:0.9,bpg:0.3,rarity:"epic",img:"1630178"},
+  {name:"Kawhi Leonard",team:"LAC",ppg:23.2,rpg:5.8,apg:3.5,spg:1.8,bpg:0.5,rarity:"rare",img:"202695"},
+  {name:"Jalen Brunson",team:"NYK",ppg:25.1,rpg:3.7,apg:7.9,spg:0.9,bpg:0.2,rarity:"rare",img:"1628973"},
+  {name:"Damian Lillard",team:"MIL",ppg:24.8,rpg:4.5,apg:7.2,spg:1.0,bpg:0.4,rarity:"rare",img:"203081"},
+  {name:"Jaylen Brown",team:"BOS",ppg:23.0,rpg:5.5,apg:3.6,spg:1.1,bpg:0.4,rarity:"rare",img:"1627759"},
+  {name:"De'Aaron Fox",team:"SAS",ppg:24.5,rpg:4.4,apg:6.0,spg:1.5,bpg:0.3,rarity:"rare",img:"1628368"},
+  {name:"Trae Young",team:"ATL",ppg:23.5,rpg:3.2,apg:10.8,spg:1.1,bpg:0.2,rarity:"rare",img:"1629027"},
+  {name:"Karl-Anthony Towns",team:"NYK",ppg:24.0,rpg:13.2,apg:3.0,spg:0.8,bpg:0.6,rarity:"rare",img:"1626157"},
+  {name:"Bam Adebayo",team:"MIA",ppg:20.4,rpg:10.6,apg:4.1,spg:1.3,bpg:0.8,rarity:"rare",img:"1628389"},
+  {name:"Anthony Davis",team:"LAL",ppg:24.3,rpg:12.0,apg:3.6,spg:1.2,bpg:2.2,rarity:"rare",img:"203076"},
+  {name:"Stephen Curry",team:"GSW",ppg:23.0,rpg:4.0,apg:5.5,spg:0.8,bpg:0.3,rarity:"rare",img:"201939"},
+  {name:"Victor Wembanyama",team:"SAS",ppg:24.6,rpg:10.6,apg:3.5,spg:1.0,bpg:3.7,rarity:"rare",img:"1641705"},
+  {name:"Lauri Markkanen",team:"UTA",ppg:22.0,rpg:8.5,apg:2.2,spg:0.7,bpg:0.5,rarity:"rare",img:"1628374"},
+  {name:"Ja Morant",team:"MEM",ppg:22.8,rpg:5.2,apg:8.5,spg:0.9,bpg:0.3,rarity:"rare",img:"1629630"},
+  {name:"Pascal Siakam",team:"IND",ppg:21.0,rpg:7.9,apg:4.2,spg:1.1,bpg:0.6,rarity:"rare",img:"1627783"},
+  {name:"Tyrese Haliburton",team:"IND",ppg:19.5,rpg:4.5,apg:11.0,spg:1.6,bpg:0.4,rarity:"rare",img:"1630169"},
+  {name:"Darius Garland",team:"CLE",ppg:20.5,rpg:3.2,apg:7.5,spg:1.4,bpg:0.2,rarity:"rare",img:"1629636"},
+  {name:"Franz Wagner",team:"ORL",ppg:22.0,rpg:5.0,apg:5.0,spg:1.6,bpg:0.5,rarity:"rare",img:"1630532"},
+  {name:"Paolo Banchero",team:"ORL",ppg:22.5,rpg:6.8,apg:5.1,spg:0.9,bpg:0.7,rarity:"rare",img:"1631094"},
+  {name:"Jaren Jackson Jr.",team:"MEM",ppg:20.5,rpg:5.5,apg:1.8,spg:0.8,bpg:3.4,rarity:"rare",img:"1628991"},
+  {name:"Zion Williamson",team:"NOP",ppg:21.5,rpg:6.0,apg:4.5,spg:1.0,bpg:0.5,rarity:"rare",img:"1629627"},
+  {name:"Cade Cunningham",team:"DET",ppg:23.8,rpg:6.0,apg:9.0,spg:1.4,bpg:0.7,rarity:"rare",img:"1630595"},
+  {name:"Alperen Sengun",team:"HOU",ppg:21.5,rpg:10.0,apg:5.3,spg:1.3,bpg:1.0,rarity:"rare",img:"1630578"},
+  {name:"Evan Mobley",team:"CLE",ppg:18.5,rpg:9.5,apg:3.0,spg:1.2,bpg:2.0,rarity:"common",img:"1630596"},
+  {name:"Scottie Barnes",team:"TOR",ppg:20.0,rpg:8.1,apg:6.0,spg:1.4,bpg:1.1,rarity:"common",img:"1630567"},
+  {name:"Chet Holmgren",team:"OKC",ppg:16.0,rpg:7.7,apg:2.3,spg:0.9,bpg:2.6,rarity:"common",img:"1631096"},
+  {name:"Jalen Williams",team:"OKC",ppg:21.5,rpg:4.3,apg:5.5,spg:1.2,bpg:0.5,rarity:"common",img:"1631108"},
+  {name:"Mikal Bridges",team:"NYK",ppg:15.5,rpg:4.0,apg:3.5,spg:1.5,bpg:0.5,rarity:"common",img:"1628969"},
+  {name:"OG Anunoby",team:"NYK",ppg:17.0,rpg:5.0,apg:2.0,spg:1.7,bpg:0.6,rarity:"common",img:"1628384"},
+  {name:"Julius Randle",team:"MIN",ppg:24.0,rpg:9.0,apg:4.8,spg:0.9,bpg:0.4,rarity:"common",img:"203994"},
+  {name:"DeMar DeRozan",team:"SAC",ppg:20.5,rpg:4.5,apg:5.0,spg:0.8,bpg:0.3,rarity:"common",img:"201942"},
+  {name:"Domantas Sabonis",team:"SAC",ppg:20.0,rpg:13.5,apg:7.0,spg:0.8,bpg:0.3,rarity:"common",img:"1627734"},
+  {name:"Andrew Wiggins",team:"GSW",ppg:17.5,rpg:5.0,apg:2.3,spg:1.0,bpg:0.7,rarity:"common",img:"203952"},
+  {name:"Klay Thompson",team:"DAL",ppg:15.0,rpg:3.2,apg:2.2,spg:0.7,bpg:0.4,rarity:"common",img:"202691"},
+  {name:"LaMelo Ball",team:"CHA",ppg:24.0,rpg:5.5,apg:8.5,spg:1.6,bpg:0.3,rarity:"common",img:"1630163"},
+  {name:"Kyle Kuzma",team:"WAS",ppg:22.0,rpg:7.5,apg:3.5,spg:0.7,bpg:0.5,rarity:"common",img:"1628398"},
+  {name:"Kristaps Porzingis",team:"BOS",ppg:19.5,rpg:7.0,apg:2.0,spg:0.7,bpg:1.9,rarity:"common",img:"204001"},
+  {name:"Brook Lopez",team:"MIL",ppg:12.0,rpg:5.0,apg:2.0,spg:0.6,bpg:2.5,rarity:"common",img:"201572"},
+  {name:"Jimmy Butler",team:"MIA",ppg:20.0,rpg:5.5,apg:5.5,spg:1.5,bpg:0.4,rarity:"common",img:"202710"},
+  {name:"Dejounte Murray",team:"NOP",ppg:21.0,rpg:5.0,apg:5.5,spg:1.5,bpg:0.4,rarity:"common",img:"1627749"},
+  {name:"Zach LaVine",team:"CHI",ppg:20.5,rpg:4.5,apg:4.5,spg:0.8,bpg:0.4,rarity:"common",img:"203897"},
+  {name:"Immanuel Quickley",team:"TOR",ppg:18.0,rpg:4.5,apg:6.5,spg:1.0,bpg:0.3,rarity:"common",img:"1630193"},
+  {name:"Coby White",team:"CHI",ppg:19.5,rpg:4.0,apg:4.5,spg:0.9,bpg:0.3,rarity:"common",img:"1629632"},
+  {name:"Cam Thomas",team:"BKN",ppg:22.5,rpg:3.5,apg:3.5,spg:0.7,bpg:0.4,rarity:"common",img:"1631119"},
+  {name:"Anfernee Simons",team:"POR",ppg:22.0,rpg:3.5,apg:5.5,spg:0.8,bpg:0.3,rarity:"common",img:"1629014"},
+  {name:"Jerami Grant",team:"POR",ppg:20.0,rpg:4.0,apg:3.0,spg:1.0,bpg:0.8,rarity:"common",img:"203924"},
+  {name:"Jordan Poole",team:"WAS",ppg:20.0,rpg:3.5,apg:5.5,spg:0.8,bpg:0.3,rarity:"common",img:"1629673"},
+  {name:"Myles Turner",team:"IND",ppg:15.0,rpg:7.0,apg:1.8,spg:0.9,bpg:2.7,rarity:"common",img:"1626167"},
+  {name:"Nikola Vucevic",team:"CHI",ppg:15.5,rpg:11.0,apg:3.0,spg:0.6,bpg:0.8,rarity:"common",img:"202696"},
+  {name:"Rudy Gobert",team:"MIN",ppg:13.5,rpg:12.5,apg:1.3,spg:0.7,bpg:2.0,rarity:"common",img:"203497"},
+  {name:"Clint Capela",team:"ATL",ppg:11.5,rpg:11.0,apg:1.0,spg:0.8,bpg:1.3,rarity:"common",img:"203991"},
+  {name:"Aaron Gordon",team:"DEN",ppg:13.5,rpg:6.5,apg:3.5,spg:0.9,bpg:0.5,rarity:"common",img:"203932"},
+  {name:"Michael Porter Jr.",team:"DEN",ppg:17.0,rpg:7.5,apg:2.0,spg:0.5,bpg:0.7,rarity:"common",img:"1629008"},
+  {name:"Deni Avdija",team:"POR",ppg:16.5,rpg:7.0,apg:5.0,spg:1.2,bpg:0.5,rarity:"common",img:"1630166"},
+  {name:"Scoot Henderson",team:"POR",ppg:15.0,rpg:4.0,apg:7.0,spg:1.0,bpg:0.3,rarity:"common",img:"1641706"},
+  {name:"Amen Thompson",team:"HOU",ppg:12.0,rpg:6.0,apg:3.5,spg:1.3,bpg:0.5,rarity:"common",img:"1641708"},
+  {name:"Jabari Smith Jr.",team:"HOU",ppg:15.0,rpg:7.0,apg:2.0,spg:1.1,bpg:0.9,rarity:"common",img:"1631095"},
+  {name:"Devin Vassell",team:"SAS",ppg:19.0,rpg:3.8,apg:4.0,spg:0.9,bpg:0.4,rarity:"common",img:"1630170"},
+  {name:"Ausar Thompson",team:"DET",ppg:14.0,rpg:5.5,apg:3.5,spg:1.5,bpg:0.8,rarity:"common",img:"1641707"},
+  {name:"Isaiah Hartenstein",team:"OKC",ppg:10.5,rpg:9.5,apg:3.5,spg:0.8,bpg:1.2,rarity:"common",img:"1629631"},
+  {name:"Jalen Johnson",team:"ATL",ppg:19.0,rpg:9.5,apg:5.5,spg:1.2,bpg:0.9,rarity:"common",img:"1630556"},
+  {name:"Naz Reid",team:"MIN",ppg:13.5,rpg:5.5,apg:1.8,spg:0.7,bpg:1.0,rarity:"common",img:"1629675"},
+  {name:"Alex Sarr",team:"WAS",ppg:13.5,rpg:7.0,apg:2.5,spg:0.8,bpg:2.5,rarity:"common",img:null},
+  {name:"Dyson Daniels",team:"ATL",ppg:13.5,rpg:5.0,apg:4.5,spg:2.3,bpg:0.5,rarity:"common",img:"1631099"},
+  {name:"Herb Jones",team:"NOP",ppg:11.5,rpg:5.0,apg:2.5,spg:1.8,bpg:0.5,rarity:"common",img:"1630529"},
+  {name:"Josh Hart",team:"NYK",ppg:12.5,rpg:9.0,apg:5.0,spg:1.2,bpg:0.4,rarity:"common",img:"1628404"},
+  {name:"Derrick White",team:"BOS",ppg:15.5,rpg:4.5,apg:5.5,spg:1.2,bpg:1.0,rarity:"common",img:"1628401"},
+  {name:"Al Horford",team:"BOS",ppg:9.0,rpg:6.5,apg:3.0,spg:0.8,bpg:1.0,rarity:"common",img:"201143"},
+]},
+
+"2021-22": { label:"2021-22", players:[
+  {name:"Joel Embiid",team:"PHI",ppg:30.6,rpg:11.7,apg:4.2,spg:1.1,bpg:1.5,rarity:"legendary",img:"203954"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:29.9,rpg:11.6,apg:5.8,spg:1.1,bpg:1.4,rarity:"legendary",img:"203507"},
+  {name:"Luka Doncic",team:"DAL",ppg:28.4,rpg:9.1,apg:8.7,spg:1.2,bpg:0.5,rarity:"legendary",img:"1629029"},
+  {name:"Trae Young",team:"ATL",ppg:28.4,rpg:3.7,apg:9.7,spg:0.9,bpg:0.1,rarity:"legendary",img:"1629027"},
+  {name:"Devin Booker",team:"PHX",ppg:26.8,rpg:5.0,apg:4.8,spg:1.0,bpg:0.3,rarity:"epic",img:"1626164"},
+  {name:"LeBron James",team:"LAL",ppg:30.3,rpg:8.2,apg:6.2,spg:1.3,bpg:1.1,rarity:"epic",img:"2544"},
+  {name:"Stephen Curry",team:"GSW",ppg:25.5,rpg:5.2,apg:6.3,spg:1.3,bpg:0.4,rarity:"epic",img:"201939"},
+  {name:"Kevin Durant",team:"BKN",ppg:29.9,rpg:7.4,apg:5.9,spg:0.8,bpg:1.4,rarity:"epic",img:"201142"},
+  {name:"Nikola Jokic",team:"DEN",ppg:27.1,rpg:13.8,apg:7.9,spg:1.5,bpg:0.9,rarity:"epic",img:"203999"},
+  {name:"Jayson Tatum",team:"BOS",ppg:26.9,rpg:8.0,apg:4.4,spg:1.1,bpg:0.7,rarity:"epic",img:"1628369"},
+  {name:"Karl-Anthony Towns",team:"MIN",ppg:24.6,rpg:9.8,apg:4.4,spg:1.2,bpg:0.8,rarity:"epic",img:"1626157"},
+  {name:"Ja Morant",team:"MEM",ppg:27.4,rpg:5.7,apg:6.7,spg:1.2,bpg:0.4,rarity:"epic",img:"1629630"},
+  {name:"Jaylen Brown",team:"BOS",ppg:23.6,rpg:6.1,apg:3.5,spg:1.1,bpg:0.3,rarity:"rare",img:"1627759"},
+  {name:"Damian Lillard",team:"POR",ppg:24.0,rpg:4.1,apg:7.3,spg:1.0,bpg:0.3,rarity:"rare",img:"203081"},
+  {name:"Anthony Davis",team:"LAL",ppg:23.2,rpg:9.9,apg:3.1,spg:1.2,bpg:2.3,rarity:"rare",img:"203076"},
+  {name:"Chris Paul",team:"PHX",ppg:14.7,rpg:4.5,apg:10.8,spg:1.9,bpg:0.2,rarity:"rare",img:"101108"},
+  {name:"Paul George",team:"LAC",ppg:24.3,rpg:6.9,apg:5.5,spg:1.5,bpg:0.5,rarity:"rare",img:"202331"},
+  {name:"Kawhi Leonard",team:"LAC",ppg:24.8,rpg:6.5,apg:5.2,spg:1.6,bpg:0.4,rarity:"rare",img:"202695"},
+  {name:"Anthony Edwards",team:"MIN",ppg:21.3,rpg:4.8,apg:3.8,spg:1.5,bpg:0.5,rarity:"rare",img:"1630162"},
+  {name:"Donovan Mitchell",team:"UTA",ppg:25.9,rpg:4.2,apg:5.3,spg:1.4,bpg:0.4,rarity:"rare",img:"1628378"},
+  {name:"Darius Garland",team:"CLE",ppg:21.7,rpg:3.3,apg:8.6,spg:1.3,bpg:0.2,rarity:"rare",img:"1629636"},
+  {name:"Pascal Siakam",team:"TOR",ppg:22.8,rpg:8.5,apg:5.3,spg:1.0,bpg:0.6,rarity:"rare",img:"1627783"},
+  {name:"De'Aaron Fox",team:"SAC",ppg:23.2,rpg:4.1,apg:5.8,spg:1.1,bpg:0.3,rarity:"rare",img:"1628368"},
+  {name:"Jimmy Butler",team:"MIA",ppg:21.4,rpg:5.9,apg:5.5,spg:1.6,bpg:0.4,rarity:"rare",img:"202710"},
+  {name:"Bam Adebayo",team:"MIA",ppg:19.1,rpg:10.1,apg:3.4,spg:1.4,bpg:0.8,rarity:"rare",img:"1628389"},
+  {name:"Miles Bridges",team:"CHA",ppg:20.2,rpg:7.0,apg:3.8,spg:1.0,bpg:0.6,rarity:"rare",img:"1628970"},
+  {name:"LaMelo Ball",team:"CHA",ppg:20.1,rpg:7.6,apg:7.6,spg:1.6,bpg:0.4,rarity:"rare",img:"1630163"},
+  {name:"Shai Gilgeous-Alexander",team:"OKC",ppg:24.5,rpg:5.0,apg:5.9,spg:1.6,bpg:0.7,rarity:"rare",img:"1628983"},
+  {name:"Dejounte Murray",team:"SAS",ppg:21.1,rpg:8.3,apg:9.2,spg:2.0,bpg:0.5,rarity:"rare",img:"1627749"},
+  {name:"Fred VanVleet",team:"TOR",ppg:20.3,rpg:4.4,apg:6.7,spg:2.1,bpg:0.3,rarity:"rare",img:"1627832"},
+  {name:"Klay Thompson",team:"GSW",ppg:20.4,rpg:3.9,apg:2.8,spg:0.8,bpg:0.5,rarity:"rare",img:"202691"},
+  {name:"Draymond Green",team:"GSW",ppg:7.5,rpg:7.3,apg:7.0,spg:1.3,bpg:1.2,rarity:"common",img:"203110"},
+  {name:"Andrew Wiggins",team:"GSW",ppg:17.2,rpg:4.5,apg:2.3,spg:1.0,bpg:0.7,rarity:"common",img:"203952"},
+  {name:"Jordan Poole",team:"GSW",ppg:18.5,rpg:3.4,apg:4.0,spg:0.8,bpg:0.3,rarity:"common",img:"1629673"},
+  {name:"Evan Mobley",team:"CLE",ppg:15.0,rpg:8.3,apg:2.5,spg:1.3,bpg:1.7,rarity:"common",img:"1630596"},
+  {name:"Jarrett Allen",team:"CLE",ppg:13.2,rpg:10.8,apg:2.4,spg:0.7,bpg:0.9,rarity:"common",img:"1628386"},
+  {name:"Cade Cunningham",team:"DET",ppg:17.4,rpg:5.5,apg:5.6,spg:1.2,bpg:0.5,rarity:"common",img:"1630595"},
+  {name:"Tyrese Haliburton",team:"SAC",ppg:15.3,rpg:4.5,apg:7.4,spg:1.6,bpg:0.4,rarity:"common",img:"1630169"},
+  {name:"Franz Wagner",team:"ORL",ppg:15.2,rpg:4.1,apg:2.7,spg:0.7,bpg:0.3,rarity:"common",img:"1630532"},
+  {name:"Paolo Banchero",team:"ORL",ppg:0.0,rpg:0.0,apg:0.0,spg:0.0,bpg:0.0,rarity:"common",img:"1631094"},
+  {name:"DeMar DeRozan",team:"CHI",ppg:27.9,rpg:5.0,apg:4.9,spg:0.9,bpg:0.3,rarity:"rare",img:"201942"},
+  {name:"Zach LaVine",team:"CHI",ppg:24.4,rpg:4.6,apg:4.5,spg:0.8,bpg:0.4,rarity:"rare",img:"203897"},
+  {name:"Nikola Vucevic",team:"CHI",ppg:17.6,rpg:11.0,apg:3.2,spg:0.7,bpg:0.7,rarity:"common",img:"202696"},
+  {name:"Lonzo Ball",team:"CHI",ppg:13.0,rpg:5.4,apg:5.1,spg:1.8,bpg:0.4,rarity:"common",img:"1628366"},
+  {name:"Khris Middleton",team:"MIL",ppg:20.1,rpg:5.4,apg:5.4,spg:1.2,bpg:0.3,rarity:"common",img:"203114"},
+  {name:"Jrue Holiday",team:"MIL",ppg:18.3,rpg:5.1,apg:6.8,spg:1.6,bpg:0.3,rarity:"common",img:"203200"},
+  {name:"Brook Lopez",team:"MIL",ppg:10.1,rpg:4.1,apg:1.8,spg:0.5,bpg:2.2,rarity:"common",img:"201572"},
+  {name:"Bradley Beal",team:"WAS",ppg:23.2,rpg:4.7,apg:6.6,spg:1.2,bpg:0.4,rarity:"common",img:"203078"},
+  {name:"Kyle Kuzma",team:"WAS",ppg:17.1,rpg:8.5,apg:3.5,spg:0.7,bpg:0.5,rarity:"common",img:"1628398"},
+  {name:"Spencer Dinwiddie",team:"WAS",ppg:16.6,rpg:4.0,apg:6.0,spg:0.9,bpg:0.3,rarity:"common",img:"203915"},
+  {name:"OG Anunoby",team:"TOR",ppg:15.4,rpg:5.5,apg:2.1,spg:1.5,bpg:0.5,rarity:"common",img:"1628384"},
+  {name:"Scottie Barnes",team:"TOR",ppg:15.3,rpg:7.5,apg:3.5,spg:1.1,bpg:0.7,rarity:"common",img:"1630567"},
+  {name:"Deandre Ayton",team:"PHX",ppg:17.2,rpg:10.2,apg:1.6,spg:0.7,bpg:0.7,rarity:"common",img:"1629028"},
+  {name:"Mikal Bridges",team:"PHX",ppg:14.2,rpg:4.3,apg:2.2,spg:1.8,bpg:0.6,rarity:"common",img:"1628969"},
+  {name:"Rudy Gobert",team:"UTA",ppg:15.6,rpg:14.7,apg:1.0,spg:0.7,bpg:2.1,rarity:"common",img:"203497"},
+  {name:"Bojan Bogdanovic",team:"UTA",ppg:18.1,rpg:4.1,apg:2.1,spg:0.6,bpg:0.2,rarity:"common",img:"202711"},
+  {name:"Mike Conley",team:"MEM",ppg:12.7,rpg:3.2,apg:7.5,spg:1.2,bpg:0.2,rarity:"common",img:"201144"},
+  {name:"Desmond Bane",team:"MEM",ppg:18.2,rpg:4.4,apg:3.3,spg:0.9,bpg:0.3,rarity:"common",img:"1630217"},
+  {name:"Steven Adams",team:"MEM",ppg:8.3,rpg:10.2,apg:3.2,spg:0.9,bpg:0.6,rarity:"common",img:"203500"},
+  {name:"Jaren Jackson Jr.",team:"MEM",ppg:16.3,rpg:6.1,apg:1.4,spg:0.7,bpg:2.3,rarity:"common",img:"1628991"},
+  {name:"Aaron Gordon",team:"DEN",ppg:12.4,rpg:6.6,apg:3.2,spg:0.9,bpg:0.4,rarity:"common",img:"203932"},
+  {name:"Michael Porter Jr.",team:"DEN",ppg:20.2,rpg:8.3,apg:2.4,spg:0.6,bpg:0.6,rarity:"common",img:"1629008"},
+  {name:"Alperen Sengun",team:"HOU",ppg:9.6,rpg:5.5,apg:1.9,spg:0.8,bpg:0.9,rarity:"common",img:"1630578"},
+  {name:"Jalen Green",team:"HOU",ppg:17.3,rpg:3.4,apg:2.6,spg:0.8,bpg:0.4,rarity:"common",img:"1630224"},
+  {name:"Norman Powell",team:"LAC",ppg:17.4,rpg:2.8,apg:1.8,spg:1.1,bpg:0.3,rarity:"common",img:"1626181"},
+  {name:"Ivica Zubac",team:"LAC",ppg:11.6,rpg:9.0,apg:2.1,spg:0.7,bpg:1.2,rarity:"common",img:"1627826"},
+  {name:"Nic Claxton",team:"BKN",ppg:8.0,rpg:7.7,apg:2.2,spg:0.9,bpg:2.0,rarity:"common",img:"1629651"},
+  {name:"Seth Curry",team:"PHI",ppg:12.5,rpg:2.5,apg:2.5,spg:0.5,bpg:0.1,rarity:"common",img:"203552"},
+  {name:"Tobias Harris",team:"PHI",ppg:18.5,rpg:6.9,apg:3.5,spg:0.8,bpg:0.5,rarity:"common",img:"202699"},
+  {name:"Tyrese Maxey",team:"PHI",ppg:17.5,rpg:3.2,apg:4.3,spg:0.9,bpg:0.4,rarity:"common",img:"1630178"},
+  {name:"Al Horford",team:"BOS",ppg:10.2,rpg:7.7,apg:3.4,spg:1.0,bpg:1.1,rarity:"common",img:"201143"},
+  {name:"Marcus Smart",team:"BOS",ppg:12.1,rpg:3.6,apg:5.5,spg:2.2,bpg:0.4,rarity:"common",img:"203935"},
+]},
+
+"2019-20": { label:"2019-20", players:[
+  {name:"James Harden",team:"HOU",ppg:34.3,rpg:6.4,apg:7.4,spg:1.8,bpg:0.9,rarity:"legendary",img:"201935"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:29.6,rpg:13.7,apg:5.8,spg:1.0,bpg:1.0,rarity:"legendary",img:"203507"},
+  {name:"Damian Lillard",team:"POR",ppg:30.0,rpg:4.3,apg:8.0,spg:1.1,bpg:0.3,rarity:"legendary",img:"203081"},
+  {name:"LeBron James",team:"LAL",ppg:25.3,rpg:7.8,apg:10.2,spg:1.2,bpg:0.5,rarity:"legendary",img:"2544"},
+  {name:"Luka Doncic",team:"DAL",ppg:28.8,rpg:9.4,apg:8.8,spg:1.0,bpg:0.2,rarity:"epic",img:"1629029"},
+  {name:"Kawhi Leonard",team:"LAC",ppg:27.1,rpg:7.1,apg:4.9,spg:1.8,bpg:0.4,rarity:"epic",img:"202695"},
+  {name:"Anthony Davis",team:"LAL",ppg:26.1,rpg:9.3,apg:3.1,spg:1.5,bpg:2.3,rarity:"epic",img:"203076"},
+  {name:"Trae Young",team:"ATL",ppg:29.6,rpg:4.3,apg:9.3,spg:1.1,bpg:0.2,rarity:"epic",img:"1629027"},
+  {name:"Bradley Beal",team:"WAS",ppg:30.5,rpg:4.2,apg:6.1,spg:1.2,bpg:0.4,rarity:"epic",img:"203078"},
+  {name:"Nikola Jokic",team:"DEN",ppg:20.2,rpg:10.2,apg:6.9,spg:1.2,bpg:0.6,rarity:"epic",img:"203999"},
+  {name:"Joel Embiid",team:"PHI",ppg:23.4,rpg:11.8,apg:3.0,spg:0.9,bpg:1.3,rarity:"epic",img:"203954"},
+  {name:"Jimmy Butler",team:"MIA",ppg:19.9,rpg:6.7,apg:6.0,spg:1.8,bpg:0.6,rarity:"epic",img:"202710"},
+  {name:"Jayson Tatum",team:"BOS",ppg:23.4,rpg:7.0,apg:3.0,spg:1.4,bpg:0.9,rarity:"rare",img:"1628369"},
+  {name:"Khris Middleton",team:"MIL",ppg:20.9,rpg:6.2,apg:4.3,spg:1.1,bpg:0.2,rarity:"rare",img:"203114"},
+  {name:"Kyle Lowry",team:"TOR",ppg:19.4,rpg:4.8,apg:7.5,spg:1.4,bpg:0.3,rarity:"rare",img:"200768"},
+  {name:"Rudy Gobert",team:"UTA",ppg:15.1,rpg:13.5,apg:2.0,spg:0.7,bpg:2.0,rarity:"rare",img:"203497"},
+  {name:"Donovan Mitchell",team:"UTA",ppg:24.0,rpg:4.4,apg:4.3,spg:1.1,bpg:0.4,rarity:"rare",img:"1628378"},
+  {name:"Devin Booker",team:"PHX",ppg:26.1,rpg:4.0,apg:6.3,spg:0.9,bpg:0.3,rarity:"rare",img:"1626164"},
+  {name:"Chris Paul",team:"OKC",ppg:17.6,rpg:5.0,apg:8.9,spg:2.1,bpg:0.4,rarity:"rare",img:"101108"},
+  {name:"Shai Gilgeous-Alexander",team:"OKC",ppg:19.0,rpg:5.9,apg:3.3,spg:1.0,bpg:0.7,rarity:"rare",img:"1628983"},
+  {name:"Ben Simmons",team:"PHI",ppg:16.4,rpg:7.8,apg:8.0,spg:2.1,bpg:0.6,rarity:"rare",img:"1627732"},
+  {name:"Bam Adebayo",team:"MIA",ppg:15.9,rpg:10.2,apg:5.1,spg:1.3,bpg:1.3,rarity:"rare",img:"1628389"},
+  {name:"Pascal Siakam",team:"TOR",ppg:22.9,rpg:7.3,apg:3.5,spg:1.3,bpg:0.7,rarity:"rare",img:"1627783"},
+  {name:"Zach LaVine",team:"CHI",ppg:25.5,rpg:4.8,apg:4.2,spg:1.4,bpg:0.5,rarity:"rare",img:"203897"},
+  {name:"Jaylen Brown",team:"BOS",ppg:20.3,rpg:6.4,apg:2.1,spg:1.1,bpg:0.4,rarity:"rare",img:"1627759"},
+  {name:"DeMar DeRozan",team:"SAS",ppg:21.6,rpg:5.1,apg:5.6,spg:1.0,bpg:0.3,rarity:"rare",img:"201942"},
+  {name:"Jrue Holiday",team:"NOP",ppg:19.1,rpg:4.8,apg:6.7,spg:1.6,bpg:0.5,rarity:"rare",img:"203200"},
+  {name:"Brandon Ingram",team:"NOP",ppg:24.3,rpg:6.3,apg:4.2,spg:1.0,bpg:0.6,rarity:"rare",img:"1627742"},
+  {name:"Domantas Sabonis",team:"IND",ppg:18.5,rpg:12.4,apg:4.9,spg:0.8,bpg:0.5,rarity:"rare",img:"1627734"},
+  {name:"Malcolm Brogdon",team:"IND",ppg:16.3,rpg:5.3,apg:7.1,spg:0.9,bpg:0.3,rarity:"rare",img:"1627763"},
+  {name:"De'Aaron Fox",team:"SAC",ppg:21.1,rpg:3.8,apg:6.8,spg:1.4,bpg:0.3,rarity:"rare",img:"1628368"},
+  {name:"Karl-Anthony Towns",team:"MIN",ppg:26.5,rpg:10.8,apg:4.4,spg:0.9,bpg:1.2,rarity:"rare",img:"1626157"},
+  {name:"Kevin Durant",team:"BKN",ppg:26.9,rpg:7.1,apg:5.9,spg:1.2,bpg:1.1,rarity:"epic",img:"201142"},
+  {name:"Kemba Walker",team:"BOS",ppg:20.4,rpg:3.9,apg:5.1,spg:1.2,bpg:0.3,rarity:"rare",img:"202689"},
+  {name:"Kristaps Porzingis",team:"DAL",ppg:20.4,rpg:9.5,apg:1.8,spg:0.9,bpg:2.1,rarity:"rare",img:"204001"},
+  {name:"Collin Sexton",team:"CLE",ppg:20.8,rpg:3.1,apg:3.0,spg:0.8,bpg:0.2,rarity:"common",img:"1629012"},
+  {name:"Darius Garland",team:"CLE",ppg:12.3,rpg:2.4,apg:3.9,spg:0.7,bpg:0.1,rarity:"common",img:"1629636"},
+  {name:"Andre Drummond",team:"DET",ppg:17.8,rpg:15.8,apg:2.0,spg:1.1,bpg:1.4,rarity:"common",img:"203083"},
+  {name:"Derrick Rose",team:"DET",ppg:18.1,rpg:3.1,apg:6.0,spg:0.8,bpg:0.2,rarity:"common",img:"201565"},
+  {name:"Lonzo Ball",team:"NOP",ppg:11.8,rpg:6.1,apg:7.1,spg:1.5,bpg:0.4,rarity:"common",img:"1628366"},
+  {name:"Devonte Graham",team:"CHA",ppg:18.2,rpg:3.4,apg:7.5,spg:1.2,bpg:0.2,rarity:"common",img:null},
+  {name:"Duncan Robinson",team:"MIA",ppg:13.5,rpg:2.8,apg:1.8,spg:0.5,bpg:0.2,rarity:"common",img:"1629130"},
+  {name:"Tyler Herro",team:"MIA",ppg:13.5,rpg:4.1,apg:2.2,spg:0.5,bpg:0.2,rarity:"common",img:"1629639"},
+  {name:"Fred VanVleet",team:"TOR",ppg:17.6,rpg:3.8,apg:6.6,spg:1.9,bpg:0.3,rarity:"common",img:"1627832"},
+  {name:"Marc Gasol",team:"TOR",ppg:7.6,rpg:6.3,apg:3.5,spg:0.8,bpg:0.8,rarity:"common",img:"201188"},
+  {name:"Paul George",team:"LAC",ppg:21.5,rpg:5.7,apg:3.9,spg:2.2,bpg:0.4,rarity:"rare",img:"202331"},
+  {name:"Lou Williams",team:"LAC",ppg:18.3,rpg:3.0,apg:5.1,spg:0.7,bpg:0.2,rarity:"common",img:"2760"},
+  {name:"Montrezl Harrell",team:"LAC",ppg:18.6,rpg:7.1,apg:1.7,spg:0.7,bpg:1.1,rarity:"common",img:"1626195"},
+  {name:"Myles Turner",team:"IND",ppg:12.0,rpg:6.0,apg:1.7,spg:0.7,bpg:2.9,rarity:"common",img:"1626167"},
+  {name:"LaMarcus Aldridge",team:"SAS",ppg:18.9,rpg:7.4,apg:2.4,spg:0.6,bpg:1.0,rarity:"rare",img:"200746"},
+  {name:"Mike Conley",team:"UTA",ppg:14.4,rpg:3.3,apg:6.0,spg:1.5,bpg:0.4,rarity:"common",img:"201144"},
+  {name:"Bojan Bogdanovic",team:"UTA",ppg:20.0,rpg:4.1,apg:2.0,spg:0.6,bpg:0.3,rarity:"common",img:"202711"},
+  {name:"Bogdan Bogdanovic",team:"SAC",ppg:15.1,rpg:3.8,apg:3.8,spg:0.8,bpg:0.3,rarity:"common",img:"203992"},
+  {name:"Buddy Hield",team:"SAC",ppg:19.8,rpg:5.1,apg:3.5,spg:1.1,bpg:0.3,rarity:"common",img:"1626169"},
+  {name:"Seth Curry",team:"DAL",ppg:12.0,rpg:2.0,apg:2.5,spg:0.5,bpg:0.1,rarity:"common",img:"203552"},
+  {name:"Klay Thompson",team:"GSW",ppg:7.0,rpg:2.1,apg:1.4,spg:0.5,bpg:0.2,rarity:"common",img:"202691"},
+  {name:"Stephen Curry",team:"GSW",ppg:20.3,rpg:5.0,apg:6.6,spg:1.1,bpg:0.3,rarity:"epic",img:"201939"},
+  {name:"D'Angelo Russell",team:"GSW",ppg:23.6,rpg:3.9,apg:6.2,spg:1.2,bpg:0.2,rarity:"common",img:"1626156"},
+  {name:"Mikal Bridges",team:"PHX",ppg:11.5,rpg:4.2,apg:1.8,spg:2.0,bpg:0.5,rarity:"common",img:"1628969"},
+  {name:"Ricky Rubio",team:"PHX",ppg:13.0,rpg:4.1,apg:8.0,spg:1.4,bpg:0.2,rarity:"common",img:"201937"},
+  {name:"Tobias Harris",team:"PHI",ppg:19.6,rpg:7.6,apg:3.2,spg:0.6,bpg:0.5,rarity:"common",img:"202699"},
+  {name:"Al Horford",team:"OKC",ppg:14.0,rpg:6.7,apg:4.2,spg:0.8,bpg:1.0,rarity:"common",img:"201143"},
+  {name:"Spencer Dinwiddie",team:"BKN",ppg:20.6,rpg:3.5,apg:6.8,spg:0.7,bpg:0.3,rarity:"common",img:"203915"},
+  {name:"Caris LeVert",team:"BKN",ppg:18.7,rpg:4.4,apg:4.4,spg:1.3,bpg:0.5,rarity:"common",img:"1627763"},
+  {name:"Jarrett Allen",team:"BKN",ppg:11.1,rpg:9.7,apg:1.5,spg:0.7,bpg:1.3,rarity:"common",img:"1628386"},
+  {name:"Jordan Clarkson",team:"CLE",ppg:16.1,rpg:3.2,apg:3.5,spg:0.7,bpg:0.2,rarity:"common",img:"203903"},
+  {name:"Jerami Grant",team:"DEN",ppg:12.0,rpg:3.3,apg:1.6,spg:0.8,bpg:0.7,rarity:"common",img:"203924"},
+  {name:"Gary Harris",team:"DEN",ppg:13.0,rpg:3.0,apg:2.5,spg:1.3,bpg:0.3,rarity:"common",img:"203914"},
+  {name:"Terry Rozier",team:"CHA",ppg:18.0,rpg:4.4,apg:4.1,spg:1.3,bpg:0.3,rarity:"common",img:"1626179"},
+  {name:"John Collins",team:"ATL",ppg:21.6,rpg:10.1,apg:1.7,spg:0.7,bpg:1.2,rarity:"common",img:"1628381"},
+  {name:"Clint Capela",team:"ATL",ppg:14.3,rpg:13.1,apg:1.3,spg:0.8,bpg:1.5,rarity:"common",img:"203991"},
+]},
+
+"2015-16": { label:"2015-16", players:[
+  {name:"Stephen Curry",team:"GSW",ppg:30.1,rpg:5.4,apg:6.7,spg:2.1,bpg:0.2,rarity:"legendary",img:"201939"},
+  {name:"LeBron James",team:"CLE",ppg:25.3,rpg:7.4,apg:6.8,spg:1.4,bpg:0.6,rarity:"legendary",img:"2544"},
+  {name:"Kevin Durant",team:"OKC",ppg:28.2,rpg:8.2,apg:5.0,spg:1.0,bpg:1.2,rarity:"legendary",img:"201142"},
+  {name:"James Harden",team:"HOU",ppg:29.0,rpg:6.1,apg:7.5,spg:1.7,bpg:0.5,rarity:"legendary",img:"201935"},
+  {name:"Russell Westbrook",team:"OKC",ppg:23.5,rpg:7.8,apg:10.4,spg:2.0,bpg:0.3,rarity:"epic",img:"200794"},
+  {name:"Anthony Davis",team:"NOP",ppg:24.3,rpg:10.3,apg:2.0,spg:1.3,bpg:2.2,rarity:"epic",img:"203076"},
+  {name:"Kawhi Leonard",team:"SAS",ppg:21.2,rpg:6.8,apg:2.6,spg:1.8,bpg:0.6,rarity:"epic",img:"202695"},
+  {name:"Damian Lillard",team:"POR",ppg:25.1,rpg:4.0,apg:6.8,spg:0.9,bpg:0.3,rarity:"epic",img:"203081"},
+  {name:"Kyle Lowry",team:"TOR",ppg:21.2,rpg:4.7,apg:6.4,spg:1.8,bpg:0.5,rarity:"epic",img:"200768"},
+  {name:"Kobe Bryant",team:"LAL",ppg:17.6,rpg:3.7,apg:4.7,spg:0.9,bpg:0.3,rarity:"epic",img:"977"},
+  {name:"Draymond Green",team:"GSW",ppg:14.0,rpg:9.5,apg:7.4,spg:1.5,bpg:1.4,rarity:"rare",img:"203110"},
+  {name:"Klay Thompson",team:"GSW",ppg:22.1,rpg:3.8,apg:2.9,spg:0.9,bpg:0.6,rarity:"rare",img:"202691"},
+  {name:"DeMar DeRozan",team:"TOR",ppg:23.5,rpg:4.3,apg:4.0,spg:1.0,bpg:0.2,rarity:"rare",img:"201942"},
+  {name:"Chris Paul",team:"LAC",ppg:19.5,rpg:4.6,apg:10.0,spg:2.1,bpg:0.2,rarity:"rare",img:"101108"},
+  {name:"DeMarcus Cousins",team:"SAC",ppg:26.9,rpg:11.5,apg:3.3,spg:1.1,bpg:1.6,rarity:"rare",img:"202326"},
+  {name:"Karl-Anthony Towns",team:"MIN",ppg:18.3,rpg:10.5,apg:2.0,spg:0.7,bpg:1.7,rarity:"rare",img:"1626157"},
+  {name:"Paul George",team:"IND",ppg:23.1,rpg:7.0,apg:4.1,spg:1.9,bpg:0.3,rarity:"rare",img:"202331"},
+  {name:"Dirk Nowitzki",team:"DAL",ppg:18.3,rpg:6.5,apg:1.8,spg:0.5,bpg:0.7,rarity:"rare",img:"1717"},
+  {name:"Hassan Whiteside",team:"MIA",ppg:17.1,rpg:14.1,apg:0.7,spg:0.7,bpg:3.7,rarity:"rare",img:null},
+  {name:"Kyrie Irving",team:"CLE",ppg:19.6,rpg:3.0,apg:4.7,spg:1.1,bpg:0.4,rarity:"rare",img:"202681"},
+  {name:"Giannis Antetokounmpo",team:"MIL",ppg:16.9,rpg:7.7,apg:4.2,spg:1.2,bpg:1.4,rarity:"rare",img:"203507"},
+  {name:"Jimmy Butler",team:"CHI",ppg:20.9,rpg:5.3,apg:3.8,spg:1.8,bpg:0.6,rarity:"rare",img:"202710"},
+  {name:"Nikola Jokic",team:"DEN",ppg:10.0,rpg:7.3,apg:2.4,spg:0.8,bpg:0.6,rarity:"common",img:"203999"},
+  {name:"Devin Booker",team:"PHX",ppg:13.8,rpg:2.5,apg:2.6,spg:0.6,bpg:0.3,rarity:"common",img:"1626164"},
+  {name:"Kristaps Porzingis",team:"NYK",ppg:14.3,rpg:7.3,apg:1.0,spg:0.5,bpg:1.9,rarity:"common",img:"204001"},
+  {name:"Marc Gasol",team:"MEM",ppg:17.1,rpg:7.9,apg:4.5,spg:0.9,bpg:1.8,rarity:"rare",img:"201188"},
+  {name:"Kemba Walker",team:"CHA",ppg:20.9,rpg:3.5,apg:5.5,spg:1.2,bpg:0.4,rarity:"rare",img:"202689"},
+  {name:"Victor Oladipo",team:"ORL",ppg:15.9,rpg:5.1,apg:4.0,spg:2.0,bpg:0.5,rarity:"rare",img:"203506"},
+  {name:"Blake Griffin",team:"LAC",ppg:21.4,rpg:8.4,apg:4.9,spg:0.7,bpg:0.3,rarity:"rare",img:"201933"},
+  {name:"Andre Drummond",team:"DET",ppg:16.2,rpg:15.8,apg:1.1,spg:0.8,bpg:1.3,rarity:"rare",img:"203083"},
+  {name:"John Wall",team:"WAS",ppg:19.9,rpg:5.0,apg:10.2,spg:2.1,bpg:0.7,rarity:"rare",img:"202322"},
+  {name:"Bradley Beal",team:"WAS",ppg:17.4,rpg:4.5,apg:2.9,spg:1.0,bpg:0.4,rarity:"rare",img:"203078"},
+  {name:"Andrew Wiggins",team:"MIN",ppg:20.7,rpg:4.0,apg:2.2,spg:1.1,bpg:0.5,rarity:"rare",img:"203952"},
+  {name:"Zach LaVine",team:"MIN",ppg:14.6,rpg:3.0,apg:2.7,spg:0.7,bpg:0.3,rarity:"common",img:"203897"},
+  {name:"Ricky Rubio",team:"MIN",ppg:10.0,rpg:4.1,apg:7.6,spg:1.6,bpg:0.3,rarity:"common",img:"201937"},
+  {name:"Kevin Love",team:"CLE",ppg:16.0,rpg:9.9,apg:2.4,spg:0.6,bpg:0.5,rarity:"rare",img:"201567"},
+  {name:"Tristan Thompson",team:"CLE",ppg:7.3,rpg:10.5,apg:0.9,spg:0.5,bpg:0.7,rarity:"common",img:"202684"},
+  {name:"Al Horford",team:"ATL",ppg:15.2,rpg:7.3,apg:3.8,spg:0.7,bpg:1.3,rarity:"rare",img:"201143"},
+  {name:"Paul Millsap",team:"ATL",ppg:18.9,rpg:8.0,apg:3.7,spg:1.3,bpg:0.8,rarity:"rare",img:"200794"},
+  {name:"Jeff Teague",team:"ATL",ppg:15.7,rpg:2.6,apg:8.0,spg:1.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Dennis Schroder",team:"ATL",ppg:11.0,rpg:2.6,apg:5.3,spg:1.3,bpg:0.2,rarity:"common",img:"203471"},
+  {name:"LaMarcus Aldridge",team:"SAS",ppg:18.0,rpg:8.5,apg:2.5,spg:0.5,bpg:1.1,rarity:"rare",img:"200746"},
+  {name:"Tony Parker",team:"SAS",ppg:13.8,rpg:2.8,apg:5.8,spg:0.8,bpg:0.2,rarity:"rare",img:"2225"},
+  {name:"Manu Ginobili",team:"SAS",ppg:10.7,rpg:4.2,apg:4.1,spg:1.3,bpg:0.2,rarity:"common",img:"1938"},
+  {name:"Tim Duncan",team:"SAS",ppg:8.6,rpg:7.3,apg:2.1,spg:0.8,bpg:1.2,rarity:"common",img:"1495"},
+  {name:"Pau Gasol",team:"CHI",ppg:16.5,rpg:11.8,apg:4.1,spg:0.6,bpg:1.5,rarity:"rare",img:"2200"},
+  {name:"Derrick Rose",team:"CHI",ppg:16.4,rpg:3.3,apg:4.7,spg:1.0,bpg:0.4,rarity:"rare",img:"201565"},
+  {name:"Joakim Noah",team:"CHI",ppg:6.8,rpg:8.6,apg:5.0,spg:0.9,bpg:1.0,rarity:"common",img:"201980"},
+  {name:"Chris Bosh",team:"MIA",ppg:19.1,rpg:7.4,apg:2.2,spg:0.8,bpg:0.8,rarity:"rare",img:"2547"},
+  {name:"Goran Dragic",team:"MIA",ppg:14.8,rpg:3.5,apg:5.2,spg:1.0,bpg:0.3,rarity:"common",img:"201609"},
+  {name:"Dwyane Wade",team:"MIA",ppg:19.0,rpg:5.1,apg:4.2,spg:1.5,bpg:0.7,rarity:"rare",img:"2548"},
+  {name:"Greg Monroe",team:"MIL",ppg:14.1,rpg:9.2,apg:3.0,spg:0.7,bpg:0.5,rarity:"common",img:"202971"},
+  {name:"Khris Middleton",team:"MIL",ppg:18.1,rpg:4.3,apg:4.0,spg:1.5,bpg:0.4,rarity:"rare",img:"203114"},
+  {name:"Mike Conley",team:"MEM",ppg:15.3,rpg:3.8,apg:6.1,spg:1.7,bpg:0.3,rarity:"common",img:"201144"},
+  {name:"Zach Randolph",team:"MEM",ppg:14.7,rpg:9.5,apg:2.0,spg:0.8,bpg:0.2,rarity:"common",img:"102321"},
+  {name:"Tony Allen",team:"MEM",ppg:8.4,rpg:4.8,apg:2.4,spg:2.0,bpg:0.3,rarity:"common",img:"1714"},
+  {name:"Danilo Gallinari",team:"DEN",ppg:19.1,rpg:6.1,apg:2.2,spg:0.6,bpg:0.4,rarity:"common",img:"201706"},
+  {name:"Nikola Jokic",team:"DEN",ppg:10.0,rpg:7.3,apg:2.4,spg:0.8,bpg:0.6,rarity:"common",img:"203999"},
+  {name:"Enes Kanter",team:"OKC",ppg:18.6,rpg:11.0,apg:1.3,spg:0.5,bpg:0.6,rarity:"common",img:"202683"},
+  {name:"Tobias Harris",team:"ORL",ppg:14.0,rpg:7.5,apg:2.5,spg:0.8,bpg:0.4,rarity:"common",img:"202699"},
+  {name:"Nikola Vucevic",team:"ORL",ppg:16.3,rpg:10.0,apg:3.7,spg:0.7,bpg:1.0,rarity:"common",img:"202696"},
+  {name:"Reggie Jackson",team:"DET",ppg:18.8,rpg:4.0,apg:6.1,spg:0.9,bpg:0.3,rarity:"common",img:"202704"},
+  {name:"D'Angelo Russell",team:"LAL",ppg:13.2,rpg:3.0,apg:3.5,spg:0.8,bpg:0.2,rarity:"common",img:"1626156"},
+  {name:"Jordan Clarkson",team:"LAL",ppg:14.8,rpg:2.9,apg:3.5,spg:0.8,bpg:0.2,rarity:"common",img:"203903"},
+  {name:"Rudy Gay",team:"SAC",ppg:18.5,rpg:6.0,apg:2.5,spg:1.2,bpg:0.5,rarity:"common",img:"200762"},
+  {name:"Brook Lopez",team:"BKN",ppg:20.0,rpg:7.4,apg:2.2,spg:0.7,bpg:2.2,rarity:"rare",img:"201572"},
+  {name:"Jeremy Lin",team:"CHA",ppg:11.7,rpg:3.1,apg:5.1,spg:0.9,bpg:0.3,rarity:"common",img:"202391"},
+  {name:"Nicolas Batum",team:"CHA",ppg:14.9,rpg:6.2,apg:5.8,spg:1.5,bpg:0.6,rarity:"common",img:"202722"},
+  {name:"Deron Williams",team:"DAL",ppg:11.4,rpg:3.5,apg:7.0,spg:0.7,bpg:0.2,rarity:"common",img:"2733"},
+  {name:"Rajon Rondo",team:"SAC",ppg:11.2,rpg:7.0,apg:11.7,spg:1.6,bpg:0.2,rarity:"common",img:null},
+  {name:"Trevor Ariza",team:"HOU",ppg:12.1,rpg:5.3,apg:2.3,spg:1.8,bpg:0.5,rarity:"common",img:"2397"},
+  {name:"Dwight Howard",team:"HOU",ppg:13.7,rpg:11.8,apg:1.7,spg:0.9,bpg:1.8,rarity:"rare",img:"2730"},
+  {name:"Patrick Beverley",team:"HOU",ppg:8.2,rpg:5.5,apg:2.7,spg:1.8,bpg:0.5,rarity:"common",img:"201976"},
+]},
+
+"2009-10": { label:"2009-10", players:[
+  {name:"LeBron James",team:"CLE",ppg:29.7,rpg:7.3,apg:8.6,spg:1.6,bpg:1.0,rarity:"legendary",img:"2544"},
+  {name:"Kevin Durant",team:"OKC",ppg:30.1,rpg:7.6,apg:2.8,spg:1.4,bpg:1.0,rarity:"legendary",img:"201142"},
+  {name:"Carmelo Anthony",team:"DEN",ppg:28.2,rpg:7.3,apg:3.3,spg:1.1,bpg:0.5,rarity:"legendary",img:"2546"},
+  {name:"Kobe Bryant",team:"LAL",ppg:27.0,rpg:5.4,apg:5.0,spg:1.5,bpg:0.3,rarity:"legendary",img:"977"},
+  {name:"Dwyane Wade",team:"MIA",ppg:26.6,rpg:6.4,apg:6.5,spg:2.1,bpg:0.9,rarity:"epic",img:"2548"},
+  {name:"Dirk Nowitzki",team:"DAL",ppg:25.0,rpg:7.7,apg:2.7,spg:0.5,bpg:0.7,rarity:"epic",img:"1717"},
+  {name:"Chris Paul",team:"NOP",ppg:18.7,rpg:4.1,apg:10.7,spg:2.8,bpg:0.1,rarity:"epic",img:"101108"},
+  {name:"Dwight Howard",team:"ORL",ppg:18.3,rpg:13.2,apg:1.3,spg:1.0,bpg:2.8,rarity:"epic",img:"2730"},
+  {name:"Tim Duncan",team:"SAS",ppg:18.3,rpg:9.5,apg:2.7,spg:0.9,bpg:1.9,rarity:"epic",img:"1495"},
+  {name:"Russell Westbrook",team:"OKC",ppg:16.1,rpg:4.9,apg:8.0,spg:1.3,bpg:0.3,rarity:"epic",img:"200794"},
+  {name:"Amar'e Stoudemire",team:"PHX",ppg:23.1,rpg:8.9,apg:1.4,spg:0.8,bpg:1.0,rarity:"rare",img:"2405"},
+  {name:"Joe Johnson",team:"ATL",ppg:21.3,rpg:4.4,apg:4.0,spg:1.4,bpg:0.4,rarity:"rare",img:"2209"},
+  {name:"Kevin Garnett",team:"BOS",ppg:14.3,rpg:8.5,apg:2.5,spg:1.0,bpg:0.9,rarity:"rare",img:"708"},
+  {name:"Paul Pierce",team:"BOS",ppg:18.3,rpg:5.0,apg:3.6,spg:1.3,bpg:0.4,rarity:"rare",img:"1718"},
+  {name:"Steve Nash",team:"PHX",ppg:16.9,rpg:3.3,apg:11.0,spg:0.8,bpg:0.1,rarity:"rare",img:"959"},
+  {name:"Pau Gasol",team:"LAL",ppg:18.3,rpg:11.3,apg:3.5,spg:0.7,bpg:1.5,rarity:"rare",img:"2200"},
+  {name:"Kevin Love",team:"MIN",ppg:20.2,rpg:14.0,apg:2.5,spg:0.6,bpg:0.6,rarity:"rare",img:"201567"},
+  {name:"Stephen Curry",team:"GSW",ppg:17.5,rpg:4.5,apg:5.9,spg:2.0,bpg:0.3,rarity:"rare",img:"201939"},
+  {name:"Derrick Rose",team:"CHI",ppg:20.8,rpg:3.5,apg:6.3,spg:1.0,bpg:0.2,rarity:"rare",img:"201565"},
+  {name:"Monta Ellis",team:"GSW",ppg:25.5,rpg:3.5,apg:5.0,spg:1.8,bpg:0.2,rarity:"rare",img:null},
+  {name:"Al Horford",team:"ATL",ppg:14.9,rpg:9.3,apg:2.4,spg:0.6,bpg:1.5,rarity:"rare",img:"201143"},
+  {name:"Vince Carter",team:"NJN",ppg:16.6,rpg:4.6,apg:3.6,spg:0.9,bpg:0.6,rarity:"rare",img:"1713"},
+  {name:"Danny Granger",team:"IND",ppg:24.1,rpg:5.1,apg:2.4,spg:1.3,bpg:0.9,rarity:"rare",img:null},
+  {name:"Yao Ming",team:"HOU",ppg:19.0,rpg:9.7,apg:1.9,spg:0.5,bpg:1.9,rarity:"rare",img:"2399"},
+  {name:"Rajon Rondo",team:"BOS",ppg:11.9,rpg:4.9,apg:11.7,spg:2.3,bpg:0.2,rarity:"rare",img:null},
+  {name:"Ray Allen",team:"BOS",ppg:16.3,rpg:3.3,apg:2.7,spg:0.7,bpg:0.2,rarity:"rare",img:"951"},
+  {name:"Tony Parker",team:"SAS",ppg:16.1,rpg:3.2,apg:6.9,spg:1.0,bpg:0.1,rarity:"rare",img:"2225"},
+  {name:"Manu Ginobili",team:"SAS",ppg:14.4,rpg:4.7,apg:4.1,spg:1.3,bpg:0.2,rarity:"rare",img:"1938"},
+  {name:"Deron Williams",team:"UTA",ppg:17.4,rpg:4.1,apg:10.5,spg:1.1,bpg:0.2,rarity:"rare",img:"2733"},
+  {name:"Carlos Boozer",team:"UTA",ppg:19.5,rpg:11.0,apg:3.0,spg:0.8,bpg:0.5,rarity:"common",img:null},
+  {name:"Tyreke Evans",team:"SAC",ppg:20.1,rpg:5.8,apg:5.8,spg:1.6,bpg:0.5,rarity:"rare",img:null},
+  {name:"Brook Lopez",team:"NJN",ppg:18.8,rpg:8.4,apg:1.6,spg:0.6,bpg:1.7,rarity:"rare",img:"201572"},
+  {name:"Zach Randolph",team:"MEM",ppg:20.8,rpg:13.0,apg:2.5,spg:0.7,bpg:0.3,rarity:"rare",img:"102321"},
+  {name:"Luol Deng",team:"CHI",ppg:16.3,rpg:6.8,apg:3.1,spg:1.5,bpg:0.5,rarity:"common",img:"2736"},
+  {name:"Joakim Noah",team:"CHI",ppg:11.0,rpg:9.7,apg:3.1,spg:0.8,bpg:1.3,rarity:"common",img:"201980"},
+  {name:"Mike Conley",team:"MEM",ppg:11.0,rpg:3.0,apg:6.3,spg:1.6,bpg:0.3,rarity:"common",img:"201144"},
+  {name:"Rudy Gay",team:"MEM",ppg:19.6,rpg:6.0,apg:2.4,spg:1.3,bpg:0.5,rarity:"common",img:"200762"},
+  {name:"Jason Kidd",team:"DAL",ppg:10.8,rpg:6.2,apg:8.0,spg:1.5,bpg:0.2,rarity:"rare",img:"1070"},
+  {name:"Paul Millsap",team:"UTA",ppg:12.4,rpg:7.7,apg:2.1,spg:1.0,bpg:0.7,rarity:"common",img:"200794"},
+  {name:"Andre Iguodala",team:"PHI",ppg:19.0,rpg:5.8,apg:5.9,spg:2.0,bpg:0.6,rarity:"rare",img:null},
+  {name:"Elton Brand",team:"PHI",ppg:13.4,rpg:8.8,apg:2.3,spg:0.9,bpg:1.6,rarity:"common",img:null},
+  {name:"David West",team:"NOP",ppg:16.6,rpg:7.9,apg:2.4,spg:0.7,bpg:0.6,rarity:"common",img:null},
+  {name:"Hedo Turkoglu",team:"ORL",ppg:10.9,rpg:4.9,apg:4.0,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Rashard Lewis",team:"ORL",ppg:14.0,rpg:5.5,apg:1.8,spg:0.6,bpg:0.7,rarity:"common",img:null},
+  {name:"Jameer Nelson",team:"ORL",ppg:14.1,rpg:3.3,apg:6.5,spg:1.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Nate Robinson",team:"BOS",ppg:10.7,rpg:2.3,apg:3.5,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"Brandon Roy",team:"POR",ppg:22.1,rpg:5.0,apg:4.7,spg:0.9,bpg:0.2,rarity:"rare",img:null},
+  {name:"LaMarcus Aldridge",team:"POR",ppg:12.9,rpg:7.5,apg:1.3,spg:0.5,bpg:1.1,rarity:"common",img:"200746"},
+  {name:"Marcus Thornton",team:"NOP",ppg:16.1,rpg:2.3,apg:2.1,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"David Lee",team:"GSW",ppg:16.8,rpg:11.7,apg:3.0,spg:0.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Aaron Brooks",team:"HOU",ppg:19.6,rpg:2.5,apg:5.2,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Luis Scola",team:"HOU",ppg:14.7,rpg:7.1,apg:1.7,spg:0.8,bpg:0.5,rarity:"common",img:null},
+  {name:"Peja Stojakovic",team:"NOP",ppg:12.7,rpg:3.4,apg:1.8,spg:0.6,bpg:0.2,rarity:"common",img:"2437"},
+  {name:"Gilbert Arenas",team:"ORL",ppg:11.9,rpg:3.0,apg:5.0,spg:1.0,bpg:0.3,rarity:"common",img:"2420"},
+  {name:"Devin Harris",team:"NJN",ppg:15.4,rpg:3.2,apg:7.7,spg:1.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Charlie Villanueva",team:"DET",ppg:12.9,rpg:5.1,apg:1.3,spg:0.6,bpg:0.6,rarity:"common",img:null},
+  {name:"Richard Hamilton",team:"DET",ppg:14.7,rpg:3.2,apg:3.5,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Brandon Jennings",team:"MIL",ppg:15.5,rpg:3.2,apg:5.7,spg:1.3,bpg:0.2,rarity:"common",img:null},
+  {name:"Andrew Bogut",team:"MIL",ppg:12.9,rpg:10.2,apg:2.8,spg:1.0,bpg:2.4,rarity:"common",img:null},
+  {name:"Corey Maggette",team:"GSW",ppg:14.9,rpg:5.0,apg:2.2,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Omri Casspi",team:"SAC",ppg:9.7,rpg:4.5,apg:1.5,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Mo Williams",team:"CLE",ppg:17.3,rpg:3.0,apg:5.2,spg:1.2,bpg:0.2,rarity:"common",img:null},
+  {name:"Antawn Jamison",team:"CLE",ppg:14.6,rpg:5.9,apg:1.4,spg:0.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Jason Terry",team:"DAL",ppg:14.6,rpg:2.4,apg:3.9,spg:1.0,bpg:0.2,rarity:"common",img:null},
+  {name:"Lamar Odom",team:"LAL",ppg:11.3,rpg:8.8,apg:3.5,spg:1.0,bpg:0.5,rarity:"common",img:null},
+  {name:"Josh Howard",team:"WAS",ppg:13.0,rpg:6.0,apg:2.2,spg:1.5,bpg:0.4,rarity:"common",img:null},
+]},
+
+"1996-97": { label:"1996-97", players:[
+  {name:"Michael Jordan",team:"CHI",ppg:29.6,rpg:5.9,apg:4.3,spg:1.7,bpg:0.5,rarity:"legendary",img:"893"},
+  {name:"Karl Malone",team:"UTA",ppg:27.4,rpg:9.9,apg:4.5,spg:1.4,bpg:0.8,rarity:"legendary",img:"252"},
+  {name:"Hakeem Olajuwon",team:"HOU",ppg:23.0,rpg:9.1,apg:3.1,spg:1.7,bpg:2.9,rarity:"legendary",img:"165"},
+  {name:"Allen Iverson",team:"PHI",ppg:23.5,rpg:4.1,apg:7.5,spg:2.1,bpg:0.2,rarity:"legendary",img:"947"},
+  {name:"Charles Barkley",team:"HOU",ppg:19.2,rpg:13.5,apg:4.7,spg:1.5,bpg:0.6,rarity:"epic",img:"787"},
+  {name:"Scottie Pippen",team:"CHI",ppg:20.2,rpg:6.5,apg:5.7,spg:1.8,bpg:0.6,rarity:"epic",img:"1738"},
+  {name:"Gary Payton",team:"SEA",ppg:21.8,rpg:4.5,apg:9.0,spg:2.4,bpg:0.3,rarity:"epic",img:"800"},
+  {name:"Shaquille O'Neal",team:"LAL",ppg:26.2,rpg:12.5,apg:3.1,spg:0.7,bpg:2.9,rarity:"epic",img:"406"},
+  {name:"Patrick Ewing",team:"NYK",ppg:22.4,rpg:11.0,apg:2.2,spg:0.9,bpg:2.2,rarity:"epic",img:"255"},
+  {name:"John Stockton",team:"UTA",ppg:14.1,rpg:3.1,apg:10.5,spg:2.2,bpg:0.2,rarity:"epic",img:"304"},
+  {name:"Grant Hill",team:"DET",ppg:21.4,rpg:9.0,apg:7.3,spg:1.5,bpg:0.6,rarity:"epic",img:"765"},
+  {name:"Kevin Garnett",team:"MIN",ppg:17.0,rpg:8.0,apg:3.1,spg:1.5,bpg:2.1,rarity:"rare",img:"708"},
+  {name:"Mitch Richmond",team:"SAC",ppg:25.9,rpg:3.8,apg:4.0,spg:1.5,bpg:0.2,rarity:"rare",img:"195"},
+  {name:"Reggie Miller",team:"IND",ppg:21.6,rpg:3.4,apg:3.0,spg:0.9,bpg:0.2,rarity:"rare",img:"245"},
+  {name:"David Robinson",team:"SAS",ppg:19.0,rpg:10.8,apg:3.3,spg:1.5,bpg:2.4,rarity:"rare",img:"278"},
+  {name:"Tim Hardaway",team:"MIA",ppg:20.3,rpg:3.4,apg:8.6,spg:1.7,bpg:0.1,rarity:"rare",img:"131"},
+  {name:"Clyde Drexler",team:"HOU",ppg:18.0,rpg:5.5,apg:5.0,spg:1.7,bpg:0.4,rarity:"rare",img:"184"},
+  {name:"Shawn Kemp",team:"SEA",ppg:18.3,rpg:9.6,apg:2.4,spg:1.0,bpg:1.4,rarity:"rare",img:"323"},
+  {name:"Chris Webber",team:"WAS",ppg:22.1,rpg:9.9,apg:3.9,spg:1.4,bpg:1.2,rarity:"rare",img:"428"},
+  {name:"Alonzo Mourning",team:"MIA",ppg:19.8,rpg:9.9,apg:1.6,spg:0.6,bpg:2.9,rarity:"rare",img:"396"},
+  {name:"Dikembe Mutombo",team:"ATL",ppg:13.3,rpg:11.6,apg:1.1,spg:0.4,bpg:3.3,rarity:"rare",img:"305"},
+  {name:"Glen Rice",team:"CHA",ppg:21.3,rpg:4.3,apg:2.7,spg:0.9,bpg:0.2,rarity:"rare",img:null},
+  {name:"Ray Allen",team:"MIL",ppg:13.4,rpg:3.1,apg:2.9,spg:0.9,bpg:0.3,rarity:"rare",img:"951"},
+  {name:"Kobe Bryant",team:"LAL",ppg:7.6,rpg:1.9,apg:1.3,spg:0.7,bpg:0.3,rarity:"rare",img:"977"},
+  {name:"Kevin Johnson",team:"PHX",ppg:18.2,rpg:3.3,apg:9.3,spg:1.5,bpg:0.2,rarity:"rare",img:null},
+  {name:"Anfernee Hardaway",team:"ORL",ppg:20.0,rpg:4.5,apg:6.2,spg:1.9,bpg:0.5,rarity:"epic",img:null},
+  {name:"Dennis Rodman",team:"CHI",ppg:5.7,rpg:16.1,apg:3.1,spg:0.7,bpg:0.2,rarity:"common",img:null},
+  {name:"Toni Kukoc",team:"CHI",ppg:13.1,rpg:4.9,apg:4.4,spg:0.9,bpg:0.5,rarity:"common",img:null},
+  {name:"Ron Harper",team:"CHI",ppg:7.4,rpg:3.3,apg:2.7,spg:1.4,bpg:0.4,rarity:"common",img:null},
+  {name:"Luc Longley",team:"CHI",ppg:9.1,rpg:5.3,apg:2.7,spg:0.6,bpg:0.9,rarity:"common",img:null},
+  {name:"Allan Houston",team:"NYK",ppg:21.8,rpg:3.1,apg:2.6,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Larry Johnson",team:"NYK",ppg:14.9,rpg:7.5,apg:2.9,spg:0.7,bpg:0.5,rarity:"common",img:null},
+  {name:"Juwan Howard",team:"WAS",ppg:18.3,rpg:7.6,apg:3.0,spg:0.6,bpg:0.3,rarity:"common",img:null},
+  {name:"Rod Strickland",team:"WAS",ppg:17.0,rpg:4.5,apg:10.6,spg:1.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Joe Dumars",team:"DET",ppg:14.6,rpg:2.8,apg:4.7,spg:1.2,bpg:0.1,rarity:"common",img:null},
+  {name:"Terry Mills",team:"DET",ppg:13.4,rpg:5.5,apg:1.6,spg:0.5,bpg:0.4,rarity:"common",img:null},
+  {name:"Cedric Ceballos",team:"LAL",ppg:12.1,rpg:4.9,apg:1.9,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Eddie Jones",team:"LAL",ppg:14.3,rpg:4.0,apg:3.1,spg:2.0,bpg:0.7,rarity:"common",img:null},
+  {name:"Elden Campbell",team:"LAL",ppg:10.5,rpg:7.9,apg:1.7,spg:0.7,bpg:1.4,rarity:"common",img:null},
+  {name:"Hersey Hawkins",team:"SEA",ppg:15.0,rpg:3.5,apg:3.0,spg:1.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Sam Perkins",team:"SEA",ppg:9.2,rpg:5.6,apg:1.5,spg:0.6,bpg:0.8,rarity:"common",img:null},
+  {name:"Detlef Schrempf",team:"SEA",ppg:16.5,rpg:6.5,apg:4.2,spg:1.0,bpg:0.4,rarity:"common",img:null},
+  {name:"Muggsy Bogues",team:"CHA",ppg:9.3,rpg:3.8,apg:6.3,spg:1.4,bpg:0.1,rarity:"common",img:null},
+  {name:"Dell Curry",team:"CHA",ppg:14.1,rpg:2.8,apg:2.5,spg:0.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Avery Johnson",team:"SAS",ppg:16.3,rpg:3.0,apg:6.4,spg:1.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Dominique Wilkins",team:"SAS",ppg:11.8,rpg:4.4,apg:1.8,spg:0.8,bpg:0.2,rarity:"common",img:"785"},
+  {name:"Steve Smith",team:"ATL",ppg:19.0,rpg:3.8,apg:4.8,spg:1.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Christian Laettner",team:"ATL",ppg:15.1,rpg:7.5,apg:2.9,spg:0.7,bpg:0.7,rarity:"common",img:null},
+  {name:"Mookie Blaylock",team:"ATL",ppg:11.2,rpg:4.3,apg:7.1,spg:2.3,bpg:0.2,rarity:"common",img:null},
+  {name:"Stacey Augmon",team:"ATL",ppg:11.3,rpg:3.5,apg:2.8,spg:2.0,bpg:0.4,rarity:"common",img:null},
+  {name:"Stephon Marbury",team:"MIN",ppg:15.8,rpg:3.3,apg:7.8,spg:1.6,bpg:0.1,rarity:"common",img:"1903"},
+  {name:"Tom Gugliotta",team:"MIN",ppg:20.6,rpg:8.7,apg:3.4,spg:1.7,bpg:0.7,rarity:"common",img:null},
+  {name:"Terrell Brandon",team:"CLE",ppg:19.5,rpg:3.5,apg:6.8,spg:1.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Damon Stoudamire",team:"TOR",ppg:16.9,rpg:3.8,apg:8.8,spg:1.7,bpg:0.2,rarity:"common",img:null},
+  {name:"Marcus Camby",team:"TOR",ppg:14.8,rpg:6.3,apg:2.0,spg:1.0,bpg:2.1,rarity:"common",img:null},
+  {name:"Jerry Stackhouse",team:"PHI",ppg:20.7,rpg:4.2,apg:4.0,spg:1.1,bpg:0.2,rarity:"common",img:null},
+  {name:"Joe Smith",team:"PHI",ppg:13.3,rpg:8.2,apg:1.4,spg:0.7,bpg:0.9,rarity:"common",img:null},
+  {name:"Jim Jackson",team:"NJN",ppg:20.5,rpg:4.9,apg:4.3,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Kendall Gill",team:"NJN",ppg:20.4,rpg:5.7,apg:4.3,spg:2.1,bpg:0.5,rarity:"common",img:null},
+  {name:"Vlade Divac",team:"SAC",ppg:12.1,rpg:8.3,apg:3.5,spg:1.2,bpg:1.2,rarity:"common",img:null},
+  {name:"Mahmoud Abdul-Rauf",team:"SAC",ppg:15.1,rpg:2.2,apg:5.2,spg:0.7,bpg:0.1,rarity:"common",img:null},
+  {name:"Danny Manning",team:"PHX",ppg:16.8,rpg:5.1,apg:2.5,spg:1.3,bpg:0.7,rarity:"common",img:null},
+  {name:"Rex Chapman",team:"PHX",ppg:15.5,rpg:3.0,apg:3.5,spg:1.3,bpg:0.3,rarity:"common",img:null},
+  {name:"Buck Williams",team:"POR",ppg:7.0,rpg:7.2,apg:1.0,spg:0.4,bpg:0.7,rarity:"common",img:null},
+  {name:"Isaiah Rider",team:"POR",ppg:15.8,rpg:3.6,apg:2.6,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Arvydas Sabonis",team:"POR",ppg:14.5,rpg:7.8,apg:3.0,spg:0.8,bpg:1.4,rarity:"common",img:null},
+  {name:"Antonio McDyess",team:"DEN",ppg:18.1,rpg:10.0,apg:1.6,spg:0.9,bpg:1.2,rarity:"common",img:null},
+  {name:"Laphonso Ellis",team:"DEN",ppg:14.3,rpg:8.1,apg:2.0,spg:0.8,bpg:0.7,rarity:"common",img:null},
+  {name:"P.J. Brown",team:"MIA",ppg:8.5,rpg:7.5,apg:1.7,spg:0.7,bpg:1.0,rarity:"common",img:null},
+  {name:"Billy Owens",team:"MIA",ppg:11.8,rpg:5.6,apg:3.1,spg:0.9,bpg:0.4,rarity:"common",img:null},
+]},
+
+"1989-90": { label:"1989-90", players:[
+  {name:"Michael Jordan",team:"CHI",ppg:33.6,rpg:6.9,apg:6.3,spg:2.8,bpg:0.5,rarity:"legendary",img:"893"},
+  {name:"Karl Malone",team:"UTA",ppg:31.0,rpg:11.1,apg:2.8,spg:1.4,bpg:0.8,rarity:"legendary",img:"252"},
+  {name:"Patrick Ewing",team:"NYK",ppg:28.6,rpg:10.9,apg:1.9,spg:1.4,bpg:3.1,rarity:"legendary",img:"255"},
+  {name:"Hakeem Olajuwon",team:"HOU",ppg:24.3,rpg:14.0,apg:2.9,spg:1.9,bpg:4.6,rarity:"legendary",img:"165"},
+  {name:"Magic Johnson",team:"LAL",ppg:22.3,rpg:6.6,apg:11.5,spg:1.7,bpg:0.3,rarity:"epic",img:"1020"},
+  {name:"Charles Barkley",team:"PHI",ppg:25.2,rpg:11.5,apg:3.9,spg:1.7,bpg:0.6,rarity:"epic",img:"787"},
+  {name:"Dominique Wilkins",team:"ATL",ppg:26.2,rpg:6.8,apg:2.5,spg:1.1,bpg:0.5,rarity:"epic",img:"785"},
+  {name:"John Stockton",team:"UTA",ppg:17.2,rpg:2.7,apg:14.5,spg:3.0,bpg:0.2,rarity:"epic",img:"304"},
+  {name:"Clyde Drexler",team:"POR",ppg:23.3,rpg:6.9,apg:6.6,spg:2.6,bpg:0.4,rarity:"epic",img:"184"},
+  {name:"Chris Mullin",team:"GSW",ppg:25.1,rpg:5.3,apg:5.4,spg:2.0,bpg:0.4,rarity:"epic",img:null},
+  {name:"David Robinson",team:"SAS",ppg:24.3,rpg:12.0,apg:2.0,spg:1.6,bpg:3.9,rarity:"rare",img:"278"},
+  {name:"Larry Bird",team:"BOS",ppg:24.3,rpg:9.5,apg:7.5,spg:1.1,bpg:0.8,rarity:"rare",img:"1449"},
+  {name:"Tom Chambers",team:"PHX",ppg:27.2,rpg:8.0,apg:3.3,spg:0.7,bpg:0.6,rarity:"rare",img:null},
+  {name:"Reggie Miller",team:"IND",ppg:24.6,rpg:4.0,apg:3.9,spg:1.2,bpg:0.3,rarity:"rare",img:"245"},
+  {name:"Dale Ellis",team:"SEA",ppg:22.6,rpg:4.3,apg:2.1,spg:0.9,bpg:0.2,rarity:"rare",img:null},
+  {name:"Scottie Pippen",team:"CHI",ppg:16.5,rpg:6.7,apg:5.4,spg:1.9,bpg:0.8,rarity:"rare",img:"1738"},
+  {name:"Kevin Johnson",team:"PHX",ppg:22.5,rpg:3.5,apg:11.4,spg:1.7,bpg:0.1,rarity:"rare",img:null},
+  {name:"Isiah Thomas",team:"DET",ppg:18.4,rpg:3.7,apg:9.4,spg:1.9,bpg:0.2,rarity:"rare",img:"216"},
+  {name:"Mitch Richmond",team:"GSW",ppg:22.0,rpg:5.3,apg:4.0,spg:1.7,bpg:0.3,rarity:"rare",img:"195"},
+  {name:"James Worthy",team:"LAL",ppg:21.4,rpg:4.9,apg:3.3,spg:1.1,bpg:0.7,rarity:"rare",img:null},
+  {name:"Joe Dumars",team:"DET",ppg:17.8,rpg:2.8,apg:4.0,spg:1.1,bpg:0.1,rarity:"rare",img:null},
+  {name:"Dennis Rodman",team:"DET",ppg:8.0,rpg:9.7,apg:1.5,spg:0.7,bpg:0.5,rarity:"common",img:null},
+  {name:"Bill Laimbeer",team:"DET",ppg:14.0,rpg:9.6,apg:2.3,spg:0.5,bpg:0.9,rarity:"common",img:null},
+  {name:"Vinnie Johnson",team:"DET",ppg:14.0,rpg:3.0,apg:4.0,spg:0.8,bpg:0.2,rarity:"common",img:null},
+  {name:"Mark Aguirre",team:"DET",ppg:11.7,rpg:3.4,apg:1.7,spg:0.6,bpg:0.2,rarity:"common",img:null},
+  {name:"Horace Grant",team:"CHI",ppg:13.6,rpg:9.3,apg:3.4,spg:1.2,bpg:1.0,rarity:"common",img:null},
+  {name:"Stacey King",team:"CHI",ppg:7.3,rpg:4.1,apg:1.1,spg:0.4,bpg:0.9,rarity:"common",img:null},
+  {name:"John Paxson",team:"CHI",ppg:8.9,rpg:1.8,apg:3.2,spg:0.7,bpg:0.1,rarity:"common",img:null},
+  {name:"Kevin McHale",team:"BOS",ppg:20.9,rpg:8.3,apg:2.0,spg:0.5,bpg:1.8,rarity:"rare",img:null},
+  {name:"Robert Parish",team:"BOS",ppg:19.3,rpg:12.2,apg:2.0,spg:0.7,bpg:1.3,rarity:"common",img:null},
+  {name:"Dee Brown",team:"BOS",ppg:8.9,rpg:2.6,apg:2.6,spg:1.0,bpg:0.1,rarity:"common",img:null},
+  {name:"Xavier McDaniel",team:"SEA",ppg:18.0,rpg:7.6,apg:2.7,spg:1.3,bpg:0.5,rarity:"common",img:null},
+  {name:"Gary Payton",team:"SEA",ppg:7.7,rpg:3.7,apg:7.3,spg:1.8,bpg:0.2,rarity:"common",img:"800"},
+  {name:"Shawn Kemp",team:"SEA",ppg:6.4,rpg:4.0,apg:0.5,spg:0.7,bpg:0.9,rarity:"common",img:"323"},
+  {name:"Buck Williams",team:"POR",ppg:12.3,rpg:10.4,apg:1.4,spg:1.1,bpg:1.1,rarity:"common",img:null},
+  {name:"Terry Porter",team:"POR",ppg:17.7,rpg:4.1,apg:9.3,spg:1.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Kevin Duckworth",team:"POR",ppg:15.8,rpg:8.0,apg:0.9,spg:0.3,bpg:1.0,rarity:"common",img:null},
+  {name:"Jerome Kersey",team:"POR",ppg:17.0,rpg:7.6,apg:3.1,spg:1.4,bpg:0.6,rarity:"common",img:null},
+  {name:"Sam Perkins",team:"DAL",ppg:13.5,rpg:6.4,apg:1.7,spg:1.1,bpg:0.9,rarity:"common",img:null},
+  {name:"Rolando Blackman",team:"DAL",ppg:18.8,rpg:3.3,apg:2.8,spg:0.7,bpg:0.2,rarity:"common",img:null},
+  {name:"Derek Harper",team:"DAL",ppg:20.4,rpg:4.0,apg:7.3,spg:2.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Roy Tarpley",team:"DAL",ppg:13.5,rpg:11.8,apg:1.6,spg:0.9,bpg:1.3,rarity:"common",img:null},
+  {name:"Fat Lever",team:"DEN",ppg:16.8,rpg:6.7,apg:7.7,spg:2.4,bpg:0.3,rarity:"common",img:null},
+  {name:"Michael Adams",team:"DEN",ppg:26.5,rpg:3.1,apg:10.5,spg:2.0,bpg:0.2,rarity:"rare",img:null},
+  {name:"Alex English",team:"DEN",ppg:20.9,rpg:4.9,apg:4.1,spg:1.0,bpg:0.4,rarity:"common",img:null},
+  {name:"Byron Scott",team:"LAL",ppg:20.1,rpg:3.4,apg:3.3,spg:1.7,bpg:0.2,rarity:"common",img:null},
+  {name:"AC Green",team:"LAL",ppg:11.0,rpg:9.4,apg:1.4,spg:1.0,bpg:0.4,rarity:"common",img:null},
+  {name:"Vlade Divac",team:"LAL",ppg:8.5,rpg:6.4,apg:1.6,spg:1.2,bpg:1.3,rarity:"common",img:null},
+  {name:"Mark Jackson",team:"NYK",ppg:16.3,rpg:4.1,apg:8.6,spg:1.7,bpg:0.1,rarity:"common",img:null},
+  {name:"Charles Oakley",team:"NYK",ppg:11.9,rpg:12.2,apg:2.7,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Johnny Newman",team:"NYK",ppg:15.4,rpg:3.9,apg:2.4,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Rik Smits",team:"IND",ppg:13.7,rpg:6.0,apg:0.9,spg:0.4,bpg:1.5,rarity:"common",img:null},
+  {name:"Chuck Person",team:"IND",ppg:14.5,rpg:6.5,apg:2.3,spg:0.7,bpg:0.4,rarity:"common",img:null},
+  {name:"Hersey Hawkins",team:"PHI",ppg:20.5,rpg:4.5,apg:3.7,spg:2.3,bpg:0.3,rarity:"common",img:null},
+  {name:"Ron Anderson",team:"PHI",ppg:16.2,rpg:5.0,apg:2.8,spg:0.9,bpg:0.3,rarity:"common",img:null},
+  {name:"Derek Smith",team:"PHI",ppg:12.8,rpg:3.8,apg:3.0,spg:1.0,bpg:0.4,rarity:"common",img:null},
+  {name:"Nate McMillan",team:"SEA",ppg:6.5,rpg:5.5,apg:10.0,spg:2.2,bpg:0.3,rarity:"common",img:null},
+  {name:"Mike Gminski",team:"CHA",ppg:14.7,rpg:8.5,apg:1.1,spg:0.3,bpg:0.9,rarity:"common",img:null},
+  {name:"Rex Chapman",team:"CHA",ppg:16.0,rpg:3.0,apg:4.0,spg:1.0,bpg:0.3,rarity:"common",img:null},
+  {name:"Kelly Tripucka",team:"CHA",ppg:16.8,rpg:4.4,apg:3.4,spg:0.7,bpg:0.3,rarity:"common",img:null},
+  {name:"Johnny Dawkins",team:"SAS",ppg:13.2,rpg:2.9,apg:7.3,spg:1.4,bpg:0.2,rarity:"common",img:null},
+  {name:"Terry Cummings",team:"SAS",ppg:16.7,rpg:7.3,apg:1.6,spg:0.7,bpg:0.4,rarity:"common",img:null},
+  {name:"Willie Anderson",team:"SAS",ppg:16.1,rpg:4.4,apg:4.3,spg:1.3,bpg:0.5,rarity:"common",img:null},
+  {name:"Vernon Maxwell",team:"HOU",ppg:14.8,rpg:3.0,apg:3.8,spg:1.5,bpg:0.2,rarity:"common",img:null},
+  {name:"Otis Thorpe",team:"HOU",ppg:14.0,rpg:10.0,apg:2.5,spg:0.9,bpg:0.6,rarity:"common",img:null},
+  {name:"Buck Johnson",team:"HOU",ppg:11.6,rpg:5.5,apg:1.8,spg:1.1,bpg:0.6,rarity:"common",img:null},
+  {name:"Ron Harper",team:"LAC",ppg:22.8,rpg:5.5,apg:5.1,spg:2.6,bpg:0.9,rarity:"common",img:null},
+  {name:"Danny Manning",team:"LAC",ppg:16.0,rpg:6.8,apg:2.8,spg:1.0,bpg:0.6,rarity:"common",img:null},
+  {name:"Charles Smith",team:"LAC",ppg:18.6,rpg:6.7,apg:1.7,spg:0.7,bpg:1.3,rarity:"common",img:null},
+  {name:"Purvis Short",team:"NJN",ppg:14.5,rpg:3.8,apg:2.2,spg:0.8,bpg:0.3,rarity:"common",img:null},
+  {name:"Reggie Theus",team:"ATL",ppg:10.7,rpg:2.9,apg:4.4,spg:0.7,bpg:0.1,rarity:"common",img:null},
+  {name:"Kevin Willis",team:"ATL",ppg:16.4,rpg:10.7,apg:1.4,spg:0.9,bpg:0.5,rarity:"common",img:null},
+  {name:"Jon Koncak",team:"ATL",ppg:5.4,rpg:6.9,apg:0.8,spg:0.5,bpg:1.1,rarity:"common",img:null},
+  {name:"Muggsy Bogues",team:"CHA",ppg:7.7,rpg:3.5,apg:7.4,spg:1.3,bpg:0.0,rarity:"common",img:null},
+  {name:"Sleepy Floyd",team:"HOU",ppg:11.5,rpg:2.8,apg:5.6,spg:0.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Rod Higgins",team:"GSW",ppg:11.2,rpg:5.3,apg:2.2,spg:0.6,bpg:0.4,rarity:"common",img:null},
+  {name:"Terry Teagle",team:"GSW",ppg:17.7,rpg:3.0,apg:2.3,spg:0.9,bpg:0.2,rarity:"common",img:null},
+  {name:"Don Nelson",team:"GSW",ppg:0.0,rpg:0.0,apg:0.0,spg:0.0,bpg:0.0,rarity:"common",img:null},
+  {name:"Kiki Vandeweghe",team:"NYK",ppg:17.2,rpg:3.7,apg:2.1,spg:0.5,bpg:0.3,rarity:"common",img:null},
+  {name:"Gerald Wilkins",team:"NYK",ppg:14.8,rpg:3.4,apg:3.6,spg:1.0,bpg:0.3,rarity:"common",img:null},
+]},
+});
+
+// ─── GAME STATE ────────────────────────────────────────────────────────────
+let coins = parseInt(localStorage.getItem('statstack_coins')) || 0;
+let streak = 0, multiplier = 1, roundNumber = 0;
+let bestStreak = parseInt(localStorage.getItem('statstack_bestStreak')) || 0;
+let player1, player2, currentStat, gameActive = true;
+let ownedCards = JSON.parse(localStorage.getItem('statstack_cards')) || [];
+let currentSeasonKey = "2025-26";
+let currentPlayers = [];
+
+const statTypes = [
+  {key:"ppg",label:"Points Per Game",short:"PPG"},
+  {key:"rpg",label:"Rebounds Per Game",short:"RPG"},
+  {key:"apg",label:"Assists Per Game",short:"APG"},
+  {key:"spg",label:"Steals Per Game",short:"SPG"},
+  {key:"bpg",label:"Blocks Per Game",short:"BPG"}
+];
+
+// ─── IMAGE URL ──────────────────────────────────────────────────────────────
+const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23667eea'/%3E%3Ccircle cx='50' cy='36' r='20' fill='white' opacity='0.6'/%3E%3Cellipse cx='50' cy='82' rx='26' ry='16' fill='white' opacity='0.6'/%3E%3C/svg%3E";
+function imgUrl(id) {
+  return id ? `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png` : FALLBACK;
+}
+
+// ─── HOOKS ──────────────────────────────────────────────────────────────────
+function randHook(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+const hooks = ["90% of players get this wrong!","85% fail this challenge!","Only 12% get this right!","Can you beat the odds?","94% lose their streak here!","This one tricks most players!","89% pick the wrong answer!","Only the top 10% pass!","Most people guess wrong here!","Harder than it looks!","88% get fooled by this!","Will you be the exception?"];
+const wins  = ["Nice! You're in the top 10%! 🔥","Wow! Most people miss that! 💪","Impressive! Only 12% get that! ⭐","You're crushing it! 🎯","Great eye for stats! 👀","Keep that streak going! 🔥","Genius move! 🧠","Outstanding! 💎","You're on fire! 🔥","Better than 85% of players! 📈"];
+const fails = ["Don't worry, 87% got that wrong!","Tough one! 91% miss that!","Fools most people!","So close! Try again!","88% make the same mistake!","Brutal! Even pros miss that!","You're in good company — 92% missed it!","Stats can be deceiving!","Better luck next round!"];
+
+// ─── SEASON CHANGE ──────────────────────────────────────────────────────────
+function changeSeason() {
+  currentSeasonKey = document.getElementById("seasonSelect").value;
+  currentPlayers = SEASONS[currentSeasonKey].players.filter(p => p.ppg > 0 || p.rpg > 0);
+  document.getElementById("playerCountInfo").textContent = `${currentPlayers.length} players loaded`;
+  roundNumber = 0; streak = 0; multiplier = 1; player2 = null;
+  updateBoard();
+  startNewRound();
+}
+
+// ─── PLAYER SELECTION ───────────────────────────────────────────────────────
+function randPlayer(exclude=null) {
+  let p, tries=0;
+  do { p=currentPlayers[Math.floor(Math.random()*currentPlayers.length)]; tries++; }
+  while(exclude && p.name===exclude.name && tries<40);
+  return p;
+}
+
+// Adaptive difficulty: start wide, narrows each round
+// Early rounds (1-5): any player pair — big stat differences fine
+// Mid rounds (6-15): within ±8 of the stat
+// Late rounds (16+): within ±2 (very close)
+function pickOpponent(base, key) {
+  const val = base[key];
+  let maxDiff;
+  if (roundNumber <= 5)       maxDiff = 999; // anything goes early
+  else if (roundNumber <= 10) maxDiff = 10;
+  else if (roundNumber <= 15) maxDiff = 6;
+  else if (roundNumber <= 20) maxDiff = 3.5;
+  else                        maxDiff = 1.5;
+
+  const pool = currentPlayers.filter(p => p.name !== base.name && Math.abs(p[key]-val) <= maxDiff);
+  if (!pool.length) return randPlayer(base);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+
+// ─── GAME ROUND ─────────────────────────────────────────────────────────────
+function startNewRound() {
+  roundNumber++;
+  player1 = player2 || randPlayer();
+  currentStat = statTypes[Math.floor(Math.random()*statTypes.length)];
+  player2 = pickOpponent(player1, currentStat.key);
+
+  setHook(randHook(hooks), "linear-gradient(135deg,#f093fb 0%,#f5576c 100%)");
+
+  setPlayer(1, player1);
+  setPlayer(2, player2, true);
+
+  document.getElementById("currentStatLabel").textContent = currentStat.label;
+  document.getElementById("p2NameInline").textContent = player2.name;
+  document.getElementById("higherBtn").style.display = "inline-block";
+  document.getElementById("lowerBtn").style.display = "inline-block";
+  document.getElementById("nextBtn").style.display = "none";
+  document.getElementById("result").textContent = "";
+  document.getElementById("result").className = "result";
+  document.getElementById("roundDisplay").textContent = roundNumber;
+  gameActive = true;
+}
+
+function setPlayer(n, p, hide=false) {
+  const img = document.getElementById(`player${n}Image`);
+  img.src = imgUrl(p.img);
+  img.onerror = () => { img.src = FALLBACK; };
+  document.getElementById(`player${n}Name`).textContent = p.name;
+  document.getElementById(`player${n}Team`).textContent = p.team;
+  document.getElementById(`player${n}StatLabel`).textContent = currentStat.short;
+  const statEl = document.getElementById(`player${n}Stat`);
+  if (hide) { statEl.textContent = "???"; statEl.className = "hidden-stat"; }
+  else { statEl.textContent = p[currentStat.key].toFixed(1); statEl.className = "stat-value"; }
+}
+
+function setHook(text, bg) {
+  document.getElementById("hookText").textContent = text;
+  document.getElementById("hookBanner").style.background = bg;
+}
+
+function makeGuess(guess) {
+  if (!gameActive) return;
+  gameActive = false;
+  const v1 = player1[currentStat.key], v2 = player2[currentStat.key];
+  document.getElementById("player2Stat").textContent = v2.toFixed(1);
+  document.getElementById("player2Stat").className = "stat-value";
+  const correct = (guess==="higher" && v2>=v1) || (guess==="lower" && v2<=v1);
+  const res = document.getElementById("result");
+  if (correct) {
+    streak++; multiplier = Math.floor(streak/3)+1;
+    const earned = 10*multiplier; coins += earned;
+    res.textContent = `✅ Correct! +${earned} coins`; res.className = "result correct";
+    setHook(randHook(wins), "linear-gradient(135deg,#11998e 0%,#38ef7d 100%)");
+  } else {
+    streak = 0; multiplier = 1;
+    res.textContent = "❌ Wrong! Streak reset."; res.className = "result incorrect";
+    setHook(randHook(fails), "linear-gradient(135deg,#ee0979 0%,#ff6a00 100%)");
+  }
+  updateBoard();
+  document.getElementById("higherBtn").style.display = "none";
+  document.getElementById("lowerBtn").style.display = "none";
+  document.getElementById("nextBtn").style.display = "inline-block";
+}
+function nextRound() { startNewRound(); }
+function updateBoard() {
+  document.getElementById("coins").textContent = coins;
+  document.getElementById("streak").textContent = streak;
+  document.getElementById("multiplier").textContent = multiplier+"x";
+  document.getElementById("bestStreak").textContent = bestStreak;
+  // Save to localStorage
+  localStorage.setItem('statstack_coins', coins);
+  if (streak > bestStreak) {
+    bestStreak = streak;
+    localStorage.setItem('statstack_bestStreak', bestStreak);
+  }
+}
+
+// ─── SHOP ───────────────────────────────────────────────────────────────────
+function openShop() {
+  document.getElementById("shopModal").style.display = "block";
+  document.getElementById("modalCoins").textContent = coins;
+  document.getElementById("buyPackBtn").disabled = coins < 2000;
+}
+function closeShop() {
+  document.getElementById("shopModal").style.display = "none";
+  document.getElementById("packOpening").style.display = "none";
+  document.getElementById("revealedCard").style.display = "none";
+}
+function buyPack() {
+  if (coins < 2000) return;
+  coins -= 2000; updateBoard();
+  document.getElementById("modalCoins").textContent = coins;
+  document.getElementById("buyPackBtn").disabled = coins < 2000;
+  document.getElementById("packOpening").style.display = "block";
+  document.getElementById("revealedCard").style.display = "none";
+  setTimeout(() => {
+    const r = Math.random()*100;
+    let pool;
+    if (r<2)       pool = currentPlayers.filter(p=>p.rarity==="legendary");
+    else if (r<10) pool = currentPlayers.filter(p=>p.rarity==="epic");
+    else if (r<30) pool = currentPlayers.filter(p=>p.rarity==="rare");
+    else           pool = currentPlayers.filter(p=>p.rarity==="common");
+    if (!pool.length) pool = currentPlayers;
+    const card = {...pool[Math.floor(Math.random()*pool.length)], season: currentSeasonKey};
+    ownedCards.push(card);
+    localStorage.setItem('statstack_cards', JSON.stringify(ownedCards));
+    document.getElementById("packOpening").style.display = "none";
+    const emo = {legendary:"⭐",epic:"💜",rare:"💎",common:"🔷"};
+    document.getElementById("revealedCard").innerHTML = `
+      <div class="revealed-card ${card.rarity}">
+        <div class="card-rarity-badge">${emo[card.rarity]} ${card.rarity.toUpperCase()}</div>
+        <img src="${imgUrl(card.img)}" class="revealed-card-img" onerror="this.src='${FALLBACK}'">
+        <h3>🎉 ${card.name}</h3>
+        <div style="opacity:0.85;font-size:0.9em;margin-bottom:10px">${card.team} · ${card.season}</div>
+        <div class="revealed-stats">
+          📊 ${card.ppg} PPG &nbsp; 🏀 ${card.rpg} RPG<br>
+          🎯 ${card.apg} APG &nbsp; 🤚 ${card.spg} SPG &nbsp; 🚫 ${card.bpg} BPG
+        </div>
+      </div>`;
+    document.getElementById("revealedCard").style.display = "block";
+    updateCollStats();
+  }, 1800);
+}
+
+// ─── COLLECTION ─────────────────────────────────────────────────────────────
+function openCollection() {
+  document.getElementById("collectionModal").style.display = "block";
+  updateCollStats(); renderColl("all");
+}
+function closeCollection() { document.getElementById("collectionModal").style.display = "none"; }
+function updateCollStats() {
+  document.getElementById("totalCards").textContent = ownedCards.length;
+  ["legendary","epic","rare","common"].forEach(r => {
+    document.getElementById(r+"Count").textContent = ownedCards.filter(c=>c.rarity===r).length;
+  });
+}
+function filterCollection(r, btn) {
+  document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+  if(btn) btn.classList.add("active");
+  renderColl(r);
+}
+function renderColl(r) {
+  const g = document.getElementById("collectionGrid");
+  const cards = r==="all" ? ownedCards : ownedCards.filter(c=>c.rarity===r);
+  if (!cards.length) { g.innerHTML=`<p style="text-align:center;grid-column:1/-1;color:#95a5a6;padding:24px">${r==="all"?"No cards yet — buy a pack!":"No "+r+" cards yet!"}</p>`; return; }
+  const emo = {legendary:"⭐",epic:"💜",rare:"💎",common:"🔷"};
+  g.innerHTML = cards.map(c=>`
+    <div class="card-small ${c.rarity}">
+      <div class="card-rarity-badge">${emo[c.rarity]}</div>
+      <img src="${imgUrl(c.img)}" class="card-img" onerror="this.src='${FALLBACK}'">
+      <h4>${c.name}</h4>
+      <div class="card-team">${c.team} · ${c.season||""}</div>
+      <div class="card-stats">PPG ${c.ppg} | RPG ${c.rpg}<br>APG ${c.apg} | SPG ${c.spg} | BPG ${c.bpg}</div>
+    </div>`).join("");
+}
+
+window.onclick = e => {
+  if (e.target===document.getElementById("shopModal")) closeShop();
+  if (e.target===document.getElementById("collectionModal")) closeCollection();
+};
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+currentPlayers = SEASONS[currentSeasonKey].players.filter(p => p.ppg > 0 || p.rpg > 0);
+document.getElementById("playerCountInfo").textContent = `${currentPlayers.length} players loaded`;
+startNewRound();
+updateBoard();
+</script>
+</body>
+</html>
