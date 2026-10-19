@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "index.html"
 CACHE = ROOT / "data" / "seasons.json"
 
-# Seasons offered in the game, newest first. The first one is labelled "(Current)".
+# Seasons offered in the game, newest first. Only completed seasons, so stats are final.
 SEASONS = [
     "2025-26", "2024-25", "2023-24", "2022-23", "2021-22", "2019-20",
     "2017-18", "2015-16", "2012-13", "2009-10", "2007-08", "2004-05",
@@ -120,8 +120,7 @@ def to_js(data):
     """Render API_SEASONS in the same one-player-per-line style as SEASONS."""
     lines = [BEGIN, "const API_SEASONS = {"]
     for season in (s for s in SEASONS if s in data):
-        label = f"{season} (Current)" if season == SEASONS[0] else season
-        lines.append(f'"{season}": {{ label:{json.dumps(label)}, players:[')
+        lines.append(f'"{season}": {{ label:{json.dumps(season)}, players:[')
         for p in data[season]:
             fields = ",".join(f"{k}:{json.dumps(v, ensure_ascii=False)}" for k, v in p.items())
             lines.append(f"  {{{fields}}},")
