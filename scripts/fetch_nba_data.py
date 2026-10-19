@@ -5,6 +5,7 @@ Usage:
     pip install -r scripts/requirements.txt
     python scripts/fetch_nba_data.py                  # every season in SEASONS below
     python scripts/fetch_nba_data.py 2023-24 1986-87  # only these seasons
+    python scripts/fetch_nba_data.py --cache-only     # rebuild index.html from data/seasons.json
 
 For each season it pulls regular-season per-game stats, keeps the players who
 logged the most minutes (among those who played a meaningful share of games),
@@ -138,17 +139,26 @@ def write_index(data):
 
 
 def main():
-    wanted = sys.argv[1:] or SEASONS
+    args = sys.argv[1:]
+    cache_only = "--cache-only" in args
+    wanted = [a for a in args if a != "--cache-only"] or ([] if cache_only else SEASONS)
     unknown = [s for s in wanted if s not in SEASONS]
     if unknown:
         sys.exit(f"Unknown season(s): {', '.join(unknown)}. Add them to SEASONS first.")
 
     data = json.loads(CACHE.read_text(encoding="utf-8")) if CACHE.exists() else {}
+    failed = []
     for season in wanted:
         print(f"Fetching {season}…")
-        players = build_season(fetch_raw(season))
+        try:
+            players = build_season(fetch_raw(season))
+        except Exception as exc:
+            print(f"  {season}: failed ({exc.__class__.__name__}: {exc}), skipping")
+            failed.append(season)
+            continue
         if not players:
             print(f"  {season}: no data returned, skipping")
+            failed.append(season)
             continue
         data[season] = players
         print(f"  {season}: {len(players)} players, top scorer "
@@ -159,7 +169,8 @@ def main():
 
     write_index(data)
     print(f"Wrote {len(data)} seasons to {INDEX.relative_to(ROOT)}")
-
+    if failed:
+        print(f"Not fetched (hand-entered data kept if any): {', '.join(failed)}")
 
 if __name__ == "__main__":
     main()
