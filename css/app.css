@@ -116,6 +116,9 @@ button, select { font: inherit; color: inherit; }
   padding: clamp(28px, 4vw, 56px) clamp(24px, 3.4vw, 48px);
 }
 .side-a { background: linear-gradient(160deg, var(--team-bg2) 0%, var(--team-bg) 100%); }
+/* Keep text out of the strip beside the centre line, where the VS badge sits */
+.side-a { padding-right: max(clamp(24px, 3.4vw, 48px), 64px); }
+.side-b { padding-left: max(clamp(24px, 3.4vw, 48px), 64px); }
 .side-b { background: linear-gradient(200deg, var(--team-bg) 0%, var(--team-bg2) 100%); align-items: flex-end; text-align: right; }
 .side-photo {
   position: absolute;
@@ -175,7 +178,7 @@ button, select { font: inherit; color: inherit; }
 }
 .side-a::before { background: linear-gradient(90deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 70%, transparent) 45%, transparent 75%); }
 .side-b::before { background: linear-gradient(270deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 70%, transparent) 45%, transparent 75%); }
-.side-text { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; max-width: 34ch; }
+.side-text { position: relative; z-index: 2; display: flex; flex-direction: column; gap: 8px; max-width: min(34ch, 100%); }
 .side-b .side-text { align-items: flex-end; }
 .side-team { font-size: 14px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--team-accent); }
 .side-name {
@@ -387,7 +390,8 @@ button, select { font: inherit; color: inherit; }
 .pcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 80%, transparent) 35%, transparent 65%); z-index: 1; }
 .pcard > :not(img) { position: relative; z-index: 2; }
 .pcard .chip { position: absolute; top: 12px; left: 12px; }
-.pcard-name { font-family: var(--display); font-size: 26px; line-height: 0.95; text-transform: uppercase; overflow-wrap: anywhere; }
+.pcard-name { font-family: var(--display); font-size: 26px; line-height: 0.95; text-transform: uppercase; }
+.name-word { white-space: nowrap; }
 .pcard-meta { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--team-accent); margin: 4px 0 8px; }
 .pcard-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
 .pcard-stats div { display: flex; flex-direction: column; }
@@ -490,7 +494,7 @@ button, select { font: inherit; color: inherit; }
   .hud-label { display: none; }
   .hud-icon { display: block; }
   .duel { grid-template-columns: 1fr; grid-template-rows: auto auto; min-height: 0; }
-  .side { min-height: 300px; padding: 24px 20px; }
+  .side, .side-a, .side-b { min-height: 300px; padding: 24px 20px; }
   .side-b { align-items: flex-start; text-align: left; padding-bottom: 28px; }
   .side-b .side-text { align-items: flex-start; }
   .side-photo { height: 92%; }
