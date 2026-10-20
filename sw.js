@@ -1,9 +1,10 @@
 // StatStack service worker: makes the app installable and playable offline.
 // App files refresh in the background, so updates show on the next launch.
 // Bump VERSION when the SHELL list changes to drop the old cache.
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `statstack-shell-${VERSION}`;
 const IMAGE_CACHE = "statstack-headshots";
+const FONT_CACHE = "statstack-fonts";
 // Headshots come from another site, so browsers count each one as a large
 // opaque entry against storage. Keep the cache modest.
 const MAX_IMAGES = 150;
@@ -13,6 +14,7 @@ const SHELL = [
   "index.html",
   "css/app.css",
   "js/data.js",
+  "js/teams.js",
   "js/fx.js",
   "js/app.js",
   "manifest.webmanifest",
@@ -46,6 +48,12 @@ self.addEventListener("fetch", event => {
   // Player headshots: serve from cache, fetch and keep new ones
   if (url.hostname === "cdn.nba.com" && url.pathname.startsWith("/headshots/")) {
     event.respondWith(cacheFirstImage(request));
+    return;
+  }
+
+  // Google Fonts: keep a copy so the type survives offline
+  if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
+    event.respondWith(cacheFirstFont(request));
     return;
   }
 
@@ -84,6 +92,19 @@ async function cacheFirstImage(request) {
     return response;
   } catch {
     return Response.error(); // the page falls back to the silhouette
+  }
+}
+
+async function cacheFirstFont(request) {
+  const cache = await caches.open(FONT_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  try {
+    const response = await fetch(request);
+    if (response.ok || response.type === "opaque") cache.put(request, response.clone()).catch(() => {});
+    return response;
+  } catch {
+    return Response.error(); // falls back to the system font stack
   }
 }
 
