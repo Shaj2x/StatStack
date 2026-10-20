@@ -1,7 +1,7 @@
 // StatStack service worker: makes the app installable and playable offline.
 // App files refresh in the background, so updates show on the next launch.
 // Bump VERSION when the SHELL list changes to drop the old cache.
-const VERSION = "v2";
+const VERSION = "v3";
 const SHELL_CACHE = `statstack-shell-${VERSION}`;
 const IMAGE_CACHE = "statstack-headshots";
 const FONT_CACHE = "statstack-fonts";
@@ -15,6 +15,7 @@ const SHELL = [
   "css/app.css",
   "js/data.js",
   "js/teams.js",
+  "js/photos.js",
   "js/fx.js",
   "js/app.js",
   "manifest.webmanifest",
@@ -46,7 +47,8 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
 
   // Player headshots: serve from cache, fetch and keep new ones
-  if (url.hostname === "cdn.nba.com" && url.pathname.startsWith("/headshots/")) {
+  if ((url.hostname === "cdn.nba.com" && url.pathname.startsWith("/headshots/")) ||
+      url.hostname === "upload.wikimedia.org") {
     event.respondWith(cacheFirstImage(request));
     return;
   }

@@ -131,6 +131,35 @@ button, select { font: inherit; color: inherit; }
 }
 .side-a .side-photo { right: -4%; }
 .side-b .side-photo { left: -4%; }
+/* Wikimedia photos are rectangles, not cut-outs: tint them into the team
+   colours and fade the edges so they sit like the NBA headshots */
+.side-photo.is-photo {
+  height: 88%;
+  max-width: 62%;
+  object-fit: cover;
+  object-position: 50% 15%;
+  filter: grayscale(1) contrast(1.15);
+  mix-blend-mode: luminosity;
+  opacity: 0.9;
+  -webkit-mask-image: radial-gradient(ellipse 62% 62% at 50% 42%, #000 40%, transparent 100%);
+  mask-image: radial-gradient(ellipse 62% 62% at 50% 42%, #000 40%, transparent 100%);
+}
+.side-a .side-photo.is-photo { right: 4%; }
+.side-b .side-photo.is-photo { left: 4%; }
+.photo-credit {
+  position: absolute;
+  bottom: 8px;
+  z-index: 2;
+  max-width: 45%;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.photo-credit:empty { display: none; }
+.side-a .photo-credit { right: 12px; }
+.side-b .photo-credit { left: 12px; }
 /* Keep the type readable over the photo */
 .side::before {
   content: "";
@@ -334,6 +363,21 @@ button, select { font: inherit; color: inherit; }
 .pcard.epic { border-color: var(--r-epic); }
 .pcard.rare { border-color: var(--r-rare); }
 .pcard-photo { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: 120%; max-width: none; height: auto; pointer-events: none; }
+.pcard-photo.is-photo {
+  top: 0;
+  bottom: auto;
+  left: 0;
+  transform: none;
+  width: 100%;
+  height: 72%;
+  object-fit: cover;
+  object-position: 50% 15%;
+  filter: grayscale(1) contrast(1.15);
+  mix-blend-mode: luminosity;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+}
+.pcard-credit { font-size: 9px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 80%, transparent) 35%, transparent 65%); z-index: 1; }
 .pcard > :not(img) { position: relative; z-index: 2; }
 .pcard .chip { position: absolute; top: 12px; left: 12px; }
@@ -445,6 +489,8 @@ button, select { font: inherit; color: inherit; }
   .side-b .side-text { align-items: flex-start; }
   .side-photo { height: 92%; }
   .side-a .side-photo, .side-b .side-photo { right: -8%; left: auto; }
+  .side-a .side-photo.is-photo, .side-b .side-photo.is-photo { right: 0; height: 90%; max-width: 58%; }
+  .side-a .photo-credit, .side-b .photo-credit { right: 12px; left: auto; }
   .side-b::before { background: linear-gradient(90deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 70%, transparent) 45%, transparent 75%); }
   .side-name { font-size: clamp(36px, 10vw, 52px); }
   .side-stat { font-size: clamp(72px, 22vw, 104px); }

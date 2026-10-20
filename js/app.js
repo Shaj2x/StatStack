@@ -39,14 +39,27 @@ const PACK_PRICE = 2000;
 // ─── IMAGES ─────────────────────────────────────────────────────────────────
 // Transparent silhouette used when a headshot is missing or blocked
 const FALLBACK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 190'%3E%3Ccircle cx='130' cy='70' r='44' fill='white' opacity='0.18'/%3E%3Cpath d='M30 190c8-52 50-80 100-80s92 28 100 80z' fill='white' opacity='0.18'/%3E%3C/svg%3E";
-function imgUrl(id) {
-  return id ? `https://cdn.nba.com/headshots/nba/latest/1040x760/${id}.png` : FALLBACK;
+// Where a player's picture comes from: NBA.com's cut-out headshot, or, for
+// players NBA.com has none for, a Wikimedia photo from js/photos.js (null
+// there means no confirmed photo, so show the silhouette)
+function photoFor(p) {
+  const key = p.img || `name:${p.name}`;
+  if (key in PHOTOS) {
+    const ph = PHOTOS[key];
+    return ph ? {src: ph.src, credit: ph.credit, cutout: false} : {src: FALLBACK, credit: "", cutout: true};
+  }
+  return p.img
+    ? {src: `https://cdn.nba.com/headshots/nba/latest/1040x760/${p.img}.png`, credit: "", cutout: true}
+    : {src: FALLBACK, credit: "", cutout: true};
 }
-function imgFail(img) { img.onerror = null; img.src = FALLBACK; }
-function setImg(img, id, alt) {
-  img.onerror = () => imgFail(img);
-  img.src = imgUrl(id);
-  img.alt = alt;
+function imgFail(img) { img.onerror = null; img.src = FALLBACK; img.classList.remove("is-photo"); }
+function setImg(img, p, creditEl) {
+  const ph = photoFor(p);
+  img.onerror = () => { imgFail(img); if (creditEl) creditEl.textContent = ""; };
+  img.classList.toggle("is-photo", !ph.cutout);
+  img.src = ph.src;
+  img.alt = p.name;
+  if (creditEl) creditEl.textContent = ph.credit;
 }
 function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
@@ -170,7 +183,7 @@ window.addEventListener("resize", placeSeam);
 function setPlayer(n, p, hide = false) {
   const card = $(`card${n}`);
   paint(card, p.team);
-  setImg($(`player${n}Image`), p.img, p.name);
+  setImg($(`player${n}Image`), p, $(`player${n}Credit`));
   $(`player${n}Name`).textContent = p.name;
   $(`player${n}Team`).textContent = team(p.team).name || p.team;
   $(`player${n}StatLabel`).textContent = hide
@@ -243,7 +256,7 @@ function updateBoard() {
 function cardHtml(c, extraClass = "") {
   return `
     <div class="pcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}">
-      <img class="pcard-photo" src="${imgUrl(c.img)}" alt="${esc(c.name)}" loading="lazy" onerror="imgFail(this)">
+      <img class="pcard-photo${photoFor(c).cutout ? "" : " is-photo"}" src="${esc(photoFor(c).src)}" alt="${esc(c.name)}" title="${esc(photoFor(c).credit)}" loading="lazy" onerror="imgFail(this)">
       <span class="chip ${c.rarity}">${c.rarity}</span>
       <div class="pcard-name">${esc(c.name)}</div>
       <div class="pcard-meta">${esc(c.team)} · ${esc(c.season || "")}</div>
@@ -254,6 +267,7 @@ function cardHtml(c, extraClass = "") {
         <div><span>STL</span><b>${c.spg}</b></div>
         <div><span>BLK</span><b>${c.bpg}</b></div>
       </div>
+      ${photoFor(c).credit ? `<div class="pcard-credit">${esc(photoFor(c).credit)}</div>` : ""}
     </div>`;
 }
 

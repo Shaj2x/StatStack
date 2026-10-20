@@ -15,6 +15,11 @@ ALIASES = {
     "fat lever": "lafayette lever",
     "world b free": "world free",
     "chris jackson": "mahmoud abdul rauf",
+    "clarence weatherspoon": "clar weatherspoon",
+    "michael ray richardson": "micheal ray richardson",
+    "dave greenwood": "david greenwood",
+    "cliff robinson": "cliff t robinson",  # the 1990s Portland one is listed as Clifford
+    "steve smith": "steven smith",
 }
 
 # Names shared by several NBA players, resolved to the one who played in the
@@ -22,7 +27,12 @@ ALIASES = {
 PICK = {
     "patrick ewing": 121, "gary payton": 56, "larry johnson": 913, "glen rice": 779,
     "ron harper": 166, "reggie williams": 199, "dee brown": 244, "charles smith": 293,
-    "bobby jones": 77193, "mike dunleavy": 76616,
+    "bobby jones": 77193, "mike dunleavy": 76616, "steven smith": 120, "eddie johnson": 698,
+}
+
+# Same-name players who played at the same time, told apart by team
+TEAM_PICK = {
+    ("eddie johnson", "ATL"): 77144,  # the Hawks guard; Eddie A. Johnson (698) was the scorer
 }
 
 
@@ -53,13 +63,15 @@ def matches(name, player_id):
     return official is not None and norm(official) == norm(name)
 
 
-def resolve(name, season_start=None, careers=None):
+def resolve(name, season_start=None, careers=None, team=None):
     """Return the NBA player ID for `name`, or None if it can't be told apart.
 
     careers: optional {normalized name: [(id, from_year, to_year), ...]} from
     stats.nba.com, used to pick the player who was active in season_start.
     """
     key = norm(name)
+    if (key, team) in TEAM_PICK:
+        return TEAM_PICK[(key, team)]
     if careers and season_start is not None:
         active = [pid for pid, start, end in careers.get(key, []) if start <= season_start <= end]
         if len(active) == 1:
