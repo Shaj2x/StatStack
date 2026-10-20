@@ -1,1 +1,2 @@
 nba_api>=1.4
+basketball_reference_web_scraper>=4.15

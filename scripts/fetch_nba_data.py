@@ -86,8 +86,17 @@ def fetch_raw(season):
             time.sleep(wait)
 
 
+def img_id(row):
+    """NBA player ID for the headshot. Rows from other sources carry it as IMG."""
+    return row.get("IMG", row["PLAYER_ID"])
+
+
 def build_season(rows):
-    """Pick the season's player pool and convert rows to StatStack's player schema."""
+    """Pick the season's player pool and convert rows to StatStack's player schema.
+
+    Each row needs PLAYER_ID (any unique key), PLAYER_NAME, TEAM, GP, MIN and
+    per-game PTS, REB, AST, STL, BLK.
+    """
     max_gp = max((r["GP"] for r in rows), default=0)
     qualified = [r for r in rows if r["GP"] >= max_gp * MIN_GP_SHARE]
     pool = sorted(qualified, key=lambda r: r["MIN"], reverse=True)[:PLAYERS_PER_SEASON]
@@ -109,7 +118,7 @@ def build_season(rows):
             "spg": round(float(r["STL"] or 0), 1),
             "bpg": round(float(r["BLK"] or 0), 1),
             "rarity": rarity[r["PLAYER_ID"]],
-            "img": str(r["PLAYER_ID"]),
+            "img": None if img_id(r) is None else str(img_id(r)),
         }
         for r in by_impact
     ]
@@ -140,7 +149,10 @@ def write_index(data):
 def main():
     args = sys.argv[1:]
     cache_only = "--cache-only" in args
-    wanted = [a for a in args if a != "--cache-only"] or ([] if cache_only else SEASONS)
+    # stats.nba.com has per-game tables from 1996-97 on; older seasons come
+    # from scripts/fetch_bbref_seasons.py
+    default = [s for s in SEASONS if int(s[:4]) >= 1996]
+    wanted = [a for a in args if a != "--cache-only"] or ([] if cache_only else default)
     unknown = [s for s in wanted if s not in SEASONS]
     if unknown:
         sys.exit(f"Unknown season(s): {', '.join(unknown)}. Add them to SEASONS first.")

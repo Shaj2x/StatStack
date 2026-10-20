@@ -2,29 +2,41 @@
 
 NBA Higher or Lower: a static web app with no build step.
 
-- `index.html` is the app shell (Home, Play, Shop and Collection screens)
+- `index.html` is the app shell (Play, Packs and Collection screens, plus a settings dialog)
 - `css/app.css` has the styles
 - `js/app.js` has the game logic
 - `js/data.js` has the player database
+- `js/teams.js` has team names and the colours used for each player's half
 
 ## Refreshing player data
 
-Season stats come from stats.nba.com through [nba_api](https://github.com/swar/nba_api):
+Stats come from two sources, both run from your own computer
+(stats.nba.com and Basketball-Reference block most cloud servers):
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r scripts/requirements.txt
-python scripts/fetch_nba_data.py                  # all seasons
-python scripts/fetch_nba_data.py 2023-24 1986-87  # just these
+python scripts/fetch_nba_data.py        # 1996-97 onward, from stats.nba.com via nba_api
+python scripts/fetch_bbref_seasons.py   # earlier seasons, from Basketball-Reference
+python scripts/check_headshots.py       # confirm every headshot is the right player
 ```
 
-The script writes `data/seasons.json` and regenerates the `API_SEASONS` block in
-`js/data.js`. Fetched seasons replace the hand-entered `SEASONS` data, and the
-season dropdown lists only seasons that have data. Each season keeps the 120
-players with the most minutes (40%+ of games played); rarity is assigned by
-points + rebounds + assists rank (top 4% legendary, next 8% epic, next 23% rare).
+Both fetch scripts write `data/seasons.json` and regenerate the `API_SEASONS`
+block in `js/data.js`, and the season dropdown lists only seasons that have
+data. Pass season names (for example `2023-24`) to fetch only those, or
+`--cache-only` to `fetch_nba_data.py` to rebuild `js/data.js` without fetching.
+Each season keeps the 120 players with the most minutes (40%+ of games
+played); rarity is assigned by points + rebounds + assists rank (top 4%
+legendary, next 8% epic, next 23% rare).
 
-stats.nba.com blocks most cloud/datacenter IPs, so run the script from a home
-connection.
+### Headshots
+
+Headshots load from NBA.com by official NBA player ID, so the ID decides whose
+face appears. `check_headshots.py` checks every player in the game against
+nba_api's offline list of all NBA players and reports any ID that belongs to
+someone else. Basketball-Reference players are matched to NBA IDs by name and
+the years they played; anyone who can't be matched gets a silhouette instead
+of a guess. Names that need a hand-picked ID go in `scripts/player_ids.py`.
 
 ## Installable app
 

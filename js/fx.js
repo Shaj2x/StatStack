@@ -27,10 +27,10 @@ const FX = (() => {
   function stop(el) { el.getAnimations().forEach(a => a.cancel()); }
 
   // Screen / element entrance: short fade + rise; fade only with reduced motion
-  function enter(el, {y = 8, duration = 180, delay = 0} = {}) {
+  function enter(el, {x = 0, y = 8, duration = 180, delay = 0} = {}) {
     stop(el);
-    const from = reduced() ? {opacity: 0} : {opacity: 0, transform: `translateY(${y}px)`};
-    const to = reduced() ? {opacity: 1} : {opacity: 1, transform: "translateY(0)"};
+    const from = reduced() ? {opacity: 0} : {opacity: 0, transform: `translate(${x}px, ${y}px)`};
+    const to = reduced() ? {opacity: 1} : {opacity: 1, transform: "translate(0, 0)"};
     return el.animate([from, to], {duration, delay, easing: EASE_OUT, fill: "backwards"});
   }
 
