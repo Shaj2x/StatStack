@@ -62,8 +62,10 @@ let currentScreen = null;
 
 function showScreen(name) {
   if (!SCREENS.includes(name)) name = "home";
+  const changed = name !== currentScreen;
   currentScreen = name;
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.dataset.screen === name));
+  if (changed) FX.enter(document.querySelector(`.screen[data-screen="${name}"]`));
   document.querySelectorAll(".tab").forEach(t => {
     const on = t.dataset.tab === name;
     t.classList.toggle("active", on);
@@ -123,6 +125,8 @@ function pickOpponent(base, key) {
 
 // ─── GAME ROUND ─────────────────────────────────────────────────────────────
 function startNewRound() {
+  // Player 2's card moves into player 1's slot, so remember where it was
+  const carried = player2 && currentScreen === "play" ? $("card2").getBoundingClientRect() : null;
   roundNumber++;
   player1 = player2 || randPlayer();
   currentStat = pick(statTypes);
@@ -139,7 +143,14 @@ function startNewRound() {
   $("result").textContent = "";
   $("result").className = "result";
   $("roundDisplay").textContent = roundNumber;
+  $("swipeHint").hidden = false;
+  $("card2").classList.remove("is-correct", "is-wrong");
   gameActive = true;
+
+  if (carried) {
+    FX.flipFrom($("card1"), carried);
+    FX.enter($("card2"), {y: 16, duration: 220, delay: 60});
+  }
 }
 
 function setPlayer(n, p, hide = false) {
@@ -157,12 +168,13 @@ function setHook(text, bg) {
   $("hookBanner").style.background = bg;
 }
 
-function makeGuess(guess) {
+function makeGuess(guess, fromKeyboard = false) {
   if (!gameActive) return;
   gameActive = false;
   const v1 = player1[currentStat.key], v2 = player2[currentStat.key];
-  $("player2Stat").textContent = v2.toFixed(1);
+  const coinsBefore = coins, multiplierBefore = multiplier;
   $("player2Stat").className = "stat-value";
+  FX.countUp($("player2Stat"), 0, v2);
   const correct = (guess === "higher" && v2 >= v1) || (guess === "lower" && v2 <= v1);
   const res = $("result");
   if (correct) {
@@ -173,16 +185,29 @@ function makeGuess(guess) {
     res.textContent = `✅ Correct! +${earned} coins`;
     res.className = "result correct";
     setHook(pick(wins), "var(--win-grad)");
+    $("card2").classList.add("is-correct");
+    FX.feedback("correct");
   } else {
     streak = 0; multiplier = 1;
     res.textContent = "❌ Wrong! Streak reset.";
     res.className = "result incorrect";
     setHook(pick(fails), "var(--fail-grad)");
+    $("card2").classList.add("is-wrong");
+    FX.shake($("card2"));
+    FX.feedback("wrong");
   }
   updateBoard();
+  FX.enter(res, {y: 4, duration: 160});
+  if (correct) {
+    FX.countUp($("coins"), coinsBefore, coins, {duration: 300, format: v => Math.round(v).toLocaleString()});
+    FX.pop($("coins"));
+    FX.pop($("streak"));
+    if (multiplier > multiplierBefore) FX.pop($("multiplier"), 1.4);
+  }
   $("guessButtons").hidden = true;
+  $("swipeHint").hidden = true;
   $("nextBtn").hidden = false;
-  $("nextBtn").focus({preventScroll: true});
+  if (fromKeyboard) $("nextBtn").focus({preventScroll: true});
 }
 function nextRound() { startNewRound(); }
 
@@ -237,6 +262,7 @@ function buyPack() {
         </div>
       </div>`;
     $("revealedCard").hidden = false;
+    FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
     $("revealedCard").scrollIntoView({behavior: "smooth", block: "center"});
     renderShop();
   }, 1800);
@@ -268,6 +294,7 @@ function renderColl(r) {
       <div class="card-team">${esc(c.team)} · ${c.season || ""}</div>
       <div class="card-stats">PPG ${c.ppg} | RPG ${c.rpg}<br>APG ${c.apg} | SPG ${c.spg} | BPG ${c.bpg}</div>
     </div>`).join("");
+  [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
 }
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
@@ -282,10 +309,72 @@ document.addEventListener("keydown", e => {
   if (currentScreen !== "play" || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.target.matches("input, select, textarea")) return;
   const k = e.key.toLowerCase();
-  if (gameActive && (k === "arrowup" || k === "h")) { e.preventDefault(); makeGuess("higher"); }
-  else if (gameActive && (k === "arrowdown" || k === "l")) { e.preventDefault(); makeGuess("lower"); }
+  if (gameActive && (k === "arrowup" || k === "h")) { e.preventDefault(); makeGuess("higher", true); }
+  else if (gameActive && (k === "arrowdown" || k === "l")) { e.preventDefault(); makeGuess("lower", true); }
   else if (!gameActive && k === "enter") { e.preventDefault(); nextRound(); }
 });
+
+// ─── SWIPE TO GUESS ─────────────────────────────────────────────────────────
+// Drag player 2's card up for higher or down for lower. The card tracks the
+// finger 1:1, resists past the commit distance, and springs home on release
+// carrying the finger's velocity.
+(function swipeToGuess() {
+  const card = $("card2");
+  const COMMIT = 70, SLOP = 10, FLICK = 0.5; // px, px, px/ms
+  let drag = null;
+
+  const setDrag = y => {
+    const dir = y < 0 ? "up" : "down";
+    card.dataset.drag = Math.abs(y) > SLOP ? dir : "";
+    card.style.setProperty("--drag", Math.min(1, Math.abs(y) / COMMIT).toFixed(2));
+  };
+
+  card.addEventListener("pointerdown", e => {
+    if (!gameActive || e.button !== 0) return;
+    card.setPointerCapture(e.pointerId);
+    if (card._springRaf) cancelAnimationFrame(card._springRaf);
+    const current = new DOMMatrix(getComputedStyle(card).transform).m42 || 0;
+    drag = {id: e.pointerId, startY: e.clientY - current, moved: false, history: [{y: e.clientY, t: e.timeStamp}]};
+  });
+
+  card.addEventListener("pointermove", e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const raw = e.clientY - drag.startY;
+    if (!drag.moved && Math.abs(raw) < SLOP) return;
+    if (!drag.moved) { drag.moved = true; card.classList.add("dragging"); }
+    const y = FX.rubberband(raw, COMMIT * 1.4);
+    card.style.transform = `translateY(${y}px)`;
+    setDrag(y);
+    drag.history.push({y: e.clientY, t: e.timeStamp});
+    if (drag.history.length > 5) drag.history.shift();
+  });
+
+  const release = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const {history, moved} = drag;
+    drag = null;
+    card.classList.remove("dragging");
+    const y = new DOMMatrix(getComputedStyle(card).transform).m42 || 0;
+    const first = history[0], last = history[history.length - 1];
+    const velocity = last.t > first.t ? (last.y - first.y) / (last.t - first.t) : 0;
+    const commit = moved && gameActive && e.type === "pointerup" &&
+      (Math.abs(y) > COMMIT || (Math.abs(velocity) > FLICK && Math.abs(y) > SLOP * 2));
+    if (commit) {
+      FX.haptic("commit");
+      makeGuess(y < 0 ? "higher" : "lower");
+    }
+    FX.springY(card, y, velocity, {onUpdate: v => setDrag(v)});
+  };
+  card.addEventListener("pointerup", release);
+  card.addEventListener("pointercancel", release);
+})();
+
+// ─── SETTINGS ───────────────────────────────────────────────────────────────
+$("soundToggle").checked = FX.settings.sound;
+$("soundToggle").addEventListener("change", e => FX.setSetting("sound", e.target.checked));
+$("hapticsToggle").checked = FX.settings.haptics;
+$("hapticsToggle").addEventListener("change", e => { FX.setSetting("haptics", e.target.checked); if (e.target.checked) FX.haptic("correct"); });
+$("hapticsRow").hidden = !FX.canVibrate;
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
 $("seasonSelect").innerHTML = SEASON_KEYS
