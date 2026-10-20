@@ -178,13 +178,27 @@ const stacked = matchMedia("(max-width: 760px)");
 function placeSeam() {
   if (stacked.matches) $("duel").style.setProperty("--seam-y", `${$("card1").offsetHeight}px`);
 }
-window.addEventListener("resize", placeSeam);
+// Shrink a name until its longest word fits, so names never break mid-word
+function fitName(el) {
+  el.style.fontSize = "";
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > el.clientWidth + 1 && size > 24) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+  }
+}
+window.addEventListener("resize", () => {
+  placeSeam();
+  fitName($("player1Name"));
+  fitName($("player2Name"));
+});
 
 function setPlayer(n, p, hide = false) {
   const card = $(`card${n}`);
   paint(card, p.team);
   setImg($(`player${n}Image`), p, $(`player${n}Credit`));
   $(`player${n}Name`).textContent = p.name;
+  fitName($(`player${n}Name`));
   $(`player${n}Team`).textContent = team(p.team).name || p.team;
   $(`player${n}StatLabel`).textContent = hide
     ? `${currentStat.label} in ${currentSeasonKey}?`
