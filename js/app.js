@@ -178,13 +178,38 @@ const stacked = matchMedia("(max-width: 760px)");
 function placeSeam() {
   if (stacked.matches) $("duel").style.setProperty("--seam-y", `${$("card1").offsetHeight}px`);
 }
-window.addEventListener("resize", placeSeam);
+// Names break only between words: each word (hyphens included, so
+// Gilgeous-Alexander stays whole) is kept on one line
+function nameHtml(name) {
+  return String(name).split(/\s+/).map(w => `<span class="name-word">${esc(w)}</span>`).join(" ");
+}
+
+// Shrink a name until its longest word fits the space its half (or card)
+// leaves for text, so names never break mid-word or run into the VS badge
+function fitName(el, min = 24) {
+  el.style.fontSize = "";
+  const box = el.closest(".side, .pcard") || el.parentElement;
+  const cs = getComputedStyle(box);
+  const room = Math.min(el.parentElement.clientWidth || Infinity,
+    box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  let size = parseFloat(getComputedStyle(el).fontSize);
+  while (el.scrollWidth > room + 1 && size > min) {
+    size -= 2;
+    el.style.fontSize = `${size}px`;
+  }
+}
+window.addEventListener("resize", () => {
+  placeSeam();
+  fitName($("player1Name"));
+  fitName($("player2Name"));
+});
 
 function setPlayer(n, p, hide = false) {
   const card = $(`card${n}`);
   paint(card, p.team);
   setImg($(`player${n}Image`), p, $(`player${n}Credit`));
-  $(`player${n}Name`).textContent = p.name;
+  $(`player${n}Name`).innerHTML = nameHtml(p.name);
+  fitName($(`player${n}Name`));
   $(`player${n}Team`).textContent = team(p.team).name || p.team;
   $(`player${n}StatLabel`).textContent = hide
     ? `${currentStat.label} in ${currentSeasonKey}?`
@@ -258,7 +283,7 @@ function cardHtml(c, extraClass = "") {
     <div class="pcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}">
       <img class="pcard-photo${photoFor(c).cutout ? "" : " is-photo"}" src="${esc(photoFor(c).src)}" alt="${esc(c.name)}" title="${esc(photoFor(c).credit)}" loading="lazy" onerror="imgFail(this)">
       <span class="chip ${c.rarity}">${c.rarity}</span>
-      <div class="pcard-name">${esc(c.name)}</div>
+      <div class="pcard-name">${nameHtml(c.name)}</div>
       <div class="pcard-meta">${esc(c.team)} · ${esc(c.season || "")}</div>
       <div class="pcard-stats">
         <div><span>PTS</span><b>${c.ppg}</b></div>
@@ -301,6 +326,7 @@ function buyPack() {
     $("packOpening").hidden = true;
     $("revealedCard").innerHTML = cardHtml(card, "reveal-card");
     $("revealedCard").hidden = false;
+    $("revealedCard").querySelectorAll(".pcard-name").forEach(el => fitName(el, 18));
     $("revealedCard").scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
     FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
     renderShop();
@@ -326,6 +352,7 @@ function renderColl(r) {
     return;
   }
   g.innerHTML = cards.slice().reverse().map(c => cardHtml(c)).join("");
+  g.querySelectorAll(".pcard-name").forEach(el => fitName(el, 14));
   [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
 }
 

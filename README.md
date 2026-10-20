@@ -20,6 +20,7 @@ python scripts/fetch_nba_data.py        # 1996-97 onward, from stats.nba.com via
 python scripts/fetch_bbref_seasons.py   # earlier seasons, from Basketball-Reference
 python scripts/check_headshots.py --fix # confirm every headshot ID is the right player
 python scripts/fetch_photos.py          # real photos for players NBA.com has none for
+python scripts/verify_stats.py          # proofcheck every stat against a second source
 ```
 
 Both fetch scripts write `data/seasons.json` and regenerate the `API_SEASONS`
@@ -40,13 +41,23 @@ the years they played; anyone who can't be matched gets a silhouette instead
 of a guess. Names that need a hand-picked ID go in `scripts/player_ids.py`.
 
 NBA.com has no headshot for many retired players and returns a generic
-silhouette instead. `fetch_photos.py` finds those players and looks each one
-up on Wikipedia, using the article's freely licensed lead photo only when the
+silhouette instead. `fetch_photos.py` finds those players and first looks them up on
+Wikidata, which links each player's NBA.com ID to their photo (an exact
+match). Anyone still missing is looked up on Wikipedia, using the article's freely licensed lead photo only when the
 article is about that basketball player (matching name, "basketball" in the
 description, an age that fits the season, and the team when two articles
 fit). Results go in `js/photos.js` with each photo's author and licence, which
 the game shows as a credit. Players with no confirmed photo keep the game's
 own silhouette rather than a guess. Rerun it after fetching new seasons.
+
+### Checking the stats
+
+`verify_stats.py` compares every player's numbers in the game with a second,
+independent source: seasons from 1996-97 on (which come from stats.nba.com)
+against Basketball-Reference, and earlier seasons (which come from
+Basketball-Reference) against each player's stats.nba.com career record. It
+prints every mismatch with both values and saves the full report to
+`data/stat_check.txt`. Differences of 0.1 are rounding.
 
 ## Installable app
 
