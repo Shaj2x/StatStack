@@ -1,7 +1,9 @@
 // StatStack service worker: makes the app installable and playable offline.
-// App files refresh in the background, so updates show on the next launch.
+// App files load fresh whenever the network answers, so updates show straight
+// away; the saved copy is used offline or when the network is too slow.
 // Bump VERSION when the SHELL list changes to drop the old cache.
-const VERSION = "v3";
+const VERSION = "v4";
+const NETWORK_TIMEOUT = 4000; // ms before falling back to the saved copy
 const SHELL_CACHE = `statstack-shell-${VERSION}`;
 const IMAGE_CACHE = "statstack-headshots";
 const FONT_CACHE = "statstack-fonts";
@@ -59,27 +61,28 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  // App files: answer instantly from cache, refresh the cache in the background
+  // App files: latest from the network, saved copy when offline
   if (url.origin === self.location.origin) {
     const key = request.mode === "navigate" ? "index.html" : request;
-    event.respondWith(staleWhileRevalidate(key, request, event));
+    event.respondWith(networkFirst(key, request));
   }
 });
 
-async function staleWhileRevalidate(key, request, event) {
+async function networkFirst(key, request) {
   const cache = await caches.open(SHELL_CACHE);
-  const cached = await cache.match(key, {ignoreSearch: true});
-  const network = fetch(request)
-    .then(response => {
-      if (response.ok) cache.put(key, response.clone());
-      return response;
-    })
-    .catch(() => null);
-  if (cached) {
-    event.waitUntil(network);
-    return cached;
+  try {
+    // Online: always the latest files, with a time limit so a weak signal
+    // falls back to the saved copy instead of hanging
+    const response = await Promise.race([
+      fetch(request, {cache: "no-cache"}),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), NETWORK_TIMEOUT)),
+    ]);
+    if (response.ok) cache.put(key, response.clone());
+    return response;
+  } catch {
+    const cached = await cache.match(key, {ignoreSearch: true});
+    return cached || new Response("Offline", {status: 503, statusText: "Offline"});
   }
-  return (await network) || new Response("Offline", {status: 503, statusText: "Offline"});
 }
 
 async function cacheFirstImage(request) {
