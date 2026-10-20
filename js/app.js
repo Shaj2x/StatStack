@@ -394,38 +394,213 @@ function fitCardNames(root, min) {
 function renderShop() {
   $("shopCoins").textContent = coins.toLocaleString();
   $("shopSeason").textContent = currentSeasonKey;
-  $("buyPackBtn").disabled = coins < PACK_PRICE;
+  $("buyPackBtn").disabled = coins < PACK_PRICE || !!opening;
   $("packNeed").textContent = coins < PACK_PRICE
     ? `You need ${(PACK_PRICE - coins).toLocaleString()} more coins. Keep your streak going.`
     : "";
 }
 
 function buyPack() {
-  if (coins < PACK_PRICE) return;
+  if (coins < PACK_PRICE || opening) return;
   coins -= PACK_PRICE;
+  const r = Math.random() * 100;
+  const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
+  let pool = currentPlayers.filter(p => p.rarity === rarity);
+  if (!pool.length) pool = currentPlayers;
+  // The card is saved before the animation, so leaving mid-opening never loses it
+  const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
+  ownedCards.push(card);
+  save('statstack_cards', ownedCards);
   updateBoard();
+  openPack(card);
   renderShop();
-  $("buyPackBtn").disabled = true;
+}
+
+// ─── PACK OPENING ───────────────────────────────────────────────────────────
+// The pack shakes at least three times, and the glow climbs one rarity tier
+// per shake until it reaches the card inside. A fourth shake means gold.
+const TIERS = ["common", "rare", "epic", "legendary"];
+let opening = null;
+
+function beat(ms) {
+  return new Promise(resolve => {
+    if (opening.skipped) return resolve();
+    const t = setTimeout(resolve, ms);
+    opening.wake = () => { clearTimeout(t); resolve(); };
+  });
+}
+function run(el, frames, opts) {
+  const anim = el.animate(frames, {fill: "forwards", ...opts});
+  opening.anims.push(anim);
+  return anim;
+}
+function shakeFrames(amp) {
+  const frames = [];
+  for (let i = 0; i <= 8; i++) {
+    const x = i === 8 ? 0 : (i % 2 ? -1 : 1) * amp * (1 - i / 10);
+    frames.push({transform: `translate(${x}px, ${-Math.abs(x) * 0.3}px) rotate(${x * 0.45}deg)`});
+  }
+  return frames;
+}
+function setTier(stage, tier) {
+  stage.style.setProperty("--glow", `var(--r-${tier})`);
+  TIERS.forEach(t => stage.classList.toggle(`tier-${t}`, t === tier));
+}
+
+async function openPack(card) {
+  const stage = $("packStage"), pack = $("pack"), level = TIERS.indexOf(card.rarity);
+  opening = {card, level, skipped: false, ready: false, anims: [], wake: null};
+  stage.className = "pack-stage";
+  setTier(stage, "common");
+  pack.hidden = false;
+  pack.querySelector(".pack-top").style.cssText = "";
+  $("mystery").hidden = true;
+  $("packHint").textContent = "Tap to skip";
   $("revealEmpty").hidden = true;
   $("revealedCard").hidden = true;
-  $("packOpening").hidden = false;
-  setTimeout(() => {
-    const r = Math.random() * 100;
-    const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
-    let pool = currentPlayers.filter(p => p.rarity === rarity);
-    if (!pool.length) pool = currentPlayers;
-    const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
-    ownedCards.push(card);
-    save('statstack_cards', ownedCards);
-    $("packOpening").hidden = true;
-    $("revealedCard").innerHTML = cardHtml(card, "reveal-card");
-    $("revealedCard").hidden = false;
-    fitCardNames($("revealedCard"), 18);
-    $("revealedCard").scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
-    FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
-    renderShop();
-  }, 1600);
+  stage.hidden = false;
+  $("packStatus").textContent = "Opening pack…";
+  stage.scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
+
+  if (!FX.reduced()) await animatePack(stage, pack, level);
+  settlePack();
 }
+
+async function animatePack(stage, pack, level) {
+  const glow = stage.querySelector(".pack-glow");
+  run(pack, [{transform: "translateY(48px) scale(0.9)", opacity: 0}, {transform: "none", opacity: 1}], {duration: 420, easing: FX.EASE_OUT});
+  await beat(560);
+  const shakes = Math.max(3, level + 1);
+  for (let i = 0; i < shakes; i++) {
+    if (opening.skipped) return;
+    setTier(stage, TIERS[Math.min(i, level)]);
+    const duration = 340 + i * 70;
+    run(pack, shakeFrames(3 + i * 3.5), {duration, easing: "linear", fill: "none"});
+    run(glow, [{transform: "scale(0.85)"}, {transform: `scale(${1.08 + i * 0.06})`}, {transform: "scale(1)"}], {duration: duration + 200, easing: FX.EASE_OUT, fill: "none"});
+    FX.haptic(`charge${Math.min(i, 3)}`);
+    FX.sound(`charge${Math.min(i, 3)}`);
+    // The pause between shakes grows, so the last one hangs a little longer
+    await beat(duration + 260 + i * 90);
+  }
+  if (opening.skipped) return;
+
+  // Tear the top strip off and let light spill out
+  run(pack.querySelector(".pack-top"), [
+    {transform: "none", opacity: 1},
+    {transform: "translate(70px, -90px) rotate(24deg)", opacity: 0},
+  ], {duration: 480, easing: FX.EASE_OUT});
+  run(stage.querySelector(".pack-flash"), [{opacity: 0}, {opacity: 0.35 + level * 0.18}, {opacity: 0}], {duration: 520, easing: "ease-out"});
+  if (level === 3) stage.classList.add("rays");
+  FX.haptic("tear");
+  FX.sound("tear");
+  await beat(300);
+  if (opening.skipped) return;
+
+  // The card slides up out of the pack, face down, and the pack falls away
+  const mystery = $("mystery");
+  mystery.hidden = false;
+  run(mystery, [{transform: "translateY(12%)"}, {transform: "translateY(-20%)"}], {duration: 460, easing: FX.EASE_OUT});
+  run(pack, [
+    {transform: "none", opacity: 1},
+    {transform: "translateY(45%) rotate(-3deg)", opacity: 1, offset: 0.65},
+    {transform: "translateY(70%) rotate(-5deg)", opacity: 0},
+  ], {duration: 560, easing: "cubic-bezier(0.55, 0, 1, 0.45)"});
+  await beat(500);
+  if (opening.skipped) return;
+  run(mystery, [{transform: "translateY(-20%)"}, {transform: "none"}], {duration: 380, easing: FX.EASE_OUT});
+  await beat(380);
+}
+
+// Jump to the face-down card: the end of the animation, or a skip
+function settlePack() {
+  const stage = $("packStage");
+  opening.anims.forEach(a => a.cancel());
+  opening.anims = [];
+  opening.ready = true;
+  setTier(stage, opening.card.rarity);
+  if (opening.level === 3) stage.classList.add("rays");
+  stage.classList.add("ready");
+  $("pack").hidden = true;
+  $("mystery").hidden = false;
+  $("packHint").textContent = "Tap to reveal";
+  $("packStatus").textContent = "Pack opened. Press the card to reveal it.";
+  $("mystery").focus({preventScroll: true});
+}
+
+function skipPack() {
+  if (!opening || opening.ready || opening.skipped) return;
+  opening.skipped = true;
+  opening.wake?.();
+}
+
+async function revealPack() {
+  if (!opening?.ready) return;
+  const {card, level} = opening;
+  const stage = $("packStage"), mystery = $("mystery"), slot = $("revealedCard");
+  opening.ready = false;
+  stage.classList.remove("ready");
+  $("packHint").textContent = "";
+  if (!FX.reduced()) {
+    await mystery.animate([{transform: "perspective(900px) rotateY(0)"}, {transform: "perspective(900px) rotateY(90deg)"}],
+      {duration: 180, easing: "cubic-bezier(0.55, 0, 1, 0.45)"}).finished;
+  }
+  mystery.hidden = true;
+  slot.innerHTML = cardHtml(card, "reveal-card");
+  slot.hidden = false;
+  fitCardNames(slot, 18);
+  if (FX.reduced()) {
+    slot.animate([{opacity: 0}, {opacity: 1}], {duration: 200, easing: "ease"});
+  } else {
+    slot.animate([
+      {transform: "perspective(900px) rotateY(-90deg) scale(1.04)"},
+      {transform: "perspective(900px) rotateY(0) scale(1)"},
+    ], {duration: 340, easing: FX.EASE_OUT});
+    burst(stage, level);
+  }
+  FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
+  $("packStatus").textContent = `${RARITY_LABEL[card.rarity].replace("★ ", "")}: ${card.name}`;
+  slot.querySelector(".flipcard").focus({preventScroll: true});
+  opening = null;
+  renderShop();
+}
+
+// Shards fly out in the rarity colour: a few for rare, a shower for legendary
+function burst(stage, level) {
+  if (level >= 1) {
+    const ring = document.createElement("span");
+    ring.className = "ring";
+    stage.append(ring);
+    ring.animate([{transform: "scale(0.4)", opacity: 1}, {transform: `scale(${2.6 + level * 0.5})`, opacity: 0}],
+      {duration: 700, easing: FX.EASE_OUT}).finished.then(() => ring.remove());
+  }
+  if (level === 3) {
+    stage.querySelector(".pack-flash").animate([{opacity: 0.9}, {opacity: 0}], {duration: 700, easing: "ease-out"});
+  }
+  const count = [0, 8, 18, 30][level];
+  for (let i = 0; i < count; i++) {
+    const spark = document.createElement("span");
+    spark.className = "spark";
+    stage.append(spark);
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = 150 + Math.random() * 130;
+    const spin = Math.random() * 540 - 270;
+    spark.animate([
+      {transform: `translate(0, 0) rotate(${angle}rad) scale(1)`, opacity: 1},
+      {transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) rotate(${angle * 57.3 + spin}deg) scale(0.3)`, opacity: 0},
+    ], {duration: 700 + Math.random() * 400, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)"}).finished.then(() => spark.remove());
+  }
+}
+
+$("packStage").addEventListener("click", e => {
+  if (e.target.closest("#mystery")) revealPack();
+  else skipPack();
+});
+document.addEventListener("keydown", e => {
+  if (currentScreen === "packs" && opening && !opening.ready && (e.key === "Escape" || e.key === " ")) {
+    e.preventDefault();
+    skipPack();
+  }
+});
 
 // ─── COLLECTION ─────────────────────────────────────────────────────────────
 let activeFilter = "all";

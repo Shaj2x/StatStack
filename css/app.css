@@ -348,9 +348,158 @@ button, select { font: inherit; color: inherit; }
 .chip.epic { color: var(--r-epic); }
 .chip.rare { color: var(--r-rare); }
 .chip.common { color: var(--r-common); }
-.reveal-slot { flex: 1 1 360px; min-width: 0; min-height: 300px; display: grid; place-items: center; border-radius: 24px; border: 1px dashed var(--line); padding: 24px; }
-.pack-opening .display { font-size: 48px; animation: pulse 0.9s ease-in-out infinite alternate; }
-@keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+.reveal-slot { flex: 1 1 360px; min-width: 0; min-height: 300px; display: grid; place-items: center; border-radius: 24px; border: 1px dashed var(--line); padding: 24px 24px 56px; isolation: isolate; overflow-x: clip; }
+.reveal-slot > * { grid-area: 1 / 1; }
+#revealedCard { position: relative; z-index: 2; width: 320px; max-width: 100%; }
+
+/* Pack opening: the glow climbs one rarity tier per shake, up to what you pulled */
+@property --glow { syntax: "<color>"; inherits: true; initial-value: #c4cad6; }
+.pack-stage {
+  --glow: var(--r-common);
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 5 / 7;
+  display: grid;
+  place-items: center;
+  transition: --glow 260ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.pack-stage > * { grid-area: 1 / 1; }
+.pack-glow {
+  position: absolute;
+  inset: -22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 80%, transparent), transparent 80%);
+  opacity: 0.25;
+  transition: opacity 260ms ease;
+  pointer-events: none;
+}
+.pack-stage.tier-rare .pack-glow { opacity: 0.6; }
+.pack-stage.tier-epic .pack-glow { opacity: 0.8; }
+.pack-stage.tier-legendary .pack-glow { opacity: 1; }
+.pack-stage.tier-rare .pack { box-shadow: 0 0 0 2px var(--glow), 0 0 36px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-stage.tier-epic .pack { box-shadow: 0 0 0 2px var(--glow), 0 0 56px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-stage.tier-legendary .pack { box-shadow: 0 0 0 3px var(--glow), 0 0 80px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-rays {
+  position: absolute;
+  inset: -45%;
+  z-index: -1;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--glow) 40%, transparent) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 20%, transparent 72%);
+  mask: radial-gradient(closest-side, #000 20%, transparent 72%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+  pointer-events: none;
+}
+.pack-stage.rays .pack-rays { opacity: 1; animation: spin 14s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pack {
+  position: relative;
+  z-index: 2;
+  width: 94%;
+  aspect-ratio: 5 / 7.3;
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 45%, transparent 60%),
+    linear-gradient(160deg, #0e2240 0%, #13305a 50%, #005a91 50%, #003a5e 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 50px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 260ms ease;
+}
+.pack::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px);
+}
+.pack-top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 15%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 12px 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px) top / 100% 12px no-repeat,
+    #0e2240;
+  border-bottom: 2px dashed rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.pack-body {
+  position: absolute;
+  inset: 15% 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 24px;
+}
+.pack-body .display { font-size: 64px; line-height: 0.9; }
+.mystery {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  border: 2px solid var(--glow);
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 8px),
+    linear-gradient(200deg, color-mix(in srgb, var(--glow) 35%, #11141b) 0 30%, #11141b 30% 62%, color-mix(in srgb, var(--glow) 22%, #11141b) 62%);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--glow) 45%, transparent), 0 20px 40px rgba(0, 0, 0, 0.5);
+  color: var(--glow);
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.mystery-mark { font-size: 54px; line-height: 0.9; color: #fff; text-shadow: 0 0 24px var(--glow); }
+.pack-stage.ready .mystery { animation: breathe 1.3s var(--ease-in-out) infinite alternate; }
+@keyframes breathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.025); box-shadow: 0 0 60px color-mix(in srgb, var(--glow) 65%, transparent), 0 20px 40px rgba(0, 0, 0, 0.5); }
+}
+.pack-flash {
+  position: absolute;
+  inset: -30%;
+  z-index: 3;
+  background: radial-gradient(closest-side, #fff, color-mix(in srgb, var(--glow) 70%, transparent) 40%, transparent 75%);
+  opacity: 0;
+  pointer-events: none;
+}
+.pack-hint {
+  align-self: end;
+  transform: translateY(calc(100% + 16px));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+.pack-stage.ready .pack-hint { color: var(--glow); }
+.spark, .ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  pointer-events: none;
+}
+.spark { width: 10px; height: 18px; margin: -9px 0 0 -5px; background: var(--glow); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.ring { width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid var(--glow); }
 
 /* ─── Player cards: refractor shards, one finish per rarity ─────────────── */
 /* A card is a flip container: front (.pcard) and back (.pback) share a box */
@@ -496,7 +645,7 @@ button, select { font: inherit; color: inherit; }
 .pback-foot { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 6px; font-size: 8px; font-weight: 700; color: #7d8494; }
 
 /* Pack reveal: a bigger card that flips in */
-.reveal-card { width: 320px; max-width: 100%; animation: cardReveal 520ms var(--ease-out); }
+.reveal-card { width: 100%; }
 .reveal-card .pcard-name { font-size: 34px; }
 .reveal-card .pback { font-size: 13px; }
 .reveal-card .pback-name { font-size: 26px; }
@@ -505,10 +654,6 @@ button, select { font: inherit; color: inherit; }
 .reveal-card .pback-note { font-size: 12px; }
 .reveal-card .pback-foot, .reveal-card .pback-no { font-size: 10px; }
 .reveal-card .pcard-meta { font-size: 12px; }
-@keyframes cardReveal {
-  from { transform: perspective(900px) rotateY(-80deg) scale(0.94); opacity: 0; }
-  to { transform: perspective(900px) rotateY(0) scale(1); opacity: 1; }
-}
 
 /* ─── Collection ────────────────────────────────────────────────────────── */
 .coll-counts { display: flex; flex-wrap: wrap; gap: 20px; }
@@ -611,7 +756,6 @@ button, select { font: inherit; color: inherit; }
 /* ─── Reduced motion: fades instead of movement ─────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .pill:active { transform: none; }
-  .reveal-card { animation: fade 200ms ease; }
   .shine { display: none !important; }
   .holo { animation: none !important; transition: none; }
   .flip-inner { transition: none; transform: none !important; }
@@ -619,7 +763,7 @@ button, select { font: inherit; color: inherit; }
   .flipcard.flipped .pback { opacity: 1; }
   .flipcard.flipped .pcard { opacity: 0; }
   .pcard { transition: opacity 200ms ease; }
-  .pack-opening .display { animation: none; }
+  .pack-stage.rays .pack-rays, .pack-stage.ready .mystery { animation: none; }
   .switch-row input::after { transition: none; }
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

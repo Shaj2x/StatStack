@@ -118,9 +118,23 @@
           </div>
         </div>
         <div class="reveal-slot">
-          <div class="pack-opening" id="packOpening" hidden>
-            <span class="display">Opening…</span>
+          <div class="pack-stage" id="packStage" hidden>
+            <div class="pack-glow" aria-hidden="true"></div>
+            <div class="pack-rays" aria-hidden="true"></div>
+            <button class="mystery" id="mystery" type="button" aria-label="Reveal your card" hidden>
+              <span class="mystery-mark display">STAT<br>STACK</span>
+            </button>
+            <div class="pack" id="pack" aria-hidden="true">
+              <div class="pack-top"><span>Tear here</span></div>
+              <div class="pack-body">
+                <span class="display">STAT<br>STACK</span>
+                <span class="pack-art-sub">Player Pack</span>
+              </div>
+            </div>
+            <div class="pack-flash" aria-hidden="true"></div>
+            <p class="pack-hint" id="packHint">Tap to skip</p>
           </div>
+          <p class="visually-hidden" id="packStatus" role="status" aria-live="polite"></p>
           <div id="revealedCard" hidden></div>
           <p class="muted reveal-empty" id="revealEmpty">Your new card appears here.</p>
         </div>
