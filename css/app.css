@@ -352,68 +352,163 @@ button, select { font: inherit; color: inherit; }
 .pack-opening .display { font-size: 48px; animation: pulse 0.9s ease-in-out infinite alternate; }
 @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
 
-/* ─── Player cards (pack reveal + collection) ───────────────────────────── */
-.pcard {
+/* ─── Player cards: refractor shards, one finish per rarity ─────────────── */
+/* A card is a flip container: front (.pcard) and back (.pback) share a box */
+.flipcard {
   --team-bg: #2a2f3a;
   --team-bg2: #15181f;
   --team-accent: #ffffff;
+  --frame: rgba(255, 255, 255, 0.16);
   position: relative;
-  overflow: hidden;
-  border-radius: 18px;
   aspect-ratio: 5 / 7;
-  background: linear-gradient(170deg, var(--team-bg) 0%, var(--team-bg2) 100%);
-  border: 2px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 14px;
+  perspective: 1100px;
+  border-radius: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.pcard.legendary { border-color: var(--r-legendary); box-shadow: 0 0 0 1px var(--r-legendary), 0 12px 40px rgba(255, 201, 60, 0.25); }
-.pcard.epic { border-color: var(--r-epic); }
-.pcard.rare { border-color: var(--r-rare); }
-.pcard-photo { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: 120%; max-width: none; height: auto; pointer-events: none; }
+.flipcard:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.flip-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 560ms var(--ease-in-out);
+}
+.flipcard.flipped .flip-inner { transform: rotateY(180deg); }
+.pcard, .pback {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.pback { transform: rotateY(180deg); }
+
+/* Front */
+.pcard { background: var(--team-bg2); box-shadow: 0 0 0 2px var(--frame), 0 12px 30px rgba(0, 0, 0, 0.45); }
+.shard { position: absolute; inset: 0; pointer-events: none; }
+.s1 { clip-path: polygon(0 0, 62% 0, 20% 55%, 0 40%); background: var(--team-bg); }
+.s2 { clip-path: polygon(62% 0, 100% 0, 100% 35%, 38% 70%, 20% 55%); background: color-mix(in srgb, var(--team-bg) 78%, #fff); }
+.s3 { clip-path: polygon(0 40%, 20% 55%, 38% 70%, 10% 100%, 0 100%); background: color-mix(in srgb, var(--team-bg2) 70%, #000); }
+.s4 { clip-path: polygon(100% 35%, 100% 100%, 60% 100%, 38% 70%); background: color-mix(in srgb, var(--team-accent) 45%, var(--team-bg2)); opacity: 0.7; }
+.lines { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 7px); }
+.holo { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: color-dodge;
+  background: linear-gradient(125deg, transparent 15%, #ff7ad9 30%, #8b7bff 40%, #4fd8ff 50%, #6dffb0 60%, #ffe36b 70%, transparent 85%);
+  background-size: 260% 260%;
+  background-position: calc(var(--mx, 0.5) * 100%) calc(var(--my, 0.5) * 100%);
+  transition: background-position 120ms linear; }
+
+.pcard-photo { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); width: 112%; max-width: none; height: auto; pointer-events: none; z-index: 1; }
 .pcard-photo.is-photo {
-  top: 0;
+  top: 8%;
   bottom: auto;
-  left: 0;
+  left: 12%;
   transform: none;
-  width: 100%;
-  height: 72%;
+  width: 76%;
+  height: 62%;
   object-fit: cover;
   object-position: 50% 15%;
   filter: grayscale(1) contrast(1.15);
   mix-blend-mode: luminosity;
-  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 45%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 60% 62% at 50% 45%, #000 45%, transparent 100%);
 }
-.pcard-credit { font-size: 9px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 80%, transparent) 35%, transparent 65%); z-index: 1; }
-.pcard > :not(img) { position: relative; z-index: 2; }
-.pcard .chip { position: absolute; top: 12px; left: 12px; }
-.pcard-name { font-family: var(--display); font-size: 26px; line-height: 0.95; text-transform: uppercase; }
-.name-word { white-space: nowrap; }
-.pcard-meta { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--team-accent); margin: 4px 0 8px; }
-.pcard-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
-.pcard-stats div { display: flex; flex-direction: column; }
-.pcard-stats span { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.7); }
-.pcard-stats b { font-size: 15px; }
-.reveal-card { width: min(320px, 100%); animation: cardReveal 520ms var(--ease-out); }
-.reveal-card .pcard-name { font-size: 38px; }
-.reveal-card.legendary::after {
-  content: "";
+.pcard-top { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 3; display: flex; justify-content: space-between; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+.plate {
   position: absolute;
-  inset: 0;
+  left: -6%;
+  right: -6%;
+  bottom: 9%;
   z-index: 3;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.4) 50%, transparent 65%);
-  transform: translateX(-100%);
-  animation: shine 900ms var(--ease-in-out) 450ms forwards;
-  pointer-events: none;
+  background: var(--ink-0);
+  transform: rotate(-6deg);
+  padding: 8px 12% 7px;
 }
+.pcard-name { font-family: var(--display); font-size: 26px; line-height: 1; text-transform: uppercase; color: #fff; }
+.name-word { white-space: nowrap; }
+.pcard-meta { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--team-accent); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-credit { position: absolute; left: 10px; right: 10px; bottom: 6px; z-index: 3; font-size: 8px; color: rgba(255, 255, 255, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flip-hint { position: absolute; right: 10px; bottom: 6px; z-index: 3; font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+
+/* Rare: chrome and steel-blue shards */
+.flipcard.rare { --frame: #c9d2de; }
+.rare .s1 { background: linear-gradient(140deg, #f2f5f9, #8d97a8); }
+.rare .s2 { background: linear-gradient(200deg, #9fb6d4, #4a6a94); }
+.rare .s3 { background: linear-gradient(20deg, #5d6878, #cfd6df); }
+.rare .s4 { background: var(--team-bg); opacity: 0.85; }
+.rare .lines { opacity: 0.6; }
+.rare .pcard-top { color: #16202e; text-shadow: none; }
+
+/* Epic: team shards under a rainbow holo that follows the pointer */
+.flipcard.epic { --frame: #d98cff; }
+.epic .pcard { box-shadow: 0 0 0 2px var(--frame), 0 12px 34px rgba(217, 140, 255, 0.3); }
+.epic .holo { opacity: 0.55; }
+.epic .lines { opacity: 0.35; }
+
+/* Legendary: gold and rainbow shards with a shine */
+.flipcard.legendary { --frame: #ffc93c; }
+.legendary .pcard { box-shadow: 0 0 0 2px var(--frame), 0 14px 44px rgba(255, 201, 60, 0.35); }
+.legendary .s1 { background: linear-gradient(135deg, #ffe9a3, #c9971c); }
+.legendary .s2 { background: linear-gradient(200deg, #ff9be6, #a99bff 50%, #7fe4ff); }
+.legendary .s3 { background: linear-gradient(20deg, #a8790c, #fff6cf); }
+.legendary .s4 { background: linear-gradient(160deg, #6dffb0, #ffe36b); opacity: 0.85; }
+.legendary .lines { opacity: 1; }
+.legendary .holo { opacity: 0.25; }
+.legendary .plate { border-top: 2px solid var(--frame); border-bottom: 2px solid var(--frame); }
+.legendary .pcard-name { color: #ffe9a3; }
+.legendary .pcard-top { color: #2a1d00; text-shadow: none; }
+.shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-100%); }
+.legendary .shine { display: block; animation: shine 1100ms var(--ease-in-out) 500ms forwards; }
+@keyframes shine { to { transform: translateX(100%); } }
+@media (hover: none) {
+  /* No pointer to follow on phones: let the holo drift slowly once */
+  .epic .holo, .legendary .holo { animation: holoDrift 2.4s var(--ease-in-out) 1 both; }
+}
+@keyframes holoDrift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+
+/* Back */
+.pback {
+  background: #0f1520;
+  box-shadow: 0 0 0 2px var(--frame), 0 12px 30px rgba(0, 0, 0, 0.45);
+  padding: 6% 7% 5%;
+  display: flex;
+  flex-direction: column;
+  gap: 4%;
+  font-size: 11px;
+}
+.pback-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+.pback-name { font-family: var(--display); font-size: 20px; line-height: 1; text-transform: uppercase; }
+.pback-team { margin-top: 3px; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--team-accent); }
+.pback-no { text-align: right; font-size: 8px; font-weight: 700; color: var(--muted); line-height: 1.3; white-space: nowrap; }
+.pback-no b { display: block; font-family: var(--display); font-size: 20px; font-weight: 400; color: var(--frame); }
+.pback-rows { display: flex; flex-direction: column; gap: 6px; }
+.pback-row { display: grid; grid-template-columns: 2.4em 1fr 2.6em 2.6em; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.pback-row span:first-child { font-weight: 800; color: var(--muted); font-size: 9px; }
+.pback-row i { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.pback-row i b { display: block; height: 100%; background: var(--frame); }
+.pback-row strong { text-align: right; font-size: 13px; }
+.pback-row em { text-align: right; font-style: normal; font-weight: 700; color: var(--muted); font-size: 9px; }
+.pback-row em.top { color: var(--frame); }
+.pback-note { margin: 0; font-size: 10px; line-height: 1.35; color: #d4d8e2; }
+.pback-foot { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 6px; font-size: 8px; font-weight: 700; color: #7d8494; }
+
+/* Pack reveal: a bigger card that flips in */
+.reveal-card { width: 320px; max-width: 100%; animation: cardReveal 520ms var(--ease-out); }
+.reveal-card .pcard-name { font-size: 34px; }
+.reveal-card .pback { font-size: 13px; }
+.reveal-card .pback-name { font-size: 26px; }
+.reveal-card .pback-row strong { font-size: 16px; }
+.reveal-card .pback-row span:first-child, .reveal-card .pback-row em, .reveal-card .pback-team { font-size: 11px; }
+.reveal-card .pback-note { font-size: 12px; }
+.reveal-card .pback-foot, .reveal-card .pback-no { font-size: 10px; }
+.reveal-card .pcard-meta { font-size: 12px; }
 @keyframes cardReveal {
   from { transform: perspective(900px) rotateY(-80deg) scale(0.94); opacity: 0; }
   to { transform: perspective(900px) rotateY(0) scale(1); opacity: 1; }
 }
-@keyframes shine { to { transform: translateX(100%); } }
 
 /* ─── Collection ────────────────────────────────────────────────────────── */
 .coll-counts { display: flex; flex-wrap: wrap; gap: 20px; }
@@ -517,7 +612,13 @@ button, select { font: inherit; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .pill:active { transform: none; }
   .reveal-card { animation: fade 200ms ease; }
-  .reveal-card.legendary::after { display: none; }
+  .shine { display: none !important; }
+  .holo { animation: none !important; transition: none; }
+  .flip-inner { transition: none; transform: none !important; }
+  .pback { transform: none; opacity: 0; transition: opacity 200ms ease; }
+  .flipcard.flipped .pback { opacity: 1; }
+  .flipcard.flipped .pcard { opacity: 0; }
+  .pcard { transition: opacity 200ms ease; }
   .pack-opening .display { animation: none; }
   .switch-row input::after { transition: none; }
 }

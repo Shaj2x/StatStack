@@ -188,10 +188,12 @@ function nameHtml(name) {
 // leaves for text, so names never break mid-word or run into the VS badge
 function fitName(el, min = 24) {
   el.style.fontSize = "";
-  const box = el.closest(".side, .pcard") || el.parentElement;
-  const cs = getComputedStyle(box);
-  const room = Math.min(el.parentElement.clientWidth || Infinity,
-    box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  const inner = node => {
+    const cs = getComputedStyle(node);
+    return node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
+  const box = el.closest(".side, .pcard, .pback") || el.parentElement;
+  const room = Math.min(inner(el.parentElement) || Infinity, inner(box));
   let size = parseFloat(getComputedStyle(el).fontSize);
   while (el.scrollWidth > room + 1 && size > min) {
     size -= 2;
@@ -278,22 +280,114 @@ function updateBoard() {
 }
 
 // ─── CARDS ──────────────────────────────────────────────────────────────────
+// Refractor-shard cards with a back: tap (or Enter/Space) to flip.
+const RARITY_LABEL = {legendary: "★ Legendary", epic: "Epic", rare: "Rare", common: "Common"};
+const CARD_STATS = [["ppg", "PTS", "scoring"], ["rpg", "REB", "rebounding"], ["apg", "AST", "assists"], ["spg", "STL", "steals"], ["bpg", "BLK", "blocks"]];
+
+// Where a player ranks in their season for each stat (1 = best) and the season's best value
+function seasonRanks(c) {
+  const pool = (SEASONS[c.season] || {}).players;
+  if (!pool) return null;
+  const out = {count: pool.length};
+  for (const [key] of CARD_STATS) {
+    const vals = pool.map(p => p[key]);
+    out[key] = {rank: 1 + vals.filter(v => v > c[key]).length, max: Math.max(...vals)};
+  }
+  return out;
+}
+
+// Stats always show one decimal place (25.0, not 25)
+function one(v) { return Number(v).toFixed(1); }
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function backNote(c, ranks) {
+  if (!ranks) return "";
+  const best = CARD_STATS.map(([k, , word]) => ({k, word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
+  if (best.r === 1) return `Led the ${c.season} season in ${best.word}.`;
+  if (best.r <= 10) return `${ordinal(best.r)} in ${best.word} among the ${ranks.count} players this season.`;
+  return `${c.team} · ${c.season}`;
+}
+
 function cardHtml(c, extraClass = "") {
+  const ph = photoFor(c);
+  const ranks = seasonRanks(c);
+  const pulled = c.pulled ? new Date(c.pulled).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "";
+  const rows = CARD_STATS.map(([key, label]) => {
+    const r = ranks && ranks[key];
+    const width = r && r.max ? Math.round((c[key] / r.max) * 100) : 0;
+    return `<div class="pback-row"><span>${label}</span><i><b style="width:${width}%"></b></i><strong>${one(c[key])}</strong><em class="${r && r.rank <= 10 ? "top" : ""}">${r ? "#" + r.rank : ""}</em></div>`;
+  }).join("");
   return `
-    <div class="pcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}">
-      <img class="pcard-photo${photoFor(c).cutout ? "" : " is-photo"}" src="${esc(photoFor(c).src)}" alt="${esc(c.name)}" title="${esc(photoFor(c).credit)}" loading="lazy" onerror="imgFail(this)">
-      <span class="chip ${c.rarity}">${c.rarity}</span>
-      <div class="pcard-name">${nameHtml(c.name)}</div>
-      <div class="pcard-meta">${esc(c.team)} · ${esc(c.season || "")}</div>
-      <div class="pcard-stats">
-        <div><span>PTS</span><b>${c.ppg}</b></div>
-        <div><span>REB</span><b>${c.rpg}</b></div>
-        <div><span>AST</span><b>${c.apg}</b></div>
-        <div><span>STL</span><b>${c.spg}</b></div>
-        <div><span>BLK</span><b>${c.bpg}</b></div>
+    <article class="flipcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
+      aria-label="${esc(c.name)}, ${c.rarity} card. Press to flip.">
+      <div class="flip-inner">
+        <div class="pcard">
+          <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
+          <div class="lines"></div><div class="holo"></div>
+          <img class="pcard-photo${ph.cutout ? "" : " is-photo"}" src="${esc(ph.src)}" alt="" loading="lazy" onerror="imgFail(this)">
+          <div class="pcard-top"><span>${RARITY_LABEL[c.rarity] || c.rarity}</span><span>${esc(c.season || "")}</span></div>
+          <div class="plate">
+            <div class="pcard-name">${nameHtml(c.name)}</div>
+            <div class="pcard-meta">${esc(c.team)} · ${one(c.ppg)} PTS · ${one(c.rpg)} REB · ${one(c.apg)} AST</div>
+          </div>
+          ${ph.credit ? `<div class="pcard-credit">${esc(ph.credit)}</div>` : `<div class="flip-hint">Tap to flip</div>`}
+          <div class="shine"></div>
+        </div>
+        <div class="pback" aria-hidden="true">
+          <div class="pback-head">
+            <div>
+              <div class="pback-name">${nameHtml(c.name)}</div>
+              <div class="pback-team">${esc(team(c.team).name || c.team)} · ${esc(c.season || "")}</div>
+            </div>
+            ${ranks ? `<div class="pback-no">CARD<b>${ranks.ppg.rank}</b>OF ${ranks.count}</div>` : ""}
+          </div>
+          <div class="pback-rows">${rows}</div>
+          <p class="pback-note">${esc(backNote(c, ranks))}</p>
+          <div class="pback-foot"><span>Per game · rank in season</span><span>${pulled ? "Pulled " + pulled : "Player Pack"}</span></div>
+        </div>
       </div>
-      ${photoFor(c).credit ? `<div class="pcard-credit">${esc(photoFor(c).credit)}</div>` : ""}
-    </div>`;
+    </article>`;
+}
+
+function flipCard(card) {
+  const on = card.classList.toggle("flipped");
+  card.setAttribute("aria-pressed", String(on));
+  card.querySelector(".pcard").setAttribute("aria-hidden", String(on));
+  card.querySelector(".pback").setAttribute("aria-hidden", String(!on));
+  FX.haptic("commit");
+}
+document.addEventListener("click", e => {
+  const card = e.target.closest(".flipcard");
+  if (card) flipCard(card);
+});
+document.addEventListener("keydown", e => {
+  const card = e.target.closest && e.target.closest(".flipcard");
+  if (card && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); flipCard(card); }
+});
+// The holo follows the pointer on Epic and Legendary cards
+document.addEventListener("pointermove", e => {
+  const card = e.target.closest && e.target.closest(".flipcard.epic, .flipcard.legendary");
+  if (!card || e.pointerType !== "mouse") return;
+  const r = card.getBoundingClientRect();
+  card.style.setProperty("--mx", ((e.clientX - r.left) / r.width).toFixed(3));
+  card.style.setProperty("--my", ((e.clientY - r.top) / r.height).toFixed(3));
+});
+
+function fitCardNames(root, min) {
+  root.querySelectorAll(".pcard-name").forEach(el => fitName(el, min));
+  root.querySelectorAll(".pback-name").forEach(el => fitName(el, min));
+  root.querySelectorAll(".pcard-meta").forEach(el => {
+    el.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth + 1 && size > 7) {
+      size -= 0.5;
+      el.style.fontSize = `${size}px`;
+    }
+  });
 }
 
 // ─── PACKS ──────────────────────────────────────────────────────────────────
@@ -320,13 +414,13 @@ function buyPack() {
     const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
     let pool = currentPlayers.filter(p => p.rarity === rarity);
     if (!pool.length) pool = currentPlayers;
-    const card = {...pick(pool), season: currentSeasonKey};
+    const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
     ownedCards.push(card);
     save('statstack_cards', ownedCards);
     $("packOpening").hidden = true;
     $("revealedCard").innerHTML = cardHtml(card, "reveal-card");
     $("revealedCard").hidden = false;
-    $("revealedCard").querySelectorAll(".pcard-name").forEach(el => fitName(el, 18));
+    fitCardNames($("revealedCard"), 18);
     $("revealedCard").scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
     FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
     renderShop();
@@ -352,7 +446,7 @@ function renderColl(r) {
     return;
   }
   g.innerHTML = cards.slice().reverse().map(c => cardHtml(c)).join("");
-  g.querySelectorAll(".pcard-name").forEach(el => fitName(el, 14));
+  fitCardNames(g, 14);
   [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
 }
 
