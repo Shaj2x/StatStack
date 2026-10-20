@@ -38,7 +38,9 @@ TEAM_PICK = {
 
 def norm(name):
     """Lower-case ASCII name without punctuation or suffixes like Jr. and III."""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    # Letters with no accent-free decomposition (Aşık, Łukasz, Ørsted) map by hand
+    s = name.translate(str.maketrans({"ı": "i", "İ": "I", "ł": "l", "Ł": "L", "ø": "o", "Ø": "O", "đ": "d", "Đ": "D", "ß": "ss"}))
+    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().lower()
     for ch in ".'-,":
         s = s.replace(ch, " " if ch == "-" else "")
     words = [w for w in s.split() if w not in ("jr", "sr", "ii", "iii", "iv")]
