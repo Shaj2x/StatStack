@@ -5,13 +5,13 @@ Usage:
     pip install -r scripts/requirements.txt
     python scripts/fetch_nba_data.py                  # every season in SEASONS below
     python scripts/fetch_nba_data.py 2023-24 1986-87  # only these seasons
-    python scripts/fetch_nba_data.py --cache-only     # rebuild index.html from data/seasons.json
+    python scripts/fetch_nba_data.py --cache-only     # rebuild js/data.js from data/seasons.json
 
 For each season it pulls regular-season per-game stats, keeps the players who
 logged the most minutes (among those who played a meaningful share of games),
 assigns card rarity by rank within that season, and writes:
   - data/seasons.json   (cached results, merged across runs)
-  - index.html          (the API_SEASONS block between the SEASONS:BEGIN / SEASONS:END
+  - js/data.js          (the API_SEASONS block between the SEASONS:BEGIN / SEASONS:END
                          markers; the game uses these in place of the hand-entered SEASONS)
 
 stats.nba.com rejects many cloud/datacenter IPs, so run this from a home or
@@ -27,7 +27,7 @@ from pathlib import Path
 from nba_api.stats.endpoints import leaguedashplayerstats, leagueleaders
 
 ROOT = Path(__file__).resolve().parent.parent
-INDEX = ROOT / "index.html"
+INDEX = ROOT / "js" / "data.js"
 CACHE = ROOT / "data" / "seasons.json"
 
 # Seasons offered in the game, newest first. Only completed seasons, so stats are final.
