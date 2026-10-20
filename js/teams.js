@@ -14,6 +14,7 @@ const TEAMS = {
   GSW: {name: "Golden State Warriors",    bg: "#1d428a", bg2: "#102a5e", accent: "#ffc72c"},
   HOU: {name: "Houston Rockets",          bg: "#a50e34", bg2: "#5c0a1c", accent: "#c4ced4"},
   IND: {name: "Indiana Pacers",           bg: "#002d62", bg2: "#001a3a", accent: "#fdbb30"},
+  KCK: {name: "Kansas City Kings",        bg: "#003a8c", bg2: "#00215a", accent: "#ff8a8a"},
   LAC: {name: "LA Clippers",              bg: "#1d428a", bg2: "#0c2350", accent: "#ff8a9a"},
   LAL: {name: "Los Angeles Lakers",       bg: "#552583", bg2: "#2e1350", accent: "#fdb927"},
   MEM: {name: "Memphis Grizzlies",        bg: "#12173f", bg2: "#0a0d26", accent: "#a3b8e3"},
@@ -35,6 +36,7 @@ const TEAMS = {
   TOR: {name: "Toronto Raptors",          bg: "#8f0d2e", bg2: "#4d0718", accent: "#c4ced4"},
   UTA: {name: "Utah Jazz",                bg: "#002b5c", bg2: "#001833", accent: "#f9a01b"},
   VAN: {name: "Vancouver Grizzlies",      bg: "#006d68", bg2: "#003f3c", accent: "#e4b77b"},
+  WSB: {name: "Washington Bullets",       bg: "#002b5c", bg2: "#001833", accent: "#ff7a86"},
   WAS: {name: "Washington Wizards",       bg: "#002b5c", bg2: "#001833", accent: "#ff7a86"},
 };
 const TEAM_FALLBACK = {name: "", bg: "#2a2f3a", bg2: "#15181f", accent: "#ffffff"};
