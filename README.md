@@ -2,10 +2,11 @@
 
 NBA Higher or Lower: a static web app with no build step.
 
-- `index.html` is the app shell (Home, Play, Shop and Collection screens)
+- `index.html` is the app shell (Play, Packs and Collection screens, plus a settings dialog)
 - `css/app.css` has the styles
 - `js/app.js` has the game logic
 - `js/data.js` has the player database
+- `js/teams.js` has team names and the colours used for each player's half
 
 ## Refreshing player data
 
