@@ -6,6 +6,13 @@
 <meta name="theme-color" content="#667eea">
 <meta name="description" content="NBA Higher or Lower: guess whose stat is bigger, build a streak, collect player cards.">
 <title>StatStack - NBA Higher or Lower</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="StatStack">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -37,6 +44,14 @@
         <div class="tile"><span class="tile-label">🏆 Best streak</span><span class="tile-value" id="homeBest">0</span></div>
         <div class="tile"><span class="tile-label">💰 Coins</span><span class="tile-value tile-coins" id="homeCoins">0</span></div>
         <div class="tile"><span class="tile-label">📚 Cards</span><span class="tile-value" id="homeCards">0</span></div>
+      </div>
+
+      <div class="panel install" id="installPanel" hidden>
+        <div class="install-text">
+          <strong>📲 Get the app</strong>
+          <span id="installNote">Add StatStack to your home screen. It opens full-screen and works offline.</span>
+        </div>
+        <button class="btn btn-primary" id="installBtn" type="button" hidden>Install</button>
       </div>
 
       <div class="panel settings">

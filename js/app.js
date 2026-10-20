@@ -376,6 +376,36 @@ $("hapticsToggle").checked = FX.settings.haptics;
 $("hapticsToggle").addEventListener("change", e => { FX.setSetting("haptics", e.target.checked); if (e.target.checked) FX.haptic("correct"); });
 $("hapticsRow").hidden = !FX.canVibrate;
 
+// ─── INSTALL / OFFLINE ──────────────────────────────────────────────────────
+const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installPrompt = null;
+
+if (!isStandalone && isIOS) {
+  // iOS has no install prompt; explain the Share sheet route instead
+  $("installNote").textContent = "Tap the Share button ⬆️ in Safari, then “Add to Home Screen”. It opens full-screen and works offline.";
+  $("installPanel").hidden = false;
+}
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  installPrompt = e;
+  $("installPanel").hidden = false;
+  $("installBtn").hidden = false;
+});
+$("installBtn").addEventListener("click", async () => {
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice;
+  installPrompt = null;
+  $("installPanel").hidden = true;
+});
+window.addEventListener("appinstalled", () => { $("installPanel").hidden = true; });
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+
 // ─── INIT ───────────────────────────────────────────────────────────────────
 $("seasonSelect").innerHTML = SEASON_KEYS
   .map(k => `<option value="${k}">${SEASONS[k].label}</option>`).join("");

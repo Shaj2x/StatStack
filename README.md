@@ -25,3 +25,11 @@ points + rebounds + assists rank (top 4% legendary, next 8% epic, next 23% rare)
 
 stats.nba.com blocks most cloud/datacenter IPs, so run the script from a home
 connection.
+
+## Installable app
+
+StatStack is a Progressive Web App: `manifest.webmanifest` and `icons/` let
+phones add it to the home screen, and `sw.js` caches the app (plus recently
+seen headshots) so it plays offline. App files refresh in the background, so
+changes reach installed copies on their next launch. If you add or rename a
+file the app loads, add it to the `SHELL` list in `sw.js` and bump `VERSION`.
