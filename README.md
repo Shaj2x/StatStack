@@ -18,7 +18,8 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r scripts/requirements.txt
 python scripts/fetch_nba_data.py        # 1996-97 onward, from stats.nba.com via nba_api
 python scripts/fetch_bbref_seasons.py   # earlier seasons, from Basketball-Reference
-python scripts/check_headshots.py       # confirm every headshot is the right player
+python scripts/check_headshots.py --fix # confirm every headshot ID is the right player
+python scripts/fetch_photos.py          # real photos for players NBA.com has none for
 ```
 
 Both fetch scripts write `data/seasons.json` and regenerate the `API_SEASONS`
@@ -37,6 +38,15 @@ nba_api's offline list of all NBA players and reports any ID that belongs to
 someone else. Basketball-Reference players are matched to NBA IDs by name and
 the years they played; anyone who can't be matched gets a silhouette instead
 of a guess. Names that need a hand-picked ID go in `scripts/player_ids.py`.
+
+NBA.com has no headshot for many retired players and returns a generic
+silhouette instead. `fetch_photos.py` finds those players and looks each one
+up on Wikipedia, using the article's freely licensed lead photo only when the
+article is about that basketball player (matching name, "basketball" in the
+description, an age that fits the season, and the team when two articles
+fit). Results go in `js/photos.js` with each photo's author and licence, which
+the game shows as a credit. Players with no confirmed photo keep the game's
+own silhouette rather than a guess. Rerun it after fetching new seasons.
 
 ## Installable app
 

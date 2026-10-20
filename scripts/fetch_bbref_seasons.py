@@ -94,7 +94,7 @@ def season_rows(season, career_years):
         g = p["games"]
         if not g:
             continue
-        nba_id = resolve(p["name"], season_start=int(season[:4]), careers=career_years)
+        nba_id = resolve(p["name"], season_start=int(season[:4]), careers=career_years, team=p["team"])
         if nba_id is None:
             unmatched.append(p["name"])
         rows.append({
