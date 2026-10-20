@@ -223,6 +223,14 @@ kbd {
 @media (hover: none) { .keys-hint { display: none; } }
 @media (hover: hover) and (pointer: fine) { .touch-hint { display: none; } }
 
+.install { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.install-text { display: flex; flex-direction: column; gap: 2px; font-size: 0.9rem; color: #44525f; }
+.install-text strong { color: var(--ink); font-size: 1rem; }
+.install .btn { min-height: 44px; padding: 8px 18px; font-size: 0.9rem; flex: none; }
+@media (display-mode: standalone) {
+  body { overscroll-behavior-y: none; }
+}
+
 .settings h2 { font-size: 1.05rem; margin-bottom: 4px; }
 .switch-row {
   display: flex;
