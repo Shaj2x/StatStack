@@ -1,0 +1,63 @@
+
+2025-26: checking 120 players against Basketball-Reference
+  2025-26: 120 OK, 0 mismatched, 0 not found
+
+2024-25: checking 120 players against Basketball-Reference
+  2024-25: 120 OK, 0 mismatched, 0 not found
+
+2023-24: checking 120 players against Basketball-Reference
+  2023-24: 120 OK, 0 mismatched, 0 not found
+
+2022-23: checking 120 players against Basketball-Reference
+  2022-23: 120 OK, 0 mismatched, 0 not found
+
+2021-22: checking 120 players against Basketball-Reference
+  2021-22: 120 OK, 0 mismatched, 0 not found
+
+2019-20: checking 120 players against Basketball-Reference
+  2019-20: 120 OK, 0 mismatched, 0 not found
+
+2017-18: checking 120 players against Basketball-Reference
+  2017-18: 120 OK, 0 mismatched, 0 not found
+
+2015-16: checking 120 players against Basketball-Reference
+  2015-16: 120 OK, 0 mismatched, 0 not found
+
+2012-13: checking 120 players against Basketball-Reference
+  Omer Asik (HOU): not found in Basketball-Reference
+  2012-13: 119 OK, 0 mismatched, 1 not found
+
+2009-10: checking 120 players against Basketball-Reference
+  2009-10: 120 OK, 0 mismatched, 0 not found
+
+2007-08: checking 120 players against Basketball-Reference
+  2007-08: 120 OK, 0 mismatched, 0 not found
+
+2004-05: checking 120 players against Basketball-Reference
+  2004-05: 120 OK, 0 mismatched, 0 not found
+
+2001-02: checking 120 players against Basketball-Reference
+  2001-02: 120 OK, 0 mismatched, 0 not found
+
+1999-00: checking 120 players against Basketball-Reference
+  1999-00: 120 OK, 0 mismatched, 0 not found
+
+1996-97: checking 120 players against Basketball-Reference
+  1996-97: 120 OK, 0 mismatched, 0 not found
+
+1993-94: checking 120 players against stats.nba.com
+  1993-94: 120 OK, 0 mismatched, 0 not found
+
+1991-92: checking 120 players against stats.nba.com
+  1991-92: 120 OK, 0 mismatched, 0 not found
+
+1989-90: checking 120 players against stats.nba.com
+  1989-90: 120 OK, 0 mismatched, 0 not found
+
+1986-87: checking 120 players against stats.nba.com
+  1986-87: 120 OK, 0 mismatched, 0 not found
+
+1984-85: checking 120 players against stats.nba.com
+  1984-85: 120 OK, 0 mismatched, 0 not found
+
+Summary: 2399 players match, 0 mismatched, 1 not found in the other source, 0 not checked
