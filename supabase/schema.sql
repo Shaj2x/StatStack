@@ -29,3 +29,16 @@ create policy "Players create their own save" on public.saves
 drop policy if exists "Players update their own save" on public.saves;
 create policy "Players update their own save" on public.saves
   for update using (auth.uid() = id) with check (auth.uid() = id);
+
+-- Lets the sign-up form check a username before making the account. It only
+-- answers yes or no; it never reveals whose name it is.
+create or replace function public.username_available(name text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select not exists (select 1 from public.saves where lower(username) = lower(name));
+$$;
+grant execute on function public.username_available(text) to anon, authenticated;

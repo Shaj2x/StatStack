@@ -63,33 +63,30 @@ prints every mismatch with both values and saves the full report to
 ## Accounts and cloud sync
 
 Players get a profile (username, team-colour avatar, lifetime stats and
-badges) whether or not they sign in. Signing in keeps coins, cards and badges
-in sync across devices. It uses [Supabase](https://supabase.com) (free tier),
-and stays off until `js/config.js` has your project's keys; until then
-everything saves in the browser as before.
+badges) whether or not they sign in. An account keeps coins, cards and badges
+in sync across devices: players sign up and sign in with an email and
+password. It uses [Supabase](https://supabase.com) (free tier) and stays off
+while `js/config.js` has no keys; then everything saves in the browser only.
 
-To switch it on:
+Setting up a Supabase project:
 
 1. Create a free project at supabase.com.
-2. In the project, open **SQL Editor**, paste in `supabase/schema.sql` and run
-   it. This makes the `saves` table, where each player can only read and write
-   their own row.
-3. Under **Authentication → URL Configuration**, set the Site URL to
-   `https://shaj2x.github.io/StatStack/` and add the same address to the
-   Redirect URLs.
-4. Optional, so players can also type a code (handy when the email opens on
-   another device, or for the home-screen app): set up custom SMTP under
-   **Authentication → Emails**, add `{{ .Token }}` to the Magic Link
-   template, and set `emailCode: true` in `js/config.js`.
+2. In **SQL Editor**, run `supabase/schema.sql`. It makes the `saves` table
+   (each player can only read and write their own row) and a check that a
+   username is free. Running it again is safe.
+3. Under **Authentication → Sign In / Providers → Email**, keep Email on and
+   turn **Confirm email** off, so new accounts can play straight away.
+4. Under **Authentication → URL Configuration**, set the Site URL to
+   `https://shaj2x.github.io/StatStack/` and add
+   `https://shaj2x.github.io/StatStack/**` to the Redirect URLs. Only
+   password-reset emails use these.
 5. Copy the Project URL and the publishable key (under **Project Settings →
-   API Keys**) into `js/config.js`. The anon key is meant to be public; the
-   table's row-level security is what protects each save.
-6. Optional Google sign-in: enable Google under **Authentication →
-   Providers** (Supabase's guide walks through the Google OAuth client), then
-   set `googleSignIn: true` in `js/config.js`.
+   API Keys**) into `js/config.js`. The publishable key is meant to be
+   public; the table's row-level security is what protects each save.
 
-Supabase's built-in email sender only allows a few emails an hour. For more
-players, add your own SMTP under **Authentication → Emails → SMTP Settings**.
+Supabase's built-in email sender only allows a few emails an hour, which is
+fine for password resets. For more, add your own SMTP under
+**Authentication → Emails**.
 
 When a player signs in, cards from the device and the account are combined;
 coins and settings come from whichever was played most recently, and records
