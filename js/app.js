@@ -878,7 +878,6 @@ function resetSave() {
 
 // ─── ACCOUNT UI ─────────────────────────────────────────────────────────────
 const GUEST_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4.5"></circle><path d="M3.5 21c1.4-4.6 4.6-7 8.5-7s7.1 2.4 8.5 7z"></path></svg>`;
-const GOOGLE_ICON = `<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#ffc107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#ff3d00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4caf50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976d2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
 const NAME_RULE = /^[A-Za-z0-9_]{3,16}$/;
 const AVATAR_TEAMS = [...new Set(SEASONS[SEASON_KEYS[0]].players.map(p => p.team))]
   .sort((a, b) => team(a).name.localeCompare(team(b).name));
@@ -950,7 +949,7 @@ function renderProfile() {
 let panelPhase = null;
 function renderAccountPanel() {
   const panel = $("accountPanel"), phase = Account.phase();
-  // Sync updates only touch the status line, so typing in a field isn't lost
+  // Sync updates only touch the status line
   if (phase === panelPhase) {
     const line = panel.querySelector(".sync-line");
     if (line) line.innerHTML = `<span class="${$("syncDot").className}"></span>${esc(syncText())}`;
@@ -959,31 +958,21 @@ function renderAccountPanel() {
   panelPhase = phase;
   const views = {
     off: `<h2 class="panel-title">Cloud sync</h2>
-      <p>Sign-in isn't switched on for this site yet, so your progress is saved in this browser.</p>`,
+      <p>Accounts aren't switched on for this site yet, so your progress is saved in this browser.</p>`,
     loading: `<h2 class="panel-title">Account</h2><p>Checking your account…</p>`,
-    "signed-out": `<h2 class="panel-title">Sign in</h2>
-      <p>Keep your coins, cards and badges on every device.</p>
-      <form class="stack" id="emailForm" novalidate>
-        <label class="field"><span>Email</span><input type="email" id="emailInput" autocomplete="email" inputmode="email" required></label>
-        <p class="form-msg" id="emailMsg" role="status" aria-live="polite"></p>
-        <button class="pill pill-solid pill-sm" type="submit">Email me a sign-in link</button>
-      </form>
-      ${Account.google ? `<div class="or">or</div><button class="pill pill-ghost pill-sm" id="googleBtn" type="button">${GOOGLE_ICON}Continue with Google</button>` : ""}`,
-    sent: Account.emailCode ? `<h2 class="panel-title">Check your email</h2>
-      <p>We sent a sign-in link to <strong>${esc(Account.email())}</strong>. Open it on this device, or type the code from the email.</p>
-      <form class="stack" id="codeForm" novalidate>
-        <label class="field"><span>Code</span><input id="codeInput" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
-        <p class="form-msg" id="codeMsg" role="status" aria-live="polite"></p>
-        <div class="btn-row"><button class="pill pill-solid pill-sm" type="submit">Sign in</button></div>
-        <button class="link-btn" type="button" id="otherEmail">Use a different email</button>
-      </form>` : `<h2 class="panel-title">Check your email</h2>
-      <p>We sent a sign-in link to <strong>${esc(Account.email())}</strong>. Open it in this browser to finish signing in.</p>
-      <p>It can take a minute to arrive. If it doesn't, check your spam folder.</p>
-      <button class="link-btn" type="button" id="otherEmail">Use a different email</button>`,
+    "signed-out": `<h2 class="panel-title">Save your progress</h2>
+      <p>Make a free account to keep your coins, cards and badges on every device. Sign in anywhere with your email and password.</p>
+      <div class="btn-row">
+        <button class="pill pill-solid pill-sm" type="button" data-auth="signup">Create account</button>
+        <button class="pill pill-ghost pill-sm" type="button" data-auth="signin">Sign in</button>
+      </div>`,
     "signed-in": `<h2 class="panel-title">Account</h2>
       <p>Signed in as <strong>${esc(Account.email())}</strong></p>
       <p class="sync-line"><span class="${$("syncDot").className}"></span>${esc(syncText())}</p>
-      <button class="pill pill-ghost pill-sm" id="signOutBtn" type="button">Sign out</button>`,
+      <div class="btn-row">
+        <button class="pill pill-ghost pill-sm" type="button" data-auth="newpass">Change password</button>
+        <button class="pill pill-ghost pill-sm" type="button" id="signOutBtn">Sign out</button>
+      </div>`,
   };
   panel.innerHTML = views[phase] || views.off;
 }
@@ -992,39 +981,114 @@ function setMsg(id, text, kind = "") {
   $(id).textContent = text;
   $(id).className = `form-msg${kind ? " " + kind : ""}`;
 }
+const CHECK_ICON = `<span class="toast-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>`;
 async function signOut() {
   if (!confirm("Sign out? Your progress stays in your account, and this device starts fresh.")) return;
   await Account.signOut();
   toast(`<span class="avatar avatar-md">${GUEST_ICON}</span>`, "Signed out", "Sign in again any time to pick up where you left off.");
 }
 
-$("accountPanel").addEventListener("submit", async e => {
-  e.preventDefault();
-  const btn = e.target.querySelector("button[type=submit]");
-  if (e.target.id === "emailForm") {
-    const email = $("emailInput").value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMsg("emailMsg", "Enter a valid email address.", "err");
-    btn.disabled = true;
-    setMsg("emailMsg", "Sending…");
-    const err = await Account.sendLink(email);
-    btn.disabled = false;
-    if (err) setMsg("emailMsg", err, "err");
-  } else if (e.target.id === "codeForm") {
-    const code = $("codeInput").value.replace(/\D/g, "");
-    if (code.length < 6) return setMsg("codeMsg", "Enter the code from the email.", "err");
-    btn.disabled = true;
-    setMsg("codeMsg", "Checking…");
-    const err = await Account.verifyCode(code);
-    btn.disabled = false;
-    if (err) setMsg("codeMsg", "That code didn't work. Check it, or ask for a new email.", "err");
-  }
-});
 $("accountPanel").addEventListener("click", e => {
-  if (e.target.closest("#googleBtn")) Account.signInWithGoogle();
-  else if (e.target.closest("#otherEmail")) Account.cancelLink();
+  const auth = e.target.closest("[data-auth]");
+  if (auth) openAuth(auth.dataset.auth);
   else if (e.target.closest("#signOutBtn")) signOut();
 });
 $("menuSignOut").addEventListener("click", signOut);
+$("menuSignIn").addEventListener("click", () => openAuth("signin"));
+
+// ─── SIGN-IN WINDOW ─────────────────────────────────────────────────────────
+const EMAIL_RULE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const AUTH_TEXT = {
+  signin: {title: "Welcome back", lede: "Sign in with your email and password.", submit: "Sign in", pass: "Password", auto: "current-password"},
+  signup: {title: "Create your account", lede: "Your coins, cards and badges on this device come with you.", submit: "Create account", pass: "Password", auto: "new-password"},
+  forgot: {title: "Reset your password", lede: "We'll email you a link to choose a new one.", submit: "Email me a reset link"},
+  newpass: {title: "Choose a new password", lede: "You'll use it to sign in from now on.", submit: "Save password", pass: "New password", auto: "new-password"},
+};
+let authMode = "signin";
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const t = AUTH_TEXT[mode], d = $("authDialog");
+  d.dataset.mode = mode;
+  $("authTitle").textContent = t.title;
+  $("authLede").textContent = t.lede;
+  $("authSubmit").textContent = t.submit;
+  if (t.pass) {
+    $("authPassLabel").textContent = t.pass;
+    $("authPass").autocomplete = t.auto;
+  }
+  d.querySelectorAll("[data-modes]").forEach(el => { el.hidden = !el.dataset.modes.split(" ").includes(mode); });
+  $("authTabs").hidden = mode !== "signin" && mode !== "signup";
+  d.querySelectorAll(".auth-tab").forEach(tab => {
+    const on = tab.dataset.mode === mode;
+    tab.classList.toggle("active", on);
+    tab.setAttribute("aria-selected", String(on));
+    tab.tabIndex = on ? 0 : -1;
+  });
+  setMsg("authMsg", "");
+}
+function focusAuthField() {
+  const field = [...$("authForm").querySelectorAll(".field:not([hidden]) input")].find(i => !i.value) ||
+    $("authForm").querySelector(".field:not([hidden]) input");
+  if (field) field.focus();
+}
+function openAuth(mode = "signin") {
+  setMenu(false);
+  setAuthMode(mode);
+  const d = $("authDialog");
+  if (!d.open) d.showModal();
+  focusAuthField();
+}
+
+$("authDialog").querySelectorAll(".auth-tab").forEach(tab => {
+  tab.addEventListener("click", () => { setAuthMode(tab.dataset.mode); focusAuthField(); });
+  tab.addEventListener("keydown", e => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const next = authMode === "signin" ? "signup" : "signin";
+    setAuthMode(next);
+    $(next === "signin" ? "tabSignin" : "tabSignup").focus();
+  });
+});
+$("forgotBtn").addEventListener("click", () => { setAuthMode("forgot"); focusAuthField(); });
+$("backBtn").addEventListener("click", () => { setAuthMode("signin"); focusAuthField(); });
+$("authClose").addEventListener("click", () => $("authDialog").close());
+// A click on the dimmed backdrop lands on the dialog itself
+$("authDialog").addEventListener("click", e => { if (e.target === $("authDialog")) $("authDialog").close(); });
+$("pwToggle").addEventListener("click", () => {
+  const show = $("authPass").type === "password";
+  $("authPass").type = show ? "text" : "password";
+  $("pwToggle").textContent = show ? "Hide" : "Show";
+  $("pwToggle").setAttribute("aria-pressed", String(show));
+  $("pwToggle").setAttribute("aria-label", show ? "Hide password" : "Show password");
+});
+
+$("authForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const mode = authMode;
+  const email = $("authEmail").value.trim(), pass = $("authPass").value, name = $("authName").value.trim();
+  const fail = text => { setMsg("authMsg", text, "err"); FX.shake($("authForm")); };
+  if (mode !== "newpass" && !EMAIL_RULE.test(email)) return fail("Enter a valid email address.");
+  if (mode === "signup" && !NAME_RULE.test(name)) return fail("Usernames are 3–16 letters, numbers or underscores.");
+  if (mode === "signin" && !pass) return fail("Enter your password.");
+  if ((mode === "signup" || mode === "newpass") && pass.length < 8) return fail("Use at least 8 characters for your password.");
+
+  const btn = $("authSubmit"), label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "One moment…";
+  const err = mode === "signin" ? await Account.signIn(email, pass)
+    : mode === "signup" ? await Account.signUp(email, pass, name)
+    : mode === "forgot" ? await Account.sendReset(email)
+    : await Account.updatePassword(pass);
+  btn.disabled = false;
+  btn.textContent = label;
+  if (err) return fail(err);
+  if (mode === "forgot") return setMsg("authMsg", `If there's an account for ${email}, a reset link is on its way.`, "ok");
+
+  $("authDialog").close();
+  $("authPass").value = "";
+  if (mode === "newpass") toast(CHECK_ICON, "Password saved", "Use it next time you sign in.");
+  else toast(CHECK_ICON, mode === "signup" ? "Account created" : "Signed in", "Your progress now syncs across devices.");
+});
 
 $("teamSelect").innerHTML = `<option value="">No team</option>` +
   AVATAR_TEAMS.map(t => `<option value="${t}">${esc(team(t).name)}</option>`).join("");
@@ -1071,9 +1135,15 @@ $("accountMenu").addEventListener("keydown", e => {
   } else if (e.key === "Tab") setMenu(false);
 });
 
+// Arriving from a password-reset email opens the new-password form once
+let recoveryShown = false;
 Account.on(() => {
   renderIdentity();
   if (currentScreen === "profile") renderProfile();
+  if (Account.recovering() && Account.signedIn() && !recoveryShown) {
+    recoveryShown = true;
+    openAuth("newpass");
+  }
 });
 
 // ─── INIT ───────────────────────────────────────────────────────────────────
@@ -1084,4 +1154,9 @@ checkBadges(false);
 updateBoard();
 renderIdentity();
 showScreen(location.hash.slice(1) || "play");
-Account.init({get: getSave, apply: applySave, reset: resetSave});
+Account.init({
+  get: getSave,
+  apply: applySave,
+  reset: resetSave,
+  rename: name => { profile.name = name; progressChanged(); renderIdentity(); },
+});

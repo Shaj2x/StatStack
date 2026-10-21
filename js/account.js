@@ -9,10 +9,14 @@ const Account = (() => {
   const PUSH_DELAY = 1500;
 
   let client = null, user = null, hooks = null, pushTimer = null;
-  // phase: off | loading | signed-out | sent | signed-in
+  // phase: off | loading | signed-out | signed-in
   let phase = enabled ? "loading" : "off";
   let sync = "idle"; // idle | busy | error
-  let lastSync = 0, pendingEmail = "";
+  let lastSync = 0;
+  // Set when the player arrived from a password-reset email
+  let recovering = false;
+  // Username chosen at sign-up, claimed once the account's save is in place
+  let pendingName = "";
   const listeners = [];
   const emit = () => listeners.forEach(fn => fn());
 
@@ -32,26 +36,30 @@ const Account = (() => {
     if (!enabled) return;
     try { await loadLib(); }
     catch { phase = "signed-out"; sync = "error"; emit(); return; }
-    // PKCE puts the sign-in code in ?code=, leaving the #screen hash alone
+    const url = new URL(location.href);
+    recovering = url.searchParams.get("reset") === "1";
+    // PKCE puts the reset code in ?code=, leaving the #screen hash alone
     client = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
       auth: {flowType: "pkce", persistSession: true, detectSessionInUrl: true},
     });
     client.auth.onAuthStateChange((event, session) => {
       const was = user && user.id;
       user = session ? session.user : null;
-      if (user) phase = "signed-in";
-      else if (phase !== "sent") phase = "signed-out";
+      phase = user ? "signed-in" : "signed-out";
+      if (event === "PASSWORD_RECOVERY") recovering = true;
       // Supabase asks that other calls wait until this callback returns
       if (user && user.id !== was) setTimeout(pull, 0);
       emit();
     });
     await client.auth.getSession();
-    const url = new URL(location.href);
-    if (url.searchParams.has("code")) {
+    if (url.searchParams.has("code") || url.searchParams.has("reset")) {
       url.searchParams.delete("code");
+      url.searchParams.delete("reset");
       history.replaceState(null, "", url.pathname + url.search + url.hash);
     }
-    if (!user && phase === "loading") { phase = "signed-out"; emit(); }
+    if (!user) recovering = false;
+    if (phase === "loading") phase = "signed-out";
+    emit();
   }
 
   // Cards from both sides are kept; everything else comes from whichever
@@ -92,6 +100,11 @@ const Account = (() => {
     const {data, error} = await client.from("saves").select("data").eq("id", user.id).maybeSingle();
     if (error) { setSync("error"); return; }
     if (data && data.data) hooks.apply(merge(hooks.get(), data.data));
+    if (pendingName) {
+      const name = pendingName;
+      pendingName = "";
+      if (!(await claimName(name))) hooks.rename(name);
+    }
     await push();
   }
 
@@ -116,29 +129,57 @@ const Account = (() => {
     if (document.visibilityState === "hidden" && pushTimer) push();
   });
 
-  const redirect = () => location.origin + location.pathname;
+  // Supabase's messages, reworded for players
+  function friendly(error) {
+    const m = (error && error.message) || "";
+    if (/invalid login credentials/i.test(m)) return "Wrong email or password.";
+    if (/already registered|already been registered|already exists/i.test(m)) return "There's already an account with that email. Sign in instead.";
+    if (/email not confirmed/i.test(m)) return "This account still needs its email confirmed. Turn off “Confirm email” in Supabase, or use the link in the email.";
+    if (/password should be|weak password|at least/i.test(m)) return m;
+    if (/rate limit|too many/i.test(m)) return "Too many tries. Wait a minute and try again.";
+    if (/fetch|network/i.test(m)) return "Couldn't reach the server. Check your connection.";
+    return m || "Something went wrong. Try again.";
+  }
 
-  async function sendLink(email) {
-    const {error} = await client.auth.signInWithOtp({email, options: {emailRedirectTo: redirect()}});
-    if (error) return error.message;
-    pendingEmail = email;
-    phase = "sent";
-    emit();
+  async function signIn(email, password) {
+    const {error} = await client.auth.signInWithPassword({email, password});
+    return error ? friendly(error) : null;
+  }
+
+  async function usernameAvailable(name) {
+    const {data, error} = await client.rpc("username_available", {name});
+    return error ? true : !!data; // if the check fails, the save itself still enforces it
+  }
+
+  async function signUp(email, password, name) {
+    if (name && !(await usernameAvailable(name))) return "That username is taken.";
+    pendingName = name || "";
+    const {data, error} = await client.auth.signUp({email, password});
+    if (error) { pendingName = ""; return friendly(error); }
+    // No session means the project still asks new accounts to confirm their email
+    if (!data.session) return "Account made. Check your email to confirm it, then sign in.";
     return null;
   }
-  async function verifyCode(code) {
-    const {error} = await client.auth.verifyOtp({email: pendingEmail, token: code, type: "email"});
-    return error ? error.message : null;
+
+  async function sendReset(email) {
+    const {error} = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: `${location.origin}${location.pathname}?reset=1`,
+    });
+    return error ? friendly(error) : null;
   }
-  function cancelLink() { phase = "signed-out"; pendingEmail = ""; emit(); }
-  function google() { return client.auth.signInWithOAuth({provider: "google", options: {redirectTo: redirect()}}); }
+
+  async function updatePassword(password) {
+    const {error} = await client.auth.updateUser({password});
+    if (!error) { recovering = false; emit(); }
+    return error ? friendly(error) : null;
+  }
 
   // Usernames are unique across players; the database enforces it
   async function claimName(name) {
     if (!user) return null;
     const {error} = await client.from("saves").upsert({id: user.id, username: name, data: hooks.get(), updated_at: new Date().toISOString()});
     if (!error) { lastSync = Date.now(); emit(); return null; }
-    return error.code === "23505" ? "That username is taken." : error.message;
+    return error.code === "23505" ? "That username is taken." : friendly(error);
   }
 
   // Progress is already in the account, so the device goes back to a fresh guest
@@ -153,15 +194,14 @@ const Account = (() => {
 
   return {
     enabled,
-    google: !!cfg.googleSignIn,
-    emailCode: !!cfg.emailCode,
     init,
     on: fn => listeners.push(fn),
     phase: () => phase,
     sync: () => sync,
     lastSync: () => lastSync,
-    email: () => (user ? user.email : pendingEmail),
+    email: () => (user ? user.email : ""),
     signedIn: () => !!user,
-    changed, sendLink, verifyCode, cancelLink, signInWithGoogle: google, claimName, signOut, merge,
+    recovering: () => recovering,
+    changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
   };
 })();

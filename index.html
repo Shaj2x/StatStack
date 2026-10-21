@@ -68,10 +68,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
             Settings &amp; help
           </button>
-          <a class="menu-item" role="menuitem" href="#profile" id="menuSignIn">
+          <button class="menu-item" role="menuitem" type="button" id="menuSignIn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 8a4.5 4.5 0 0 1 0 9"></path><path d="M12 12v8M9 15l3-3 3 3"></path></svg>
-            Sign in to sync
-          </a>
+            Sign in or create account
+          </button>
           <button class="menu-item" role="menuitem" type="button" id="menuSignOut" hidden>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"></path></svg>
             Sign out
@@ -243,6 +243,51 @@
   </main>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <dialog class="auth" id="authDialog" aria-labelledby="authTitle">
+    <div class="auth-art" aria-hidden="true">
+      <i class="auth-shard a1"></i><i class="auth-shard a2"></i><i class="auth-shard a3"></i><i class="auth-shard a4"></i>
+      <div class="auth-cards"><i></i><i></i><i></i></div>
+      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <p class="auth-art-title display">Your cards.<br>Every device.</p>
+      <p class="auth-art-sub">Coins, cards and badges follow you wherever you play.</p>
+    </div>
+    <div class="auth-body">
+      <button class="icon-btn auth-close" id="authClose" type="button" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+      <div class="auth-tabs" id="authTabs" role="tablist" aria-label="Account">
+        <button class="auth-tab" role="tab" type="button" data-mode="signin" id="tabSignin">Sign in</button>
+        <button class="auth-tab" role="tab" type="button" data-mode="signup" id="tabSignup">Create account</button>
+      </div>
+      <div class="auth-head">
+        <h2 class="auth-title" id="authTitle">Welcome back</h2>
+        <p class="auth-lede" id="authLede">Sign in to pick up where you left off.</p>
+      </div>
+      <form class="stack auth-form" id="authForm" novalidate>
+        <label class="field" data-modes="signup">
+          <span>Username</span>
+          <input id="authName" name="username" maxlength="16" autocomplete="username" spellcheck="false" autocapitalize="none" placeholder="3–16 letters, numbers or _">
+        </label>
+        <label class="field" data-modes="signin signup forgot">
+          <span>Email</span>
+          <input id="authEmail" name="email" type="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false">
+        </label>
+        <label class="field" data-modes="signin signup newpass">
+          <span id="authPassLabel">Password</span>
+          <span class="pw">
+            <input id="authPass" name="password" type="password" autocomplete="current-password" minlength="8">
+            <button class="pw-toggle" id="pwToggle" type="button" aria-pressed="false" aria-label="Show password">Show</button>
+          </span>
+          <small class="field-hint" data-modes="signup newpass">At least 8 characters.</small>
+        </label>
+        <p class="form-msg" id="authMsg" role="status" aria-live="polite"></p>
+        <button class="pill pill-solid auth-submit" id="authSubmit" type="submit">Sign in</button>
+        <button class="link-btn auth-link" id="forgotBtn" type="button" data-modes="signin">Forgot password?</button>
+        <button class="link-btn auth-link" id="backBtn" type="button" data-modes="forgot">Back to sign in</button>
+      </form>
+    </div>
+  </dialog>
 
   <dialog class="settings" id="settingsDialog" aria-labelledby="settingsTitle">
     <form method="dialog" class="settings-inner">
