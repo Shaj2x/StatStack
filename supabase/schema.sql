@@ -12,6 +12,10 @@ create table if not exists public.saves (
 -- Usernames are unique regardless of case
 create unique index if not exists saves_username_lower on public.saves (lower(username));
 
+-- Signed-in players can reach the table through the Data API; nobody else can
+grant select, insert, update on public.saves to authenticated;
+revoke all on public.saves from anon;
+
 alter table public.saves enable row level security;
 
 drop policy if exists "Players read their own save" on public.saves;
