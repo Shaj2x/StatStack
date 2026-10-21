@@ -7,6 +7,7 @@ NBA Higher or Lower: a static web app with no build step.
 - `js/app.js` has the game logic
 - `js/data.js` has the player database
 - `js/teams.js` has team names and the colours used for each player's half
+- `js/account.js` handles sign-in and cloud saves; `js/config.js` holds its keys
 
 ## Refreshing player data
 
@@ -58,6 +59,42 @@ against Basketball-Reference, and earlier seasons (which come from
 Basketball-Reference) against each player's stats.nba.com career record. It
 prints every mismatch with both values and saves the full report to
 `data/stat_check.txt`. Differences of 0.1 are rounding.
+
+## Accounts and cloud sync
+
+Players get a profile (username, team-colour avatar, lifetime stats and
+badges) whether or not they sign in. Signing in keeps coins, cards and badges
+in sync across devices. It uses [Supabase](https://supabase.com) (free tier),
+and stays off until `js/config.js` has your project's keys; until then
+everything saves in the browser as before.
+
+To switch it on:
+
+1. Create a free project at supabase.com.
+2. In the project, open **SQL Editor**, paste in `supabase/schema.sql` and run
+   it. This makes the `saves` table, where each player can only read and write
+   their own row.
+3. Under **Authentication → URL Configuration**, set the Site URL to
+   `https://shaj2x.github.io/StatStack/` and add the same address to the
+   Redirect URLs.
+4. Optional, so players can also type a code (handy when the email opens on
+   another device, or for the home-screen app): set up custom SMTP under
+   **Authentication → Emails**, add `{{ .Token }}` to the Magic Link
+   template, and set `emailCode: true` in `js/config.js`.
+5. Copy the Project URL and the publishable key (under **Project Settings →
+   API Keys**) into `js/config.js`. The anon key is meant to be public; the
+   table's row-level security is what protects each save.
+6. Optional Google sign-in: enable Google under **Authentication →
+   Providers** (Supabase's guide walks through the Google OAuth client), then
+   set `googleSignIn: true` in `js/config.js`.
+
+Supabase's built-in email sender only allows a few emails an hour. For more
+players, add your own SMTP under **Authentication → Emails → SMTP Settings**.
+
+When a player signs in, cards from the device and the account are combined;
+coins and settings come from whichever was played most recently, and records
+(best streak, totals, badges) keep the higher value. Signing out leaves the
+progress in the account and resets the device to a fresh guest.
 
 ## Installable app
 
