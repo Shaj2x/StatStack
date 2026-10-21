@@ -5,7 +5,7 @@
 const Account = (() => {
   const cfg = window.STATSTACK_CONFIG || {};
   const enabled = !!(cfg.supabaseUrl && cfg.supabaseAnonKey);
-  const LIB = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js";
+  const LIB = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js";
   const PUSH_DELAY = 1500;
 
   let client = null, user = null, hooks = null, pushTimer = null;
