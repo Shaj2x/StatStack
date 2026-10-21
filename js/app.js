@@ -372,13 +372,33 @@ function bestStat(c, ranks) {
   return {title: `#${best.r} in ${best.word}`, sub: `${one(c[best.k])} per game in ${c.season}`};
 }
 
-// Overall rating, 50–99, from where the player ranked in their own season.
-// The curve spreads the top end so stars stand apart from solid starters.
-const OVR_WEIGHT = {ppg: 0.4, rpg: 0.2, apg: 0.2, spg: 0.1, bpg: 0.1};
-function cardOvr(c, ranks = seasonRanks(c)) {
-  if (!ranks) return 50;
-  const score = Object.entries(OVR_WEIGHT).reduce((sum, [k, w]) => sum + w * (1 - (ranks[k].rank - 1) / ranks.count), 0);
-  return Math.round(50 + 49 * score ** 1.5);
+// Overall rating on an NBA 2K-style scale. Players are ranked within their
+// season by all-round production, then the rank maps onto 2K's usual spread:
+// the season's best player is about 97, the top five are 92+, the top twenty
+// around 85+, a typical starter about 80 and the last rotation players ~70.
+const PRODUCTION = c => c.ppg + 1.2 * c.rpg + 1.5 * c.apg + 3 * c.spg + 3 * c.bpg;
+const OVR_CURVE = [[1, 97], [2, 95], [5, 92], [10, 89], [20, 85], [40, 81], [60, 78], [90, 74], [120, 70]];
+const ovrCache = {};
+function seasonOvrs(season) {
+  if (ovrCache[season]) return ovrCache[season];
+  const players = ((SEASONS[season] || {}).players || []).slice().sort((a, b) => PRODUCTION(b) - PRODUCTION(a));
+  const scale = 120 / Math.max(players.length, 1);
+  const map = new Map();
+  players.forEach((p, i) => {
+    const r = (i + 1) * scale;
+    let k = OVR_CURVE.findIndex(([rank]) => rank >= r);
+    if (k < 1) k = k === 0 ? 1 : OVR_CURVE.length - 1;
+    const [r0, o0] = OVR_CURVE[k - 1], [r1, o1] = OVR_CURVE[k];
+    map.set(p.name, Math.round(o0 + (o1 - o0) * Math.min(1, Math.max(0, (r - r0) / (r1 - r0)))));
+  });
+  return (ovrCache[season] = map);
+}
+// Like 2K, the game's stars get a little extra beyond the box score
+const RARITY_BUMP = {legendary: [2, 90], epic: [1, 85], rare: [0, 0], common: [0, 0]};
+function cardOvr(c) {
+  const base = seasonOvrs(c.season).get(c.name) || 70;
+  const [bump, floor] = RARITY_BUMP[c.rarity] || [0, 0];
+  return Math.min(99, Math.max(floor, base + bump));
 }
 
 // A pentagon of season ranks: every player's card back has its own shape
@@ -436,7 +456,7 @@ function cardHtml(c, extraClass = "") {
               <div class="pback-name">${nameHtml(c.name)}</div>
               <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
             </div>
-            ${ranks ? `<div class="pback-no" aria-label="Overall rating ${cardOvr(c, ranks)}"><span>OVR</span><b>${cardOvr(c, ranks)}</b></div>` : ""}
+            ${ranks ? `<div class="pback-no" aria-label="Overall rating ${cardOvr(c)}"><span>OVR</span><b>${cardOvr(c)}</b></div>` : ""}
           </div>
           ${ranks ? statRadar(c, ranks) : ""}
           ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}
