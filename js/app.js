@@ -188,10 +188,12 @@ function nameHtml(name) {
 // leaves for text, so names never break mid-word or run into the VS badge
 function fitName(el, min = 24) {
   el.style.fontSize = "";
-  const box = el.closest(".side, .pcard") || el.parentElement;
-  const cs = getComputedStyle(box);
-  const room = Math.min(el.parentElement.clientWidth || Infinity,
-    box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight));
+  const inner = node => {
+    const cs = getComputedStyle(node);
+    return node.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  };
+  const box = el.closest(".side, .pcard, .pback") || el.parentElement;
+  const room = Math.min(inner(el.parentElement) || Infinity, inner(box));
   let size = parseFloat(getComputedStyle(el).fontSize);
   while (el.scrollWidth > room + 1 && size > min) {
     size -= 2;
@@ -278,60 +280,353 @@ function updateBoard() {
 }
 
 // ─── CARDS ──────────────────────────────────────────────────────────────────
+// Refractor-shard cards with a back: tap (or Enter/Space) to flip.
+const RARITY_LABEL = {legendary: "★ Legendary", epic: "Epic", rare: "Rare", common: "Common"};
+const CARD_STATS = [["ppg", "PTS", "scoring"], ["rpg", "REB", "rebounding"], ["apg", "AST", "assists"], ["spg", "STL", "steals"], ["bpg", "BLK", "blocks"]];
+
+// Where a player ranks in their season for each stat (1 = best) and the season's best value
+function seasonRanks(c) {
+  const pool = (SEASONS[c.season] || {}).players;
+  if (!pool) return null;
+  const out = {count: pool.length};
+  for (const [key] of CARD_STATS) {
+    const vals = pool.map(p => p[key]);
+    out[key] = {rank: 1 + vals.filter(v => v > c[key]).length, max: Math.max(...vals)};
+  }
+  return out;
+}
+
+// Stats always show one decimal place (25.0, not 25)
+function one(v) { return Number(v).toFixed(1); }
+
+function ordinal(n) {
+  const s = ["th", "st", "nd", "rd"], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+// The back's plate names the player's best stat: "#2 in scoring"
+function bestStat(c, ranks) {
+  if (!ranks) return null;
+  const best = CARD_STATS.map(([k, , word]) => ({word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
+  return {
+    title: `#${best.r} in ${best.word}`,
+    sub: best.r === 1 ? `Led all ${ranks.count} players · ${c.season}` : `${ordinal(best.r)} of ${ranks.count} players · ${c.season}`,
+  };
+}
+
+// A pentagon of season ranks: every player's card back has its own shape
+function statRadar(c, ranks) {
+  const cx = 110, cy = 100, R = 62;
+  const at = (i, r) => {
+    const a = (-90 + i * 72) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+  const ring = f => CARD_STATS.map((_, i) => at(i, R * f).map(n => n.toFixed(1)).join(",")).join(" ");
+  const share = key => Math.max(0.08, 1 - (ranks[key].rank - 1) / ranks.count);
+  const shape = CARD_STATS.map(([key], i) => at(i, R * share(key)));
+  const labels = CARD_STATS.map(([key, label], i) => {
+    const [x, y] = at(i, R + 24);
+    const r = ranks[key].rank;
+    return `<text x="${x.toFixed(1)}" y="${(y - 3).toFixed(1)}" class="rv">${one(c[key])}</text>`
+      + `<text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" class="rl">${label} <tspan class="${r <= 10 ? "top" : ""}">#${r}</tspan></text>`;
+  }).join("");
+  const spoken = CARD_STATS.map(([key, label]) => `${label} ${one(c[key])}, ${ordinal(ranks[key].rank)}`).join("; ");
+  return `<svg class="pback-radar" viewBox="0 0 220 196" role="img" aria-label="Season ranks: ${spoken}">
+      <polygon class="grid" points="${ring(1)}"/><polygon class="grid" points="${ring(0.66)}"/><polygon class="grid" points="${ring(0.33)}"/>
+      ${CARD_STATS.map((_, i) => { const [x, y] = at(i, R); return `<line class="grid" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join("")}
+      <polygon class="shape" points="${shape.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ")}"/>
+      ${shape.map(([x, y]) => `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"/>`).join("")}
+      ${labels}
+    </svg>`;
+}
+
 function cardHtml(c, extraClass = "") {
+  const ph = photoFor(c);
+  const ranks = seasonRanks(c);
+  const pulled = c.pulled ? new Date(c.pulled).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "";
+  const best = bestStat(c, ranks);
   return `
-    <div class="pcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}">
-      <img class="pcard-photo${photoFor(c).cutout ? "" : " is-photo"}" src="${esc(photoFor(c).src)}" alt="${esc(c.name)}" title="${esc(photoFor(c).credit)}" loading="lazy" onerror="imgFail(this)">
-      <span class="chip ${c.rarity}">${c.rarity}</span>
-      <div class="pcard-name">${nameHtml(c.name)}</div>
-      <div class="pcard-meta">${esc(c.team)} · ${esc(c.season || "")}</div>
-      <div class="pcard-stats">
-        <div><span>PTS</span><b>${c.ppg}</b></div>
-        <div><span>REB</span><b>${c.rpg}</b></div>
-        <div><span>AST</span><b>${c.apg}</b></div>
-        <div><span>STL</span><b>${c.spg}</b></div>
-        <div><span>BLK</span><b>${c.bpg}</b></div>
+    <article class="flipcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
+      aria-label="${esc(c.name)}, ${c.rarity} card. Press to flip.">
+      <div class="flip-inner">
+        <div class="pcard">
+          <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
+          <div class="lines"></div><div class="holo"></div>
+          <img class="pcard-photo${ph.cutout ? "" : " is-photo"}" src="${esc(ph.src)}" alt="" loading="lazy" onerror="imgFail(this)">
+          <div class="pcard-top"><span>${RARITY_LABEL[c.rarity] || c.rarity}</span><span>${esc(c.season || "")}</span></div>
+          <div class="plate">
+            <div class="pcard-name">${nameHtml(c.name)}</div>
+            <div class="pcard-meta">${esc(c.team)} · ${one(c.ppg)} PTS · ${one(c.rpg)} REB · ${one(c.apg)} AST</div>
+          </div>
+          ${ph.credit ? `<div class="pcard-credit">${esc(ph.credit)}</div>` : `<div class="flip-hint">Tap to flip</div>`}
+          <div class="shine"></div>
+        </div>
+        <div class="pback" aria-hidden="true">
+          <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
+          <div class="lines"></div><div class="holo"></div>
+          <div class="pback-head">
+            <div class="pback-id">
+              <div class="pback-name">${nameHtml(c.name)}</div>
+              <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
+            </div>
+            ${ranks ? `<div class="pback-no"><span>No.</span><b>${String(ranks.ppg.rank).padStart(3, "0")}</b><span>of ${ranks.count}</span></div>` : ""}
+          </div>
+          ${ranks ? statRadar(c, ranks) : ""}
+          ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}
+          <div class="pback-foot"><span>${pulled ? "Pulled " + pulled : "Player Pack"}</span><span class="pback-mark">StatStack</span></div>
+        </div>
       </div>
-      ${photoFor(c).credit ? `<div class="pcard-credit">${esc(photoFor(c).credit)}</div>` : ""}
-    </div>`;
+    </article>`;
+}
+
+function flipCard(card) {
+  const on = card.classList.toggle("flipped");
+  card.setAttribute("aria-pressed", String(on));
+  card.querySelector(".pcard").setAttribute("aria-hidden", String(on));
+  card.querySelector(".pback").setAttribute("aria-hidden", String(!on));
+  FX.haptic("commit");
+}
+document.addEventListener("click", e => {
+  const card = e.target.closest(".flipcard");
+  if (card) flipCard(card);
+});
+document.addEventListener("keydown", e => {
+  const card = e.target.closest && e.target.closest(".flipcard");
+  if (card && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); flipCard(card); }
+});
+// The holo follows the pointer on Epic and Legendary cards
+document.addEventListener("pointermove", e => {
+  const card = e.target.closest && e.target.closest(".flipcard.epic, .flipcard.legendary");
+  if (!card || e.pointerType !== "mouse") return;
+  const r = card.getBoundingClientRect();
+  card.style.setProperty("--mx", ((e.clientX - r.left) / r.width).toFixed(3));
+  card.style.setProperty("--my", ((e.clientY - r.top) / r.height).toFixed(3));
+});
+
+function fitCardNames(root, min) {
+  root.querySelectorAll(".pcard-name").forEach(el => fitName(el, min));
+  root.querySelectorAll(".pback-name").forEach(el => fitName(el, min));
+  root.querySelectorAll(".pcard-meta, .pback-plate strong").forEach(el => {
+    el.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth + 1 && size > 7) {
+      size -= 0.5;
+      el.style.fontSize = `${size}px`;
+    }
+  });
 }
 
 // ─── PACKS ──────────────────────────────────────────────────────────────────
 function renderShop() {
   $("shopCoins").textContent = coins.toLocaleString();
   $("shopSeason").textContent = currentSeasonKey;
-  $("buyPackBtn").disabled = coins < PACK_PRICE;
+  $("buyPackBtn").disabled = coins < PACK_PRICE || !!opening;
   $("packNeed").textContent = coins < PACK_PRICE
     ? `You need ${(PACK_PRICE - coins).toLocaleString()} more coins. Keep your streak going.`
     : "";
 }
 
 function buyPack() {
-  if (coins < PACK_PRICE) return;
+  if (coins < PACK_PRICE || opening) return;
   coins -= PACK_PRICE;
+  const r = Math.random() * 100;
+  const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
+  let pool = currentPlayers.filter(p => p.rarity === rarity);
+  if (!pool.length) pool = currentPlayers;
+  // The card is saved before the animation, so leaving mid-opening never loses it
+  const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
+  ownedCards.push(card);
+  save('statstack_cards', ownedCards);
   updateBoard();
+  openPack(card);
   renderShop();
-  $("buyPackBtn").disabled = true;
+}
+
+// ─── PACK OPENING ───────────────────────────────────────────────────────────
+// The pack shakes at least three times, and the glow climbs one rarity tier
+// per shake until it reaches the card inside. A fourth shake means gold.
+const TIERS = ["common", "rare", "epic", "legendary"];
+let opening = null;
+
+function beat(ms) {
+  return new Promise(resolve => {
+    if (opening.skipped) return resolve();
+    const t = setTimeout(resolve, ms);
+    opening.wake = () => { clearTimeout(t); resolve(); };
+  });
+}
+function run(el, frames, opts) {
+  const anim = el.animate(frames, {fill: "forwards", ...opts});
+  opening.anims.push(anim);
+  return anim;
+}
+function shakeFrames(amp) {
+  const frames = [];
+  for (let i = 0; i <= 8; i++) {
+    const x = i === 8 ? 0 : (i % 2 ? -1 : 1) * amp * (1 - i / 10);
+    frames.push({transform: `translate(${x}px, ${-Math.abs(x) * 0.3}px) rotate(${x * 0.45}deg)`});
+  }
+  return frames;
+}
+function setTier(stage, tier) {
+  stage.style.setProperty("--glow", `var(--r-${tier})`);
+  TIERS.forEach(t => stage.classList.toggle(`tier-${t}`, t === tier));
+}
+
+async function openPack(card) {
+  const stage = $("packStage"), pack = $("pack"), level = TIERS.indexOf(card.rarity);
+  opening = {card, level, skipped: false, ready: false, anims: [], wake: null};
+  stage.className = "pack-stage";
+  setTier(stage, "common");
+  pack.hidden = false;
+  pack.querySelector(".pack-top").style.cssText = "";
+  $("mystery").hidden = true;
+  $("packHint").textContent = "Tap to skip";
   $("revealEmpty").hidden = true;
   $("revealedCard").hidden = true;
-  $("packOpening").hidden = false;
-  setTimeout(() => {
-    const r = Math.random() * 100;
-    const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
-    let pool = currentPlayers.filter(p => p.rarity === rarity);
-    if (!pool.length) pool = currentPlayers;
-    const card = {...pick(pool), season: currentSeasonKey};
-    ownedCards.push(card);
-    save('statstack_cards', ownedCards);
-    $("packOpening").hidden = true;
-    $("revealedCard").innerHTML = cardHtml(card, "reveal-card");
-    $("revealedCard").hidden = false;
-    $("revealedCard").querySelectorAll(".pcard-name").forEach(el => fitName(el, 18));
-    $("revealedCard").scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
-    FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
-    renderShop();
-  }, 1600);
+  stage.hidden = false;
+  $("packStatus").textContent = "Opening pack…";
+  stage.scrollIntoView({behavior: FX.reduced() ? "auto" : "smooth", block: "center"});
+
+  if (!FX.reduced()) await animatePack(stage, pack, level);
+  settlePack();
 }
+
+async function animatePack(stage, pack, level) {
+  const glow = stage.querySelector(".pack-glow");
+  run(pack, [{transform: "translateY(48px) scale(0.9)", opacity: 0}, {transform: "none", opacity: 1}], {duration: 420, easing: FX.EASE_OUT});
+  await beat(560);
+  const shakes = Math.max(3, level + 1);
+  for (let i = 0; i < shakes; i++) {
+    if (opening.skipped) return;
+    setTier(stage, TIERS[Math.min(i, level)]);
+    const duration = 340 + i * 70;
+    run(pack, shakeFrames(3 + i * 3.5), {duration, easing: "linear", fill: "none"});
+    run(glow, [{transform: "scale(0.85)"}, {transform: `scale(${1.08 + i * 0.06})`}, {transform: "scale(1)"}], {duration: duration + 200, easing: FX.EASE_OUT, fill: "none"});
+    FX.haptic(`charge${Math.min(i, 3)}`);
+    FX.sound(`charge${Math.min(i, 3)}`);
+    // The pause between shakes grows, so the last one hangs a little longer
+    await beat(duration + 260 + i * 90);
+  }
+  if (opening.skipped) return;
+
+  // Tear the top strip off and let light spill out
+  run(pack.querySelector(".pack-top"), [
+    {transform: "none", opacity: 1},
+    {transform: "translate(70px, -90px) rotate(24deg)", opacity: 0},
+  ], {duration: 480, easing: FX.EASE_OUT});
+  run(stage.querySelector(".pack-flash"), [{opacity: 0}, {opacity: 0.35 + level * 0.18}, {opacity: 0}], {duration: 520, easing: "ease-out"});
+  if (level === 3) stage.classList.add("rays");
+  FX.haptic("tear");
+  FX.sound("tear");
+  await beat(300);
+  if (opening.skipped) return;
+
+  // The card slides up out of the pack, face down, and the pack falls away
+  const mystery = $("mystery");
+  mystery.hidden = false;
+  run(mystery, [{transform: "translateY(12%)"}, {transform: "translateY(-20%)"}], {duration: 460, easing: FX.EASE_OUT});
+  run(pack, [
+    {transform: "none", opacity: 1},
+    {transform: "translateY(45%) rotate(-3deg)", opacity: 1, offset: 0.65},
+    {transform: "translateY(70%) rotate(-5deg)", opacity: 0},
+  ], {duration: 560, easing: "cubic-bezier(0.55, 0, 1, 0.45)"});
+  await beat(500);
+  if (opening.skipped) return;
+  run(mystery, [{transform: "translateY(-20%)"}, {transform: "none"}], {duration: 380, easing: FX.EASE_OUT});
+  await beat(380);
+}
+
+// Jump to the face-down card: the end of the animation, or a skip
+function settlePack() {
+  const stage = $("packStage");
+  opening.anims.forEach(a => a.cancel());
+  opening.anims = [];
+  opening.ready = true;
+  setTier(stage, opening.card.rarity);
+  if (opening.level === 3) stage.classList.add("rays");
+  stage.classList.add("ready");
+  $("pack").hidden = true;
+  $("mystery").hidden = false;
+  $("packHint").textContent = "Tap to reveal";
+  $("packStatus").textContent = "Pack opened. Press the card to reveal it.";
+  $("mystery").focus({preventScroll: true});
+}
+
+function skipPack() {
+  if (!opening || opening.ready || opening.skipped) return;
+  opening.skipped = true;
+  opening.wake?.();
+}
+
+async function revealPack() {
+  if (!opening?.ready) return;
+  const {card, level} = opening;
+  const stage = $("packStage"), mystery = $("mystery"), slot = $("revealedCard");
+  opening.ready = false;
+  stage.classList.remove("ready");
+  $("packHint").textContent = "";
+  if (!FX.reduced()) {
+    await mystery.animate([{transform: "perspective(900px) rotateY(0)"}, {transform: "perspective(900px) rotateY(90deg)"}],
+      {duration: 180, easing: "cubic-bezier(0.55, 0, 1, 0.45)"}).finished;
+  }
+  mystery.hidden = true;
+  slot.innerHTML = cardHtml(card, "reveal-card");
+  slot.hidden = false;
+  fitCardNames(slot, 18);
+  if (FX.reduced()) {
+    slot.animate([{opacity: 0}, {opacity: 1}], {duration: 200, easing: "ease"});
+  } else {
+    slot.animate([
+      {transform: "perspective(900px) rotateY(-90deg) scale(1.04)"},
+      {transform: "perspective(900px) rotateY(0) scale(1)"},
+    ], {duration: 340, easing: FX.EASE_OUT});
+    burst(stage, level);
+  }
+  FX.feedback(card.rarity === "legendary" ? "legendary" : "reveal");
+  $("packStatus").textContent = `${RARITY_LABEL[card.rarity].replace("★ ", "")}: ${card.name}`;
+  slot.querySelector(".flipcard").focus({preventScroll: true});
+  opening = null;
+  renderShop();
+}
+
+// Shards fly out in the rarity colour: a few for rare, a shower for legendary
+function burst(stage, level) {
+  if (level >= 1) {
+    const ring = document.createElement("span");
+    ring.className = "ring";
+    stage.append(ring);
+    ring.animate([{transform: "scale(0.4)", opacity: 1}, {transform: `scale(${2.6 + level * 0.5})`, opacity: 0}],
+      {duration: 700, easing: FX.EASE_OUT}).finished.then(() => ring.remove());
+  }
+  if (level === 3) {
+    stage.querySelector(".pack-flash").animate([{opacity: 0.9}, {opacity: 0}], {duration: 700, easing: "ease-out"});
+  }
+  const count = [0, 8, 18, 30][level];
+  for (let i = 0; i < count; i++) {
+    const spark = document.createElement("span");
+    spark.className = "spark";
+    stage.append(spark);
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4;
+    const dist = 150 + Math.random() * 130;
+    const spin = Math.random() * 540 - 270;
+    spark.animate([
+      {transform: `translate(0, 0) rotate(${angle}rad) scale(1)`, opacity: 1},
+      {transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) rotate(${angle * 57.3 + spin}deg) scale(0.3)`, opacity: 0},
+    ], {duration: 700 + Math.random() * 400, easing: "cubic-bezier(0.2, 0.7, 0.3, 1)"}).finished.then(() => spark.remove());
+  }
+}
+
+$("packStage").addEventListener("click", e => {
+  if (e.target.closest("#mystery")) revealPack();
+  else skipPack();
+});
+document.addEventListener("keydown", e => {
+  if (currentScreen === "packs" && opening && !opening.ready && (e.key === "Escape" || e.key === " ")) {
+    e.preventDefault();
+    skipPack();
+  }
+});
 
 // ─── COLLECTION ─────────────────────────────────────────────────────────────
 let activeFilter = "all";
@@ -352,7 +647,7 @@ function renderColl(r) {
     return;
   }
   g.innerHTML = cards.slice().reverse().map(c => cardHtml(c)).join("");
-  g.querySelectorAll(".pcard-name").forEach(el => fitName(el, 14));
+  fitCardNames(g, 14);
   [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
 }
 

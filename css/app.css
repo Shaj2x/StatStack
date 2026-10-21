@@ -348,72 +348,358 @@ button, select { font: inherit; color: inherit; }
 .chip.epic { color: var(--r-epic); }
 .chip.rare { color: var(--r-rare); }
 .chip.common { color: var(--r-common); }
-.reveal-slot { flex: 1 1 360px; min-width: 0; min-height: 300px; display: grid; place-items: center; border-radius: 24px; border: 1px dashed var(--line); padding: 24px; }
-.pack-opening .display { font-size: 48px; animation: pulse 0.9s ease-in-out infinite alternate; }
-@keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+.reveal-slot { flex: 1 1 360px; min-width: 0; min-height: 300px; display: grid; place-items: center; border-radius: 24px; border: 1px dashed var(--line); padding: 24px 24px 56px; isolation: isolate; overflow-x: clip; }
+.reveal-slot > * { grid-area: 1 / 1; }
+#revealedCard { position: relative; z-index: 2; width: 320px; max-width: 100%; }
 
-/* ─── Player cards (pack reveal + collection) ───────────────────────────── */
-.pcard {
+/* Pack opening: the glow climbs one rarity tier per shake, up to what you pulled */
+@property --glow { syntax: "<color>"; inherits: true; initial-value: #c4cad6; }
+.pack-stage {
+  --glow: var(--r-common);
+  position: relative;
+  width: 320px;
+  max-width: 100%;
+  aspect-ratio: 5 / 7;
+  display: grid;
+  place-items: center;
+  transition: --glow 260ms ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.pack-stage > * { grid-area: 1 / 1; }
+.pack-glow {
+  position: absolute;
+  inset: -22%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--glow) 80%, transparent), transparent 80%);
+  opacity: 0.25;
+  transition: opacity 260ms ease;
+  pointer-events: none;
+}
+.pack-stage.tier-rare .pack-glow { opacity: 0.6; }
+.pack-stage.tier-epic .pack-glow { opacity: 0.8; }
+.pack-stage.tier-legendary .pack-glow { opacity: 1; }
+.pack-stage.tier-rare .pack { box-shadow: 0 0 0 2px var(--glow), 0 0 36px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-stage.tier-epic .pack { box-shadow: 0 0 0 2px var(--glow), 0 0 56px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-stage.tier-legendary .pack { box-shadow: 0 0 0 3px var(--glow), 0 0 80px var(--glow), 0 24px 50px rgba(0, 0, 0, 0.55); }
+.pack-rays {
+  position: absolute;
+  inset: -45%;
+  z-index: -1;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--glow) 40%, transparent) 0deg 5deg, transparent 5deg 15deg);
+  -webkit-mask: radial-gradient(closest-side, #000 20%, transparent 72%);
+  mask: radial-gradient(closest-side, #000 20%, transparent 72%);
+  opacity: 0;
+  transition: opacity 500ms ease;
+  pointer-events: none;
+}
+.pack-stage.rays .pack-rays { opacity: 1; animation: spin 14s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.pack {
+  position: relative;
+  z-index: 2;
+  width: 94%;
+  aspect-ratio: 5 / 7.3;
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.16) 45%, transparent 60%),
+    linear-gradient(160deg, #0e2240 0%, #13305a 50%, #005a91 50%, #003a5e 100%);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 24px 50px rgba(0, 0, 0, 0.55);
+  transition: box-shadow 260ms ease;
+}
+.pack::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px);
+}
+.pack-top {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 1;
+  height: 15%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0 12px 6px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px) top / 100% 12px no-repeat,
+    #0e2240;
+  border-bottom: 2px dashed rgba(255, 255, 255, 0.4);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+.pack-body {
+  position: absolute;
+  inset: 15% 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 24px;
+}
+.pack-body .display { font-size: 64px; line-height: 0.9; }
+.mystery {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  border-radius: 14px;
+  border: 2px solid var(--glow);
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 8px),
+    linear-gradient(200deg, color-mix(in srgb, var(--glow) 35%, #11141b) 0 30%, #11141b 30% 62%, color-mix(in srgb, var(--glow) 22%, #11141b) 62%);
+  box-shadow: 0 0 36px color-mix(in srgb, var(--glow) 45%, transparent), 0 20px 40px rgba(0, 0, 0, 0.5);
+  color: var(--glow);
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.mystery-mark { font-size: 54px; line-height: 0.9; color: #fff; text-shadow: 0 0 24px var(--glow); }
+.pack-stage.ready .mystery { animation: breathe 1.3s var(--ease-in-out) infinite alternate; }
+@keyframes breathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.025); box-shadow: 0 0 60px color-mix(in srgb, var(--glow) 65%, transparent), 0 20px 40px rgba(0, 0, 0, 0.5); }
+}
+.pack-flash {
+  position: absolute;
+  inset: -30%;
+  z-index: 3;
+  background: radial-gradient(closest-side, #fff, color-mix(in srgb, var(--glow) 70%, transparent) 40%, transparent 75%);
+  opacity: 0;
+  pointer-events: none;
+}
+.pack-hint {
+  align-self: end;
+  transform: translateY(calc(100% + 16px));
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  pointer-events: none;
+}
+.pack-stage.ready .pack-hint { color: var(--glow); }
+.spark, .ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 3;
+  pointer-events: none;
+}
+.spark { width: 10px; height: 18px; margin: -9px 0 0 -5px; background: var(--glow); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.ring { width: 120px; height: 120px; margin: -60px 0 0 -60px; border-radius: 50%; border: 3px solid var(--glow); }
+
+/* ─── Player cards: refractor shards, one finish per rarity ─────────────── */
+/* A card is a flip container: front (.pcard) and back (.pback) share a box */
+.flipcard {
   --team-bg: #2a2f3a;
   --team-bg2: #15181f;
   --team-accent: #ffffff;
+  --frame: rgba(255, 255, 255, 0.16);
   position: relative;
-  overflow: hidden;
-  border-radius: 18px;
   aspect-ratio: 5 / 7;
-  background: linear-gradient(170deg, var(--team-bg) 0%, var(--team-bg2) 100%);
-  border: 2px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  padding: 14px;
+  perspective: 1100px;
+  border-radius: 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.pcard.legendary { border-color: var(--r-legendary); box-shadow: 0 0 0 1px var(--r-legendary), 0 12px 40px rgba(255, 201, 60, 0.25); }
-.pcard.epic { border-color: var(--r-epic); }
-.pcard.rare { border-color: var(--r-rare); }
-.pcard-photo { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); width: 120%; max-width: none; height: auto; pointer-events: none; }
+.flipcard:focus-visible { outline: 3px solid var(--gold); outline-offset: 4px; }
+.flip-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 560ms var(--ease-in-out);
+}
+.flipcard.flipped .flip-inner { transform: rotateY(180deg); }
+.pcard, .pback {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  overflow: hidden;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.pback { transform: rotateY(180deg); }
+
+/* Front */
+.pcard { background: var(--team-bg2); box-shadow: 0 0 0 2px var(--frame), 0 12px 30px rgba(0, 0, 0, 0.45); }
+.shard { position: absolute; inset: 0; pointer-events: none; }
+.s1 { clip-path: polygon(0 0, 62% 0, 20% 55%, 0 40%); background: var(--team-bg); }
+.s2 { clip-path: polygon(62% 0, 100% 0, 100% 35%, 38% 70%, 20% 55%); background: color-mix(in srgb, var(--team-bg) 78%, #fff); }
+.s3 { clip-path: polygon(0 40%, 20% 55%, 38% 70%, 10% 100%, 0 100%); background: color-mix(in srgb, var(--team-bg2) 70%, #000); }
+.s4 { clip-path: polygon(100% 35%, 100% 100%, 60% 100%, 38% 70%); background: color-mix(in srgb, var(--team-accent) 45%, var(--team-bg2)); opacity: 0.7; }
+.lines { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 7px); }
+.holo { position: absolute; inset: 0; pointer-events: none; opacity: 0; mix-blend-mode: color-dodge;
+  background: linear-gradient(125deg, transparent 15%, #ff7ad9 30%, #8b7bff 40%, #4fd8ff 50%, #6dffb0 60%, #ffe36b 70%, transparent 85%);
+  background-size: 260% 260%;
+  background-position: calc(var(--mx, 0.5) * 100%) calc(var(--my, 0.5) * 100%);
+  transition: background-position 120ms linear; }
+
+.pcard-photo { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); width: 112%; max-width: none; height: auto; pointer-events: none; z-index: 1; }
 .pcard-photo.is-photo {
-  top: 0;
+  top: 8%;
   bottom: auto;
-  left: 0;
+  left: 12%;
   transform: none;
-  width: 100%;
-  height: 72%;
+  width: 76%;
+  height: 62%;
   object-fit: cover;
   object-position: 50% 15%;
   filter: grayscale(1) contrast(1.15);
   mix-blend-mode: luminosity;
-  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 55%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 60% 62% at 50% 45%, #000 45%, transparent 100%);
+  mask-image: radial-gradient(ellipse 60% 62% at 50% 45%, #000 45%, transparent 100%);
 }
-.pcard-credit { font-size: 9px; color: rgba(255, 255, 255, 0.55); margin-top: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pcard::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--team-bg2) 0%, color-mix(in srgb, var(--team-bg2) 80%, transparent) 35%, transparent 65%); z-index: 1; }
-.pcard > :not(img) { position: relative; z-index: 2; }
-.pcard .chip { position: absolute; top: 12px; left: 12px; }
-.pcard-name { font-family: var(--display); font-size: 26px; line-height: 0.95; text-transform: uppercase; }
-.name-word { white-space: nowrap; }
-.pcard-meta { font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--team-accent); margin: 4px 0 8px; }
-.pcard-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
-.pcard-stats div { display: flex; flex-direction: column; }
-.pcard-stats span { font-size: 10px; font-weight: 700; color: rgba(255, 255, 255, 0.7); }
-.pcard-stats b { font-size: 15px; }
-.reveal-card { width: min(320px, 100%); animation: cardReveal 520ms var(--ease-out); }
-.reveal-card .pcard-name { font-size: 38px; }
-.reveal-card.legendary::after {
-  content: "";
+.pcard-top { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 3; display: flex; justify-content: space-between; font-size: 10px; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(255, 255, 255, 0.9); text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5); }
+.plate {
   position: absolute;
-  inset: 0;
+  left: -6%;
+  right: -6%;
+  bottom: 9%;
   z-index: 3;
-  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.4) 50%, transparent 65%);
-  transform: translateX(-100%);
-  animation: shine 900ms var(--ease-in-out) 450ms forwards;
-  pointer-events: none;
+  background: var(--ink-0);
+  transform: rotate(-6deg);
+  padding: 8px 12% 7px;
 }
-@keyframes cardReveal {
-  from { transform: perspective(900px) rotateY(-80deg) scale(0.94); opacity: 0; }
-  to { transform: perspective(900px) rotateY(0) scale(1); opacity: 1; }
-}
+.pcard-name { font-family: var(--display); font-size: 26px; line-height: 1; text-transform: uppercase; color: #fff; }
+.name-word { white-space: nowrap; }
+.pcard-meta { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--team-accent); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pcard-credit { position: absolute; left: 10px; right: 10px; bottom: 6px; z-index: 3; font-size: 8px; color: rgba(255, 255, 255, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.flip-hint { position: absolute; right: 10px; bottom: 6px; z-index: 3; font-size: 9px; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+
+/* Rare: chrome and steel-blue shards */
+.flipcard.rare { --frame: #c9d2de; }
+.rare .s1 { background: linear-gradient(140deg, #f2f5f9, #8d97a8); }
+.rare .s2 { background: linear-gradient(200deg, #9fb6d4, #4a6a94); }
+.rare .s3 { background: linear-gradient(20deg, #5d6878, #cfd6df); }
+.rare .s4 { background: var(--team-bg); opacity: 0.85; }
+.rare .lines { opacity: 0.6; }
+.rare .pcard-top { color: #16202e; text-shadow: none; }
+
+/* Epic: team shards under a rainbow holo that follows the pointer */
+.flipcard.epic { --frame: #d98cff; }
+.epic .pcard { box-shadow: 0 0 0 2px var(--frame), 0 12px 34px rgba(217, 140, 255, 0.3); }
+.epic .holo { opacity: 0.55; }
+.epic .lines { opacity: 0.35; }
+
+/* Legendary: gold and rainbow shards with a shine */
+.flipcard.legendary { --frame: #ffc93c; }
+.legendary .pcard { box-shadow: 0 0 0 2px var(--frame), 0 14px 44px rgba(255, 201, 60, 0.35); }
+.legendary .s1 { background: linear-gradient(135deg, #ffe9a3, #c9971c); }
+.legendary .s2 { background: linear-gradient(200deg, #ff9be6, #a99bff 50%, #7fe4ff); }
+.legendary .s3 { background: linear-gradient(20deg, #a8790c, #fff6cf); }
+.legendary .s4 { background: linear-gradient(160deg, #6dffb0, #ffe36b); opacity: 0.85; }
+.legendary .lines { opacity: 1; }
+.legendary .holo { opacity: 0.25; }
+.legendary .plate { border-top: 2px solid var(--frame); border-bottom: 2px solid var(--frame); }
+.legendary .pcard-name { color: #ffe9a3; }
+.legendary .pcard-top { color: #2a1d00; text-shadow: none; }
+.shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; display: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.45) 50%, transparent 65%);
+  transform: translateX(-100%); }
+.legendary .shine { display: block; animation: shine 1100ms var(--ease-in-out) 500ms forwards; }
 @keyframes shine { to { transform: translateX(100%); } }
+@media (hover: none) {
+  /* No pointer to follow on phones: let the holo drift slowly once */
+  .epic .holo, .legendary .holo { animation: holoDrift 2.4s var(--ease-in-out) 1 both; }
+}
+@keyframes holoDrift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
+
+/* Back: the front's shards fold over the top, a rank pentagon in the middle,
+   and a tilted plate naming the player's best stat. Sizes follow card width. */
+.flipcard { container-type: inline-size; }
+.pback {
+  --chart: var(--team-accent);
+  background: #0f1520;
+  box-shadow: 0 0 0 2px var(--frame), 0 12px 30px rgba(0, 0, 0, 0.45);
+  padding: 6cqw 7cqw 4.5cqw;
+  display: flex;
+  flex-direction: column;
+}
+.pback .s1 { clip-path: polygon(0 0, 100% 0, 100% 17%, 0 30%); }
+.pback .s2 { clip-path: polygon(48% 0, 100% 0, 100% 17%, 22% 27.5%); }
+.pback .s3 { clip-path: polygon(0 84%, 34% 100%, 0 100%); opacity: 0.8; }
+.pback .s4 { clip-path: polygon(100% 76%, 100% 100%, 64% 100%); }
+.pback > :not(.shard, .lines, .holo) { position: relative; z-index: 1; }
+/* Foil texture stays on the shard band so the chart sits on clean ink */
+.pback .lines, .legendary .pback .holo { clip-path: polygon(0 0, 100% 0, 100% 17%, 0 30%); }
+.pback-team .nw { white-space: nowrap; }
+.pback-head { display: flex; justify-content: space-between; gap: 3cqw; align-items: flex-start; min-height: 24%; }
+.pback-id { min-width: 0; flex: 1; }
+.pback-name { font-family: var(--display); font-size: 10cqw; line-height: 0.95; text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); }
+.pback-team { margin-top: 1.2cqw; font-size: 3.2cqw; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; opacity: 0.85; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); }
+.pback-no {
+  flex: 0 0 auto;
+  width: 19cqw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-0);
+  border: 0.8cqw solid var(--frame);
+  font-size: 2.6cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.1;
+  transform: rotate(8deg);
+}
+.pback-no b { font-family: var(--display); font-weight: 400; font-size: 6.4cqw; letter-spacing: 0; color: #fff; }
+.pback-radar { display: block; width: 100%; flex: 1 1 auto; min-height: 0; margin: 1cqw 0 0; overflow: visible; }
+.pback-radar .grid { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
+.pback-radar .shape { fill: color-mix(in srgb, var(--chart) 32%, transparent); stroke: var(--chart); stroke-width: 2; stroke-linejoin: round; }
+.pback-radar .dot { fill: var(--chart); }
+.pback-radar text { text-anchor: middle; font-family: var(--body); font-variant-numeric: tabular-nums; }
+.pback-radar .rv { font-size: 14px; font-weight: 800; fill: #fff; }
+.pback-radar .rl { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; fill: #8a91a2; }
+.pback-radar .rl .top { fill: var(--chart); }
+.pback-plate {
+  margin: 1cqw -12cqw 3cqw;
+  padding: 2.4cqw 14cqw 2cqw;
+  background: var(--ink-0);
+  transform: rotate(-6deg);
+  display: flex;
+  flex-direction: column;
+}
+.pback-plate strong { font-family: var(--display); font-weight: 400; font-size: 7.4cqw; line-height: 1; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.pback-plate span { font-size: 2.9cqw; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chart); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pback-foot { display: flex; justify-content: space-between; gap: 2cqw; font-size: 2.8cqw; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.pback-mark { font-family: var(--display); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Rarity finishes carry over to the back */
+.rare .pback, .epic .pback, .legendary .pback { --chart: var(--frame); }
+.rare .pback .pback-name, .rare .pback .pback-team { color: #16202e; text-shadow: none; }
+.legendary .pback .pback-name, .legendary .pback .pback-team { color: #2a1d00; text-shadow: none; }
+.epic .pback { box-shadow: 0 0 0 2px var(--frame), 0 12px 34px rgba(217, 140, 255, 0.3); }
+.epic .pback .holo { opacity: 0.35; }
+.legendary .pback { box-shadow: inset 0 0 0 1.4cqw #0f1520, inset 0 0 0 2.2cqw var(--frame), 0 0 0 2px var(--frame), 0 14px 44px rgba(255, 201, 60, 0.35); }
+.legendary .pback .lines { opacity: 0.6; }
+.legendary .pback .shape { fill: color-mix(in srgb, var(--frame) 40%, transparent); }
+.legendary .pback-plate { border-top: 2px solid var(--frame); border-bottom: 2px solid var(--frame); }
+.legendary .pback-plate strong { color: #ffe9a3; }
+.legendary .pback-no { background: radial-gradient(circle at 35% 30%, #fff6cf, #ffc93c 50%, #a8790c); color: #2a1d00; border-color: #2a1d00; }
+.legendary .pback-no b { color: #2a1d00; }
+
+/* Pack reveal: a bigger card that flips in */
+.reveal-card { width: 100%; }
+.reveal-card .pcard-name { font-size: 34px; }
+.reveal-card .pcard-meta { font-size: 12px; }
 
 /* ─── Collection ────────────────────────────────────────────────────────── */
 .coll-counts { display: flex; flex-wrap: wrap; gap: 20px; }
@@ -516,9 +802,14 @@ button, select { font: inherit; color: inherit; }
 /* ─── Reduced motion: fades instead of movement ─────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .pill:active { transform: none; }
-  .reveal-card { animation: fade 200ms ease; }
-  .reveal-card.legendary::after { display: none; }
-  .pack-opening .display { animation: none; }
+  .shine { display: none !important; }
+  .holo { animation: none !important; transition: none; }
+  .flip-inner { transition: none; transform: none !important; }
+  .pback { transform: none; opacity: 0; transition: opacity 200ms ease; }
+  .flipcard.flipped .pback { opacity: 1; }
+  .flipcard.flipped .pcard { opacity: 0; }
+  .pcard { transition: opacity 200ms ease; }
+  .pack-stage.rays .pack-rays, .pack-stage.ready .mystery { animation: none; }
   .switch-row input::after { transition: none; }
 }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }

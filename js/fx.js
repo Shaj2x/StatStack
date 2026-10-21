@@ -112,7 +112,8 @@ const FX = (() => {
   }
 
   // ─── Haptics ──────────────────────────────────────────────────────────────
-  const PATTERNS = {correct: 18, wrong: [40, 50, 40], commit: 8, legendary: [30, 40, 30, 40, 80], reveal: 25};
+  const PATTERNS = {correct: 18, wrong: [40, 50, 40], commit: 8, legendary: [30, 40, 30, 40, 80], reveal: 25,
+    charge0: 10, charge1: 18, charge2: 28, charge3: [40, 30, 60], tear: [8, 30, 12]};
   function haptic(kind) {
     if (settings.haptics && canVibrate) navigator.vibrate(PATTERNS[kind] || 10);
   }
@@ -145,6 +146,12 @@ const FX = (() => {
     wrong:     ac => { tone(ac, 220, 0, 0.18, "sawtooth", 0.06); tone(ac, 165, 0.12, 0.25, "sawtooth", 0.06); },
     reveal:    ac => { tone(ac, 523, 0, 0.12); tone(ac, 784, 0.1, 0.22); },
     legendary: ac => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(ac, f, i * 0.08, 0.3, "triangle", 0.1)),
+    // Pack opening: each shake sits a step higher, then a bright tear
+    charge0:   ac => tone(ac, 196, 0, 0.22, "triangle", 0.1),
+    charge1:   ac => tone(ac, 262, 0, 0.24, "triangle", 0.1),
+    charge2:   ac => { tone(ac, 330, 0, 0.26, "triangle", 0.1); tone(ac, 165, 0, 0.26, "sine", 0.06); },
+    charge3:   ac => { tone(ac, 392, 0, 0.32, "triangle", 0.12); tone(ac, 196, 0, 0.32, "sine", 0.08); },
+    tear:      ac => { tone(ac, 1400, 0, 0.05, "square", 0.03); tone(ac, 900, 0.03, 0.08, "square", 0.03); },
   };
   function sound(kind) {
     if (!settings.sound) return;
@@ -155,5 +162,5 @@ const FX = (() => {
   // Fire visual, haptic and sound feedback together on the same event
   function feedback(kind) { haptic(kind); sound(kind); }
 
-  return {EASE_OUT, reduced, settings, setSetting, canVibrate, stop, enter, pop, shake, countUp, flipFrom, springY, rubberband, feedback, haptic};
+  return {EASE_OUT, reduced, settings, setSetting, canVibrate, stop, enter, pop, shake, countUp, flipFrom, springY, rubberband, feedback, haptic, sound};
 })();
