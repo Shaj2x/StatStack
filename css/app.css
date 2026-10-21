@@ -618,41 +618,87 @@ button, select { font: inherit; color: inherit; }
 }
 @keyframes holoDrift { from { background-position: 0% 0%; } to { background-position: 100% 100%; } }
 
-/* Back */
+/* Back: the front's shards fold over the top, a rank pentagon in the middle,
+   and a tilted plate naming the player's best stat. Sizes follow card width. */
+.flipcard { container-type: inline-size; }
 .pback {
+  --chart: var(--team-accent);
   background: #0f1520;
   box-shadow: 0 0 0 2px var(--frame), 0 12px 30px rgba(0, 0, 0, 0.45);
-  padding: 6% 7% 5%;
+  padding: 6cqw 7cqw 4.5cqw;
   display: flex;
   flex-direction: column;
-  gap: 4%;
-  font-size: 11px;
 }
-.pback-head { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-.pback-name { font-family: var(--display); font-size: 20px; line-height: 1; text-transform: uppercase; }
-.pback-team { margin-top: 3px; font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--team-accent); }
-.pback-no { text-align: right; font-size: 8px; font-weight: 700; color: var(--muted); line-height: 1.3; white-space: nowrap; }
-.pback-no b { display: block; font-family: var(--display); font-size: 20px; font-weight: 400; color: var(--frame); }
-.pback-rows { display: flex; flex-direction: column; gap: 6px; }
-.pback-row { display: grid; grid-template-columns: 2.4em 1fr 2.6em 2.6em; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
-.pback-row span:first-child { font-weight: 800; color: var(--muted); font-size: 9px; }
-.pback-row i { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
-.pback-row i b { display: block; height: 100%; background: var(--frame); }
-.pback-row strong { text-align: right; font-size: 13px; }
-.pback-row em { text-align: right; font-style: normal; font-weight: 700; color: var(--muted); font-size: 9px; }
-.pback-row em.top { color: var(--frame); }
-.pback-note { margin: 0; font-size: 10px; line-height: 1.35; color: #d4d8e2; }
-.pback-foot { margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 6px; font-size: 8px; font-weight: 700; color: #7d8494; }
+.pback .s1 { clip-path: polygon(0 0, 100% 0, 100% 17%, 0 30%); }
+.pback .s2 { clip-path: polygon(48% 0, 100% 0, 100% 17%, 22% 27.5%); }
+.pback .s3 { clip-path: polygon(0 84%, 34% 100%, 0 100%); opacity: 0.8; }
+.pback .s4 { clip-path: polygon(100% 76%, 100% 100%, 64% 100%); }
+.pback > :not(.shard, .lines, .holo) { position: relative; z-index: 1; }
+/* Foil texture stays on the shard band so the chart sits on clean ink */
+.pback .lines, .legendary .pback .holo { clip-path: polygon(0 0, 100% 0, 100% 17%, 0 30%); }
+.pback-team .nw { white-space: nowrap; }
+.pback-head { display: flex; justify-content: space-between; gap: 3cqw; align-items: flex-start; min-height: 24%; }
+.pback-id { min-width: 0; flex: 1; }
+.pback-name { font-family: var(--display); font-size: 10cqw; line-height: 0.95; text-transform: uppercase; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45); }
+.pback-team { margin-top: 1.2cqw; font-size: 3.2cqw; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: #fff; opacity: 0.85; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6); }
+.pback-no {
+  flex: 0 0 auto;
+  width: 19cqw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--ink-0);
+  border: 0.8cqw solid var(--frame);
+  font-size: 2.6cqw;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.1;
+  transform: rotate(8deg);
+}
+.pback-no b { font-family: var(--display); font-weight: 400; font-size: 6.4cqw; letter-spacing: 0; color: #fff; }
+.pback-radar { display: block; width: 100%; flex: 1 1 auto; min-height: 0; margin: 1cqw 0 0; overflow: visible; }
+.pback-radar .grid { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
+.pback-radar .shape { fill: color-mix(in srgb, var(--chart) 32%, transparent); stroke: var(--chart); stroke-width: 2; stroke-linejoin: round; }
+.pback-radar .dot { fill: var(--chart); }
+.pback-radar text { text-anchor: middle; font-family: var(--body); font-variant-numeric: tabular-nums; }
+.pback-radar .rv { font-size: 14px; font-weight: 800; fill: #fff; }
+.pback-radar .rl { font-size: 9px; font-weight: 800; letter-spacing: 0.08em; fill: #8a91a2; }
+.pback-radar .rl .top { fill: var(--chart); }
+.pback-plate {
+  margin: 1cqw -12cqw 3cqw;
+  padding: 2.4cqw 14cqw 2cqw;
+  background: var(--ink-0);
+  transform: rotate(-6deg);
+  display: flex;
+  flex-direction: column;
+}
+.pback-plate strong { font-family: var(--display); font-weight: 400; font-size: 7.4cqw; line-height: 1; text-transform: uppercase; color: #fff; white-space: nowrap; }
+.pback-plate span { font-size: 2.9cqw; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--chart); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pback-foot { display: flex; justify-content: space-between; gap: 2cqw; font-size: 2.8cqw; font-weight: 700; color: rgba(255, 255, 255, 0.6); }
+.pback-mark { font-family: var(--display); font-weight: 400; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* Rarity finishes carry over to the back */
+.rare .pback, .epic .pback, .legendary .pback { --chart: var(--frame); }
+.rare .pback .pback-name, .rare .pback .pback-team { color: #16202e; text-shadow: none; }
+.legendary .pback .pback-name, .legendary .pback .pback-team { color: #2a1d00; text-shadow: none; }
+.epic .pback { box-shadow: 0 0 0 2px var(--frame), 0 12px 34px rgba(217, 140, 255, 0.3); }
+.epic .pback .holo { opacity: 0.35; }
+.legendary .pback { box-shadow: inset 0 0 0 1.4cqw #0f1520, inset 0 0 0 2.2cqw var(--frame), 0 0 0 2px var(--frame), 0 14px 44px rgba(255, 201, 60, 0.35); }
+.legendary .pback .lines { opacity: 0.6; }
+.legendary .pback .shape { fill: color-mix(in srgb, var(--frame) 40%, transparent); }
+.legendary .pback-plate { border-top: 2px solid var(--frame); border-bottom: 2px solid var(--frame); }
+.legendary .pback-plate strong { color: #ffe9a3; }
+.legendary .pback-no { background: radial-gradient(circle at 35% 30%, #fff6cf, #ffc93c 50%, #a8790c); color: #2a1d00; border-color: #2a1d00; }
+.legendary .pback-no b { color: #2a1d00; }
 
 /* Pack reveal: a bigger card that flips in */
 .reveal-card { width: 100%; }
 .reveal-card .pcard-name { font-size: 34px; }
-.reveal-card .pback { font-size: 13px; }
-.reveal-card .pback-name { font-size: 26px; }
-.reveal-card .pback-row strong { font-size: 16px; }
-.reveal-card .pback-row span:first-child, .reveal-card .pback-row em, .reveal-card .pback-team { font-size: 11px; }
-.reveal-card .pback-note { font-size: 12px; }
-.reveal-card .pback-foot, .reveal-card .pback-no { font-size: 10px; }
 .reveal-card .pcard-meta { font-size: 12px; }
 
 /* ─── Collection ────────────────────────────────────────────────────────── */

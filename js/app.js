@@ -304,23 +304,47 @@ function ordinal(n) {
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
 }
 
-function backNote(c, ranks) {
-  if (!ranks) return "";
-  const best = CARD_STATS.map(([k, , word]) => ({k, word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
-  if (best.r === 1) return `Led the ${c.season} season in ${best.word}.`;
-  if (best.r <= 10) return `${ordinal(best.r)} in ${best.word} among the ${ranks.count} players this season.`;
-  return `${c.team} · ${c.season}`;
+// The back's plate names the player's best stat: "#2 in scoring"
+function bestStat(c, ranks) {
+  if (!ranks) return null;
+  const best = CARD_STATS.map(([k, , word]) => ({word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
+  return {
+    title: `#${best.r} in ${best.word}`,
+    sub: best.r === 1 ? `Led all ${ranks.count} players · ${c.season}` : `${ordinal(best.r)} of ${ranks.count} players · ${c.season}`,
+  };
+}
+
+// A pentagon of season ranks: every player's card back has its own shape
+function statRadar(c, ranks) {
+  const cx = 110, cy = 100, R = 62;
+  const at = (i, r) => {
+    const a = (-90 + i * 72) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  };
+  const ring = f => CARD_STATS.map((_, i) => at(i, R * f).map(n => n.toFixed(1)).join(",")).join(" ");
+  const share = key => Math.max(0.08, 1 - (ranks[key].rank - 1) / ranks.count);
+  const shape = CARD_STATS.map(([key], i) => at(i, R * share(key)));
+  const labels = CARD_STATS.map(([key, label], i) => {
+    const [x, y] = at(i, R + 24);
+    const r = ranks[key].rank;
+    return `<text x="${x.toFixed(1)}" y="${(y - 3).toFixed(1)}" class="rv">${one(c[key])}</text>`
+      + `<text x="${x.toFixed(1)}" y="${(y + 9).toFixed(1)}" class="rl">${label} <tspan class="${r <= 10 ? "top" : ""}">#${r}</tspan></text>`;
+  }).join("");
+  const spoken = CARD_STATS.map(([key, label]) => `${label} ${one(c[key])}, ${ordinal(ranks[key].rank)}`).join("; ");
+  return `<svg class="pback-radar" viewBox="0 0 220 196" role="img" aria-label="Season ranks: ${spoken}">
+      <polygon class="grid" points="${ring(1)}"/><polygon class="grid" points="${ring(0.66)}"/><polygon class="grid" points="${ring(0.33)}"/>
+      ${CARD_STATS.map((_, i) => { const [x, y] = at(i, R); return `<line class="grid" x1="${cx}" y1="${cy}" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join("")}
+      <polygon class="shape" points="${shape.map(p => p.map(n => n.toFixed(1)).join(",")).join(" ")}"/>
+      ${shape.map(([x, y]) => `<circle class="dot" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6"/>`).join("")}
+      ${labels}
+    </svg>`;
 }
 
 function cardHtml(c, extraClass = "") {
   const ph = photoFor(c);
   const ranks = seasonRanks(c);
   const pulled = c.pulled ? new Date(c.pulled).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "";
-  const rows = CARD_STATS.map(([key, label]) => {
-    const r = ranks && ranks[key];
-    const width = r && r.max ? Math.round((c[key] / r.max) * 100) : 0;
-    return `<div class="pback-row"><span>${label}</span><i><b style="width:${width}%"></b></i><strong>${one(c[key])}</strong><em class="${r && r.rank <= 10 ? "top" : ""}">${r ? "#" + r.rank : ""}</em></div>`;
-  }).join("");
+  const best = bestStat(c, ranks);
   return `
     <article class="flipcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
       aria-label="${esc(c.name)}, ${c.rarity} card. Press to flip.">
@@ -338,16 +362,18 @@ function cardHtml(c, extraClass = "") {
           <div class="shine"></div>
         </div>
         <div class="pback" aria-hidden="true">
+          <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
+          <div class="lines"></div><div class="holo"></div>
           <div class="pback-head">
-            <div>
+            <div class="pback-id">
               <div class="pback-name">${nameHtml(c.name)}</div>
-              <div class="pback-team">${esc(team(c.team).name || c.team)} · ${esc(c.season || "")}</div>
+              <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
             </div>
-            ${ranks ? `<div class="pback-no">CARD<b>${ranks.ppg.rank}</b>OF ${ranks.count}</div>` : ""}
+            ${ranks ? `<div class="pback-no"><span>No.</span><b>${String(ranks.ppg.rank).padStart(3, "0")}</b><span>of ${ranks.count}</span></div>` : ""}
           </div>
-          <div class="pback-rows">${rows}</div>
-          <p class="pback-note">${esc(backNote(c, ranks))}</p>
-          <div class="pback-foot"><span>Per game · rank in season</span><span>${pulled ? "Pulled " + pulled : "Player Pack"}</span></div>
+          ${ranks ? statRadar(c, ranks) : ""}
+          ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}
+          <div class="pback-foot"><span>${pulled ? "Pulled " + pulled : "Player Pack"}</span><span class="pback-mark">StatStack</span></div>
         </div>
       </div>
     </article>`;
@@ -380,7 +406,7 @@ document.addEventListener("pointermove", e => {
 function fitCardNames(root, min) {
   root.querySelectorAll(".pcard-name").forEach(el => fitName(el, min));
   root.querySelectorAll(".pback-name").forEach(el => fitName(el, min));
-  root.querySelectorAll(".pcard-meta").forEach(el => {
+  root.querySelectorAll(".pcard-meta, .pback-plate strong").forEach(el => {
     el.style.fontSize = "";
     let size = parseFloat(getComputedStyle(el).fontSize);
     while (el.scrollWidth > el.clientWidth + 1 && size > 7) {
