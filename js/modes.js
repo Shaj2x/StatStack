@@ -392,13 +392,14 @@ function openPicker(i) {
 }
 function renderPicker() {
   const q = $("pickerSearch").value.trim().toLowerCase();
-  const taken = new Set(profile.lineup.slots.filter((k, j) => k && j !== pickingSlot));
+  // A player can only be in the lineup once, whichever season the card is from
+  const taken = new Set(profile.lineup.slots.filter((k, j) => k && j !== pickingSlot).map(k => k.split("|")[0]));
   const cards = [...groupCards(ownedCards).values()].map(copies => copies[0])
     .filter(c => !q || c.name.toLowerCase().includes(q) || (team(c.team).name || "").toLowerCase().includes(q) || c.season.includes(q))
     .map(c => ({c, ovr: cardOvr(c)}))
     .sort((a, b) => b.ovr - a.ovr);
   $("pickerList").innerHTML = cards.length ? cards.map(({c}) => {
-    const key = cardKey(c), used = taken.has(key);
+    const key = cardKey(c), used = taken.has(c.name);
     return `<li><button class="pick-row" type="button" data-pick="${esc(key)}"${used ? " disabled" : ""}>
       ${miniTile(c)}
       <span class="pick-text"><strong>${esc(c.name)}</strong><span>${esc(team(c.team).name || c.team)} · ${esc(c.season)}${used ? " · in lineup" : ""}</span></span>
@@ -409,7 +410,7 @@ function setSlot(key) {
   profile.lineup.slots[pickingSlot] = key;
   progressChanged();
   $("pickerDialog").close();
-  renderLocker();
+  SCREEN_HOOKS.locker();
   const slot = document.querySelector(`[data-slot="${pickingSlot}"]`);
   if (slot) { FX.pop(slot, 1.06); slot.focus({preventScroll: true}); }
 }
@@ -435,7 +436,7 @@ $("clearLineup").addEventListener("click", () => {
   if (!profile.lineup.slots.some(Boolean) || !confirm("Clear every spot in your lineup?")) return;
   profile.lineup.slots = profile.lineup.slots.map(() => null);
   progressChanged();
-  renderLocker();
+  SCREEN_HOOKS.locker();
 });
 SCREEN_HOOKS.locker = renderLocker;
 

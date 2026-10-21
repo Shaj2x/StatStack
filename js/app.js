@@ -30,6 +30,14 @@ function freshProfile() {
     // Today's Daily Challenge: puzzle number, one entry per answer, final score
     daily: {num: 0, answers: [], done: false, score: 0},
     lineup: {name: "", slots: [null, null, null, null, null, null, null, null]},
+    // Daily login streak: last day claimed (local YYYY-MM-DD) and the run length
+    login: {last: "", streak: 0, best: 0},
+    // Packs earned for free, opened from the shop without spending coins
+    freePacks: {player: 0},
+    // Completed sets: id → time completed (rewards are paid once)
+    sets: {},
+    // Lineup Battles record
+    battle: {w: 0, l: 0, streak: 0, best: 0, legendWins: 0},
   };
 }
 function readProfile(p) {
@@ -40,6 +48,10 @@ function readProfile(p) {
   out.daily = {...base.daily, ...out.daily};
   if (!Array.isArray(out.daily.answers)) out.daily.answers = [];
   out.lineup = {...base.lineup, ...out.lineup};
+  out.login = {...base.login, ...out.login};
+  out.freePacks = {...base.freePacks, ...out.freePacks};
+  out.battle = {...base.battle, ...out.battle};
+  if (!out.sets || typeof out.sets !== "object") out.sets = {};
   if (!Array.isArray(out.lineup.slots) || out.lineup.slots.length !== 8) out.lineup.slots = base.lineup.slots;
   if (!Array.isArray(out.seasons)) out.seasons = [];
   if (!out.badges || typeof out.badges !== "object") out.badges = {};
@@ -110,9 +122,9 @@ const wins  = ["Nice read", "Most people miss that", "Great eye for stats", "Kee
 const fails = ["87% got that wrong too", "Tough one", "Stats can be deceiving", "Even the pros miss that one"];
 
 // ─── SCREENS ────────────────────────────────────────────────────────────────
-const SCREENS = ["play", "who", "daily", "packs", "collection", "locker", "ranks", "profile"];
+const SCREENS = ["play", "who", "daily", "packs", "collection", "book", "locker", "ranks", "profile"];
 // Which top-bar tab each screen belongs to
-const SCREEN_TAB = {play: "play", who: "play", daily: "daily", packs: "packs", collection: "cards", locker: "cards", ranks: "ranks"};
+const SCREEN_TAB = {play: "play", who: "play", daily: "daily", packs: "packs", collection: "cards", book: "cards", locker: "cards", ranks: "ranks"};
 // Screens defined in js/modes.js register how to draw themselves here
 const SCREEN_HOOKS = {};
 const ALIASES = {home: "play", shop: "packs"}; // links from the previous layout
@@ -546,7 +558,8 @@ function renderShop() {
   $("shopCoins").textContent = coins.toLocaleString();
   const teams = [...new Set(ALL_CARDS.map(c => franchise(c.team)))].sort((a, b) => team(a).name.localeCompare(team(b).name));
   $("shop").innerHTML = PACK_TYPES.map(t => {
-    const short = Math.max(0, t.price - coins);
+    const freeCount = t.id === "player" ? profile.freePacks.player : 0;
+    const short = freeCount ? 0 : Math.max(0, t.price - coins);
     const chooser = t.choose === "era"
       ? `<label class="field pack-choose"><span>Era</span><select data-choose="era">${ERAS.map(e => `<option value="${e.id}"${packChoice.era === e.id ? " selected" : ""}>${e.name} · ${e.label}</option>`).join("")}</select></label>`
       : t.choose === "team"
@@ -562,7 +575,7 @@ function renderShop() {
         <p class="muted">${esc(t.blurb())}</p>
         ${chooser}
         <ul class="odds">${odds}</ul>
-        <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} pill-sm" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>Open · ${t.price.toLocaleString()}</button>
+        <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} pill-sm" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>${freeCount ? `Open free · ${freeCount} left` : `Open · ${t.price.toLocaleString()}`}</button>
         ${short ? `<p class="muted pack-need">${short.toLocaleString()} more coins</p>` : ""}
       </div>
     </article>`;
@@ -571,10 +584,12 @@ function renderShop() {
 
 function buyPack(typeId = "player") {
   const type = PACK_TYPES.find(t => t.id === typeId);
-  if (!type || coins < type.price || opening) return;
+  const free = typeId === "player" && profile.freePacks.player > 0;
+  if (!type || (!free && coins < type.price) || opening) return;
   const all = type.pool(packChoice[type.choose]);
   if (!all.length) return;
-  coins -= type.price;
+  if (free) profile.freePacks.player--;
+  else coins -= type.price;
   // Fall back a tier at a time if this pool has no card of the rolled rarity
   const order = ["legendary", "epic", "rare", "common"];
   let i = order.indexOf(rollRarity(type.odds)), pool = [];
@@ -1030,8 +1045,11 @@ const BADGES = [
 function medalHtml(b) { return `<span class="medal ${b.tier}" aria-hidden="true">${b.glyph}</span>`; }
 
 // Award any badge whose goal is met; announce=false backfills quietly
+// Other goals (sets in js/goals.js) check themselves at the same moments
+const PROGRESS_HOOKS = [];
 function checkBadges(announce) {
   if (opening) return;
+  PROGRESS_HOOKS.forEach(fn => fn(announce));
   const fresh = BADGES.filter(b => !profile.badges[b.id] && b.value() >= b.goal);
   if (!fresh.length) return;
   fresh.forEach(b => { profile.badges[b.id] = Date.now(); });

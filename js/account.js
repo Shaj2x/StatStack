@@ -89,6 +89,10 @@ const Account = (() => {
         seasons: [...new Set([...(lp.seasons || []), ...(cp.seasons || [])])],
         weekly: mergeWeekly(lp.weekly, cp.weekly),
         daily: mergeDaily(lp.daily, cp.daily),
+        login: (lp.login || {}).last > (cp.login || {}).last ? lp.login : cp.login || lp.login,
+        sets: Object.fromEntries([...new Set([...Object.keys(lp.sets || {}), ...Object.keys(cp.sets || {})])]
+          .map(id => [id, Math.max((lp.sets || {})[id] || 0, (cp.sets || {})[id] || 0)])),
+        battle: ["w", "l", "best", "legendWins"].reduce((b, k) => ({...b, [k]: Math.max((lp.battle || {})[k] || 0, (cp.battle || {})[k] || 0)}), {...(newer.profile || {}).battle}),
         created: Math.min(lp.created || Date.now(), cp.created || Date.now()),
       },
     };

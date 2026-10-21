@@ -183,6 +183,7 @@
         <div>
           <nav class="sub-tabs" aria-label="Cards">
             <a class="sub-tab active" href="#collection" aria-current="page">Collection</a>
+            <a class="sub-tab" href="#book">Sets</a>
             <a class="sub-tab" href="#locker">Locker</a>
           </nav>
           <h1 class="display" id="collTitle">Collection</h1>
@@ -256,6 +257,7 @@
         <div>
           <nav class="sub-tabs" aria-label="Cards">
             <a class="sub-tab" href="#collection">Collection</a>
+            <a class="sub-tab" href="#book">Sets</a>
             <a class="sub-tab active" href="#locker" aria-current="page">Locker</a>
           </nav>
           <h1 class="display" id="lockerTitle">Locker</h1>
@@ -277,6 +279,35 @@
       </div>
       <h2 class="section-title">Bench</h2>
       <div class="bench" id="bench"></div>
+
+      <section class="battles" aria-labelledby="battleTitle">
+        <div class="battle-head">
+          <h2 class="section-title" id="battleTitle">Lineup Battles</h2>
+          <p class="battle-record" id="battleRecord"></p>
+        </div>
+        <div id="battleBody"></div>
+      </section>
+    </section>
+
+    <!-- SETS (collection book) -->
+    <section class="screen page" id="screen-book" data-screen="book" aria-labelledby="bookTitle">
+      <div class="page-head">
+        <div>
+          <nav class="sub-tabs" aria-label="Cards">
+            <a class="sub-tab" href="#collection">Collection</a>
+            <a class="sub-tab active" href="#book" aria-current="page">Sets</a>
+            <a class="sub-tab" href="#locker">Locker</a>
+          </nav>
+          <h1 class="display" id="bookTitle">Sets</h1>
+        </div>
+        <dl class="coll-counts" id="bookTotals"></dl>
+      </div>
+      <div class="filters" role="group" aria-label="Set type" id="bookTabs">
+        <button class="filter-btn active" type="button" data-kind="era">Eras</button>
+        <button class="filter-btn" type="button" data-kind="team">Teams</button>
+        <button class="filter-btn" type="button" data-kind="season">Seasons</button>
+      </div>
+      <ul class="set-grid" id="setGrid"></ul>
     </section>
 
     <!-- RANKS -->
@@ -381,6 +412,33 @@
     </div>
   </dialog>
 
+  <dialog class="settings login-dialog" id="loginDialog" aria-labelledby="loginTitle">
+    <div class="settings-inner">
+      <p class="eyebrow" id="loginEyebrow">Daily reward</p>
+      <h2 id="loginTitle">Day 1 streak</h2>
+      <p class="muted" id="loginLede">Come back every day. Each day in a row pays more, and day 7 is a free pack.</p>
+      <ol class="login-days" id="loginDays"></ol>
+      <button class="pill pill-solid" id="loginClaim" type="button">Claim</button>
+    </div>
+  </dialog>
+
+  <dialog class="settings set-dialog" id="setDialog" aria-labelledby="setTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow" id="setKind"></p>
+          <h2 id="setTitle">Set</h2>
+        </div>
+        <button class="icon-btn" type="button" id="setClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <p class="muted" id="setInfo"></p>
+      <div class="set-bar"><b id="setBar"></b></div>
+      <ul class="set-cards" id="setCards"></ul>
+    </div>
+  </dialog>
+
   <dialog class="settings picker" id="pickerDialog" aria-labelledby="pickerTitle">
     <div class="settings-inner">
       <div class="settings-head">
@@ -430,5 +488,6 @@
 <script src="js/account.js"></script>
 <script src="js/app.js"></script>
 <script src="js/modes.js"></script>
+<script src="js/goals.js"></script>
 </body>
 </html>
