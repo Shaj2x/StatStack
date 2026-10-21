@@ -339,16 +339,6 @@ SCREEN_HOOKS.seasonChanged = () => {
 // ─── LOCKER ─────────────────────────────────────────────────────────────────
 // A starting five and a three-player bench built from cards you own.
 const SLOT_NAMES = ["PG", "SG", "SF", "PF", "C", "6th", "7th", "8th"];
-const OVR_WEIGHT = {ppg: 0.4, rpg: 0.2, apg: 0.2, spg: 0.1, bpg: 0.1};
-let pickingSlot = null;
-
-// 55–99, from where the player ranked in their own season
-function cardOvr(c) {
-  const ranks = seasonRanks(c);
-  if (!ranks) return 55;
-  const score = Object.entries(OVR_WEIGHT).reduce((sum, [k, w]) => sum + w * (1 - (ranks[k].rank - 1) / ranks.count), 0);
-  return Math.round(55 + 44 * score);
-}
 function ownedByKey(key) {
   return key ? ownedCards.find(c => cardKey(c) === key) || null : null;
 }

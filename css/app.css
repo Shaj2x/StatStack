@@ -847,7 +847,7 @@ button, select { font: inherit; color: inherit; }
   line-height: 1.1;
   transform: rotate(8deg);
 }
-.pback-no b { font-family: var(--display); font-weight: 400; font-size: 6.4cqw; letter-spacing: 0; color: #fff; }
+.pback-no b { font-family: var(--display); font-weight: 400; font-size: 8.6cqw; line-height: 0.95; letter-spacing: 0; color: #fff; }
 .pback-radar { display: block; width: 100%; flex: 1 1 auto; min-height: 0; margin: 1cqw 0 0; overflow: visible; }
 .pback-radar .grid { fill: none; stroke: rgba(255, 255, 255, 0.14); stroke-width: 1; }
 .pback-radar .shape { fill: color-mix(in srgb, var(--chart) 32%, transparent); stroke: var(--chart); stroke-width: 2; stroke-linejoin: round; }

@@ -368,11 +368,17 @@ function ordinal(n) {
 // The back's plate names the player's best stat: "#2 in scoring"
 function bestStat(c, ranks) {
   if (!ranks) return null;
-  const best = CARD_STATS.map(([k, , word]) => ({word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
-  return {
-    title: `#${best.r} in ${best.word}`,
-    sub: best.r === 1 ? `Led all ${ranks.count} players · ${c.season}` : `${ordinal(best.r)} of ${ranks.count} players · ${c.season}`,
-  };
+  const best = CARD_STATS.map(([k, , word]) => ({k, word, r: ranks[k].rank})).sort((a, b) => a.r - b.r)[0];
+  return {title: `#${best.r} in ${best.word}`, sub: `${one(c[best.k])} per game in ${c.season}`};
+}
+
+// Overall rating, 50–99, from where the player ranked in their own season.
+// The curve spreads the top end so stars stand apart from solid starters.
+const OVR_WEIGHT = {ppg: 0.4, rpg: 0.2, apg: 0.2, spg: 0.1, bpg: 0.1};
+function cardOvr(c, ranks = seasonRanks(c)) {
+  if (!ranks) return 50;
+  const score = Object.entries(OVR_WEIGHT).reduce((sum, [k, w]) => sum + w * (1 - (ranks[k].rank - 1) / ranks.count), 0);
+  return Math.round(50 + 49 * score ** 1.5);
 }
 
 // A pentagon of season ranks: every player's card back has its own shape
@@ -430,7 +436,7 @@ function cardHtml(c, extraClass = "") {
               <div class="pback-name">${nameHtml(c.name)}</div>
               <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
             </div>
-            ${ranks ? `<div class="pback-no"><span>No.</span><b>${String(ranks.ppg.rank).padStart(3, "0")}</b><span>of ${ranks.count}</span></div>` : ""}
+            ${ranks ? `<div class="pback-no" aria-label="Overall rating ${cardOvr(c, ranks)}"><span>OVR</span><b>${cardOvr(c, ranks)}</b></div>` : ""}
           </div>
           ${ranks ? statRadar(c, ranks) : ""}
           ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}
