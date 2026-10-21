@@ -154,6 +154,7 @@ const Account = (() => {
   return {
     enabled,
     google: !!cfg.googleSignIn,
+    emailCode: !!cfg.emailCode,
     init,
     on: fn => listeners.push(fn),
     phase: () => phase,

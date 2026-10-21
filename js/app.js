@@ -969,14 +969,17 @@ function renderAccountPanel() {
         <button class="pill pill-solid pill-sm" type="submit">Email me a sign-in link</button>
       </form>
       ${Account.google ? `<div class="or">or</div><button class="pill pill-ghost pill-sm" id="googleBtn" type="button">${GOOGLE_ICON}Continue with Google</button>` : ""}`,
-    sent: `<h2 class="panel-title">Check your email</h2>
+    sent: Account.emailCode ? `<h2 class="panel-title">Check your email</h2>
       <p>We sent a sign-in link to <strong>${esc(Account.email())}</strong>. Open it on this device, or type the code from the email.</p>
       <form class="stack" id="codeForm" novalidate>
         <label class="field"><span>Code</span><input id="codeInput" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
         <p class="form-msg" id="codeMsg" role="status" aria-live="polite"></p>
         <div class="btn-row"><button class="pill pill-solid pill-sm" type="submit">Sign in</button></div>
         <button class="link-btn" type="button" id="otherEmail">Use a different email</button>
-      </form>`,
+      </form>` : `<h2 class="panel-title">Check your email</h2>
+      <p>We sent a sign-in link to <strong>${esc(Account.email())}</strong>. Open it in this browser to finish signing in.</p>
+      <p>It can take a minute to arrive. If it doesn't, check your spam folder.</p>
+      <button class="link-btn" type="button" id="otherEmail">Use a different email</button>`,
     "signed-in": `<h2 class="panel-title">Account</h2>
       <p>Signed in as <strong>${esc(Account.email())}</strong></p>
       <p class="sync-line"><span class="${$("syncDot").className}"></span>${esc(syncText())}</p>

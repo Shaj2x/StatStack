@@ -78,10 +78,11 @@ To switch it on:
    `https://shaj2x.github.io/StatStack/` and add the same address to the
    Redirect URLs.
 4. Optional, so players can also type a code (handy when the email opens on
-   another device, or for the home-screen app): under **Authentication →
-   Emails**, edit the Magic Link template and add `{{ .Token }}` to it.
-5. Copy the Project URL and the anon public key (under **Project Settings →
-   API**) into `js/config.js`. The anon key is meant to be public; the
+   another device, or for the home-screen app): set up custom SMTP under
+   **Authentication → Emails**, add `{{ .Token }}` to the Magic Link
+   template, and set `emailCode: true` in `js/config.js`.
+5. Copy the Project URL and the publishable key (under **Project Settings →
+   API Keys**) into `js/config.js`. The anon key is meant to be public; the
    table's row-level security is what protects each save.
 6. Optional Google sign-in: enable Google under **Authentication →
    Providers** (Supabase's guide walks through the Google OAuth client), then
