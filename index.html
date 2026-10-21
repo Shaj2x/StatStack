@@ -21,23 +21,63 @@
 <body>
 <div class="app">
   <header class="topbar">
-    <a class="brand" href="#play">STATSTACK</a>
+    <a class="brand" href="#play" aria-label="StatStack, play">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="brand-word">STATSTACK</span>
+    </a>
     <nav class="nav" aria-label="Main">
-      <a class="nav-link" href="#play" data-tab="play">Play</a>
-      <a class="nav-link" href="#packs" data-tab="packs">Packs</a>
-      <a class="nav-link" href="#collection" data-tab="collection">Collection</a>
+      <a class="nav-link" href="#play" data-tab="play">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>
+        <span>Play</span>
+      </a>
+      <a class="nav-link" href="#packs" data-tab="packs">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M5 7h14M9 3l1 4M15 3l-1 4"></path></svg>
+        <span>Packs</span>
+      </a>
+      <a class="nav-link" href="#collection" data-tab="collection">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="12" height="15" rx="2"></rect><path d="M8 3h11a2 2 0 0 1 2 2v12"></path></svg>
+        <span>Collection</span>
+      </a>
     </nav>
     <div class="topbar-right">
-      <label class="visually-hidden" for="seasonSelect">Season</label>
-      <select class="season-select" id="seasonSelect"></select>
+      <label class="season-chip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+        <span class="visually-hidden">Season</span>
+        <select class="season-select" id="seasonSelect"></select>
+      </label>
       <div class="hud" aria-label="Your progress">
-        <span class="hud-item"><svg class="hud-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v10M9 9.5h4.5a2 2 0 0 1 0 4H10a2 2 0 0 0 0 4h5"></path></svg><span class="hud-label">Coins</span> <span id="coins">0</span></span>
-        <span class="hud-item"><svg class="hud-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 3c1 4 5 6 5 11a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 2 3 4"></path></svg><span class="hud-label">Streak</span> <span id="streak">0</span></span>
-        <span class="hud-item hud-multi"><span id="multiplier">1×</span></span>
+        <span class="hud-item hud-coins" title="Coins"><span class="coin" aria-hidden="true"></span><span class="visually-hidden">Coins</span><span id="coins">0</span></span>
+        <span class="hud-item hud-streak" title="Streak"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1.2 4 5.5 6.2 5.5 11.5A5.5 5.5 0 0 1 6.5 13.5c0-3 1.7-4.6 2.3-7.3 1.6 1.2 2.6 2.6 2.7 4.6C13 9 12.9 5.6 12 2z"></path></svg><span class="visually-hidden">Streak</span><span id="streak">0</span></span>
+        <span class="hud-multi" title="Coin multiplier"><span class="visually-hidden">Multiplier</span><span id="multiplier">1×</span></span>
       </div>
-      <button class="icon-btn" id="settingsBtn" type="button" aria-label="Settings and help">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg>
-      </button>
+      <div class="account">
+        <button class="avatar-btn" id="avatarBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu" aria-label="Account menu">
+          <span class="avatar" data-avatar></span>
+          <span class="sync-dot" id="syncDot" hidden></span>
+        </button>
+        <div class="account-menu" id="accountMenu" role="menu" aria-label="Account" hidden>
+          <div class="menu-head">
+            <span class="avatar avatar-md" data-avatar></span>
+            <div class="menu-who"><strong data-username>Guest</strong><span id="menuSub">Not signed in</span></div>
+          </div>
+          <a class="menu-item" role="menuitem" href="#profile">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
+            Profile &amp; badges
+          </a>
+          <button class="menu-item" role="menuitem" type="button" id="settingsBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
+            Settings &amp; help
+          </button>
+          <a class="menu-item" role="menuitem" href="#profile" id="menuSignIn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a5 5 0 0 1-.5-10A6 6 0 0 1 18 8a4.5 4.5 0 0 1 0 9"></path><path d="M12 12v8M9 15l3-3 3 3"></path></svg>
+            Sign in to sync
+          </a>
+          <button class="menu-item" role="menuitem" type="button" id="menuSignOut" hidden>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"></path></svg>
+            Sign out
+          </button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -162,7 +202,47 @@
       </div>
       <div class="cards-grid" id="collectionGrid"></div>
     </section>
+    <!-- PROFILE -->
+    <section class="screen page" id="screen-profile" data-screen="profile" aria-labelledby="profileTitle">
+      <div class="profile-hero">
+        <span class="avatar avatar-xl" data-avatar></span>
+        <div class="profile-id">
+          <p class="eyebrow" id="profileStatus">Guest</p>
+          <h1 class="display profile-name" id="profileTitle" data-username>Guest</h1>
+          <p class="muted" id="profileSince"></p>
+        </div>
+      </div>
+
+      <div class="profile-cols">
+        <form class="panel" id="profileForm" novalidate>
+          <h2 class="panel-title">Your player card</h2>
+          <label class="field">
+            <span>Username</span>
+            <input id="nameInput" name="username" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="3–16 letters, numbers or _" aria-describedby="nameMsg">
+          </label>
+          <label class="field">
+            <span>Team colours</span>
+            <select id="teamSelect"></select>
+          </label>
+          <p class="form-msg" id="nameMsg" role="status" aria-live="polite"></p>
+          <button class="pill pill-solid pill-sm" type="submit">Save</button>
+        </form>
+        <div class="panel account-panel" id="accountPanel"></div>
+      </div>
+
+      <section aria-labelledby="statsTitle" class="profile-section">
+        <h2 class="section-title" id="statsTitle">Stats</h2>
+        <dl class="stat-grid" id="statGrid"></dl>
+      </section>
+
+      <section aria-labelledby="badgesTitle" class="profile-section">
+        <h2 class="section-title" id="badgesTitle">Badges <span class="muted" id="badgeCount"></span></h2>
+        <ul class="badge-grid" id="badgeGrid"></ul>
+      </section>
+    </section>
   </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
   <dialog class="settings" id="settingsDialog" aria-labelledby="settingsTitle">
     <form method="dialog" class="settings-inner">
@@ -191,10 +271,12 @@
   </dialog>
 </div>
 
+<script src="js/config.js"></script>
 <script src="js/data.js"></script>
 <script src="js/teams.js"></script>
 <script src="js/photos.js"></script>
 <script src="js/fx.js"></script>
+<script src="js/account.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -19,6 +19,21 @@ let coins = parseInt(load('statstack_coins', 0)) || 0;
 let bestStreak = parseInt(load('statstack_bestStreak', 0)) || 0;
 let ownedCards = load('statstack_cards', []);
 if (!Array.isArray(ownedCards)) ownedCards = [];
+// Profile: username, avatar team, lifetime totals and earned badges
+function freshProfile() {
+  return {name: "", team: "", created: Date.now(), stats: {rounds: 0, correct: 0, coinsEarned: 0, packs: 0}, seasons: [], badges: {}};
+}
+function readProfile(p) {
+  const base = freshProfile();
+  const out = {...base, ...(p && typeof p === "object" ? p : {})};
+  out.stats = {...base.stats, ...out.stats};
+  if (!Array.isArray(out.seasons)) out.seasons = [];
+  if (!out.badges || typeof out.badges !== "object") out.badges = {};
+  return out;
+}
+let profile = readProfile(load('statstack_profile', null));
+// When progress last changed, so a cloud save and this device can tell which is newer
+let updatedAt = load('statstack_updated', 0) || 0;
 let streak = 0, multiplier = 1, roundNumber = 0;
 let player1, player2, currentStat, gameActive = false;
 
@@ -82,7 +97,7 @@ const wins  = ["Nice read", "Most people miss that", "Great eye for stats", "Kee
 const fails = ["87% got that wrong too", "Tough one", "Stats can be deceiving", "Even the pros miss that one"];
 
 // ─── SCREENS ────────────────────────────────────────────────────────────────
-const SCREENS = ["play", "packs", "collection"];
+const SCREENS = ["play", "packs", "collection", "profile"];
 const ALIASES = {home: "play", shop: "packs"}; // links from the previous layout
 let currentScreen = null;
 
@@ -100,6 +115,7 @@ function showScreen(name) {
   if (changed) FX.enter(document.querySelector(`.screen[data-screen="${name}"]`));
   if (name === "packs") renderShop();
   if (name === "collection") { updateCollStats(); renderColl(activeFilter); }
+  if (name === "profile") renderProfile();
   if (name === "play" && !player1) startNewRound();
   window.scrollTo(0, 0);
 }
@@ -225,6 +241,8 @@ function makeGuess(guess, fromKeyboard = false) {
   const v1 = player1[currentStat.key], v2 = player2[currentStat.key];
   const coinsBefore = coins, multiplierBefore = multiplier;
   const correct = (guess === "higher" && v2 >= v1) || (guess === "lower" && v2 <= v1);
+  profile.stats.rounds++;
+  if (!profile.seasons.includes(currentSeasonKey)) profile.seasons.push(currentSeasonKey);
 
   $("guessButtons").hidden = true;
   $("swipeHint").hidden = true;
@@ -239,6 +257,8 @@ function makeGuess(guess, fromKeyboard = false) {
     multiplier = Math.floor(streak / 3) + 1;
     const earned = 10 * multiplier;
     coins += earned;
+    profile.stats.correct++;
+    profile.stats.coinsEarned += earned;
     res.innerHTML = `Correct · +${earned}<small>${pick(wins)}</small>`;
     res.className = "result correct";
     vs.textContent = "✓";
@@ -254,6 +274,7 @@ function makeGuess(guess, fromKeyboard = false) {
     FX.feedback("wrong");
   }
   updateBoard();
+  progressChanged();
   $("verdict").hidden = false;
   FX.enter($("verdict"), {y: 12, duration: 200});
   FX.pop(vs, 1.15);
@@ -275,7 +296,9 @@ function updateBoard() {
   save('statstack_coins', coins);
   $("coins").textContent = coins.toLocaleString();
   $("streak").textContent = streak;
+  $("streak").parentElement.classList.toggle("hot", streak > 0);
   $("multiplier").textContent = multiplier + "×";
+  $("multiplier").parentElement.classList.toggle("flat", multiplier === 1);
   $("bestStreak").textContent = bestStreak;
 }
 
@@ -437,8 +460,10 @@ function buyPack() {
   const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
   ownedCards.push(card);
   save('statstack_cards', ownedCards);
+  profile.stats.packs++;
   updateBoard();
   openPack(card);
+  progressChanged();
   renderShop();
 }
 
@@ -588,6 +613,8 @@ async function revealPack() {
   slot.querySelector(".flipcard").focus({preventScroll: true});
   opening = null;
   renderShop();
+  // Badges from this pull wait for the reveal so they don't spoil it
+  setTimeout(() => checkBadges(true), 900);
 }
 
 // Shards fly out in the rarity colour: a few for rare, a shower for legendary
@@ -761,9 +788,297 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 }
 
+// ─── PROFILE & BADGES ───────────────────────────────────────────────────────
+function accuracy() { return profile.stats.rounds ? profile.stats.correct / profile.stats.rounds : 0; }
+function countRarity(r) { return ownedCards.filter(c => c.rarity === r).length; }
+function bestTeamCount() {
+  const n = {};
+  ownedCards.forEach(c => { n[c.team] = (n[c.team] || 0) + 1; });
+  return Math.max(0, ...Object.values(n));
+}
+const BADGES = [
+  {id: "first-win", name: "First Bucket", desc: "Win a round", glyph: "1", tier: "bronze", goal: 1, value: () => profile.stats.correct},
+  {id: "streak-5", name: "Heating Up", desc: "5 right in a row", glyph: "5", tier: "bronze", goal: 5, value: () => bestStreak},
+  {id: "streak-10", name: "On Fire", desc: "10 right in a row", glyph: "10", tier: "silver", goal: 10, value: () => bestStreak},
+  {id: "streak-20", name: "Unstoppable", desc: "20 right in a row", glyph: "20", tier: "gold", goal: 20, value: () => bestStreak},
+  {id: "correct-100", name: "Century", desc: "100 right answers", glyph: "100", tier: "silver", goal: 100, value: () => profile.stats.correct},
+  {id: "sharpshooter", name: "Sharpshooter", desc: "75% right over 50+ rounds", glyph: "%", tier: "gold", goal: 1,
+    value: () => (profile.stats.rounds >= 50 && accuracy() >= 0.75 ? 1 : 0),
+    meter: () => (profile.stats.rounds < 50 ? profile.stats.rounds / 50 : accuracy() / 0.75),
+    label: () => (profile.stats.rounds < 50 ? `${profile.stats.rounds} / 50 rounds` : `${Math.round(accuracy() * 100)}% right, need 75%`)},
+  {id: "first-pack", name: "Rip It", desc: "Open a pack", glyph: "P", tier: "bronze", goal: 1, value: () => profile.stats.packs},
+  {id: "packs-10", name: "Pack Addict", desc: "Open 10 packs", glyph: "×10", tier: "silver", goal: 10, value: () => profile.stats.packs},
+  {id: "cards-25", name: "Collector", desc: "Own 25 cards", glyph: "25", tier: "silver", goal: 25, value: () => ownedCards.length},
+  {id: "epic", name: "Shiny", desc: "Pull an epic card", glyph: "E", tier: "silver", goal: 1, value: () => countRarity("epic")},
+  {id: "legendary", name: "Legend", desc: "Pull a legendary card", glyph: "★", tier: "gold", goal: 1, value: () => countRarity("legendary")},
+  {id: "team-5", name: "Team Player", desc: "5 cards from one team", glyph: "T", tier: "silver", goal: 5, value: bestTeamCount},
+  {id: "seasons-5", name: "Time Traveler", desc: "Play 5 different seasons", glyph: "ERA", tier: "silver", goal: 5, value: () => profile.seasons.length},
+  {id: "bankroll", name: "Bankroll", desc: "Hold 10,000 coins", glyph: "$", tier: "gold", goal: 10000, value: () => coins},
+];
+function medalHtml(b) { return `<span class="medal ${b.tier}" aria-hidden="true">${b.glyph}</span>`; }
+
+// Award any badge whose goal is met; announce=false backfills quietly
+function checkBadges(announce) {
+  if (opening) return;
+  const fresh = BADGES.filter(b => !profile.badges[b.id] && b.value() >= b.goal);
+  if (!fresh.length) return;
+  fresh.forEach(b => { profile.badges[b.id] = Date.now(); });
+  save('statstack_profile', profile);
+  if (announce) fresh.forEach((b, i) => setTimeout(() => toast(medalHtml(b), "Badge unlocked", b.name), i * 2600));
+  if (currentScreen === "profile") renderProfile();
+}
+
+// Every change to progress goes through here: saved locally, then to the cloud
+function progressChanged() {
+  updatedAt = Date.now();
+  save('statstack_profile', profile);
+  save('statstack_updated', updatedAt);
+  checkBadges(true);
+  Account.changed();
+}
+
+let toastTimer = null;
+function toast(iconHtml, title, text) {
+  const t = $("toast");
+  t.innerHTML = `${iconHtml}<div><strong>${esc(title)}</strong>${esc(text)}</div>`;
+  t.hidden = false;
+  FX.enter(t, {y: -8, duration: 220});
+  FX.haptic("reveal");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+
+// ─── SAVES (local and cloud) ────────────────────────────────────────────────
+function getSave() {
+  return {v: 1, coins, bestStreak, cards: ownedCards, profile, updatedAt};
+}
+function applySave(data) {
+  coins = parseInt(data.coins) || 0;
+  bestStreak = parseInt(data.bestStreak) || 0;
+  ownedCards = Array.isArray(data.cards) ? data.cards : [];
+  profile = readProfile(data.profile);
+  updatedAt = data.updatedAt || 0;
+  save('statstack_coins', coins);
+  save('statstack_bestStreak', bestStreak);
+  save('statstack_cards', ownedCards);
+  save('statstack_profile', profile);
+  save('statstack_updated', updatedAt);
+  checkBadges(false);
+  updateBoard();
+  renderIdentity();
+  if (currentScreen === "profile") renderProfile();
+  if (currentScreen === "collection") { updateCollStats(); renderColl(activeFilter); }
+  if (currentScreen === "packs") renderShop();
+}
+function resetSave() {
+  streak = 0;
+  multiplier = 1;
+  applySave({coins: 0, bestStreak: 0, cards: [], profile: freshProfile(), updatedAt: 0});
+}
+
+// ─── ACCOUNT UI ─────────────────────────────────────────────────────────────
+const GUEST_ICON = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4.5"></circle><path d="M3.5 21c1.4-4.6 4.6-7 8.5-7s7.1 2.4 8.5 7z"></path></svg>`;
+const GOOGLE_ICON = `<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#ffc107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#ff3d00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4caf50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976d2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>`;
+const NAME_RULE = /^[A-Za-z0-9_]{3,16}$/;
+const AVATAR_TEAMS = [...new Set(SEASONS[SEASON_KEYS[0]].players.map(p => p.team))]
+  .sort((a, b) => team(a).name.localeCompare(team(b).name));
+
+function initials(name) {
+  const parts = name.split("_").filter(Boolean);
+  return (parts.length > 1 ? parts[0][0] + parts[1][0] : name.slice(0, 2)).toUpperCase();
+}
+function paintAvatar(el, teamCode, name) {
+  if (teamCode) paint(el, teamCode);
+  else ["--team-bg", "--team-bg2", "--team-accent"].forEach(v => el.style.removeProperty(v));
+  el.innerHTML = name ? esc(initials(name)) : GUEST_ICON;
+}
+function syncText() {
+  if (Account.sync() === "busy") return "Syncing…";
+  if (Account.sync() === "error") return "Couldn't reach the server. Your next move will try again.";
+  const t = Account.lastSync();
+  return t ? `Synced at ${new Date(t).toLocaleTimeString(undefined, {hour: "numeric", minute: "2-digit"})}` : "Synced";
+}
+
+function renderIdentity() {
+  const label = profile.name || "Guest";
+  document.querySelectorAll("[data-avatar]").forEach(el => paintAvatar(el, profile.team, profile.name));
+  document.querySelectorAll("[data-username]").forEach(el => { el.textContent = label; });
+  const signedIn = Account.signedIn();
+  $("menuSub").textContent = signedIn ? Account.email() : Account.enabled ? "Not signed in" : "Saved on this device";
+  $("menuSignIn").hidden = signedIn || !Account.enabled;
+  $("menuSignOut").hidden = !signedIn;
+  const dot = $("syncDot");
+  dot.hidden = !signedIn;
+  dot.className = `sync-dot${Account.sync() === "busy" ? " busy" : Account.sync() === "error" ? " error" : ""}`;
+  $("avatarBtn").setAttribute("aria-label", `Account menu, ${label}${signedIn ? ", signed in" : ""}`);
+}
+
+function renderProfile() {
+  renderIdentity();
+  $("profileStatus").textContent = Account.signedIn() ? "Signed in · synced across devices"
+    : Account.enabled ? "Guest · sign in to keep progress everywhere" : "Guest · saved on this device";
+  $("profileSince").textContent = `Playing since ${new Date(profile.created).toLocaleDateString(undefined, {month: "long", year: "numeric"})}`;
+  if (document.activeElement !== $("nameInput")) $("nameInput").value = profile.name;
+  if (document.activeElement !== $("teamSelect")) $("teamSelect").value = profile.team;
+
+  const s = profile.stats;
+  const rows = [
+    ["Rounds", s.rounds], ["Right", s.correct], ["Accuracy", s.rounds ? `${Math.round(accuracy() * 100)}%` : "—"],
+    ["Best streak", bestStreak], ["Coins earned", s.coinsEarned], ["Packs opened", s.packs],
+    ["Cards", ownedCards.length], ["Legendaries", countRarity("legendary")], ["Seasons played", profile.seasons.length],
+  ];
+  $("statGrid").innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${typeof v === "number" ? v.toLocaleString() : v}</dd></div>`).join("");
+
+  const earned = BADGES.filter(b => profile.badges[b.id]).length;
+  $("badgeCount").textContent = `${earned} of ${BADGES.length}`;
+  $("badgeGrid").innerHTML = BADGES.map(b => {
+    const at = profile.badges[b.id];
+    if (at) {
+      const day = new Date(at).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"});
+      return `<li class="badge">${medalHtml(b)}<div class="badge-text"><strong>${b.name}</strong><span>${b.desc}</span><span>Earned ${day}</span></div></li>`;
+    }
+    const have = Math.min(b.value(), b.goal);
+    const frac = Math.max(0, Math.min(1, b.meter ? b.meter() : have / b.goal));
+    const label = b.label ? b.label() : `${have.toLocaleString()} / ${b.goal.toLocaleString()}`;
+    return `<li class="badge locked">${medalHtml(b)}<div class="badge-text"><strong>${b.name}</strong><span>${b.desc}</span>
+      <div class="badge-meter" role="progressbar" aria-label="${b.name} progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(frac * 100)}"><b style="width:${frac * 100}%"></b></div>
+      <span>${label}</span></div></li>`;
+  }).join("");
+  renderAccountPanel();
+}
+
+let panelPhase = null;
+function renderAccountPanel() {
+  const panel = $("accountPanel"), phase = Account.phase();
+  // Sync updates only touch the status line, so typing in a field isn't lost
+  if (phase === panelPhase) {
+    const line = panel.querySelector(".sync-line");
+    if (line) line.innerHTML = `<span class="${$("syncDot").className}"></span>${esc(syncText())}`;
+    return;
+  }
+  panelPhase = phase;
+  const views = {
+    off: `<h2 class="panel-title">Cloud sync</h2>
+      <p>Sign-in isn't switched on for this site yet, so your progress is saved in this browser.</p>`,
+    loading: `<h2 class="panel-title">Account</h2><p>Checking your account…</p>`,
+    "signed-out": `<h2 class="panel-title">Sign in</h2>
+      <p>Keep your coins, cards and badges on every device.</p>
+      <form class="stack" id="emailForm" novalidate>
+        <label class="field"><span>Email</span><input type="email" id="emailInput" autocomplete="email" inputmode="email" required></label>
+        <p class="form-msg" id="emailMsg" role="status" aria-live="polite"></p>
+        <button class="pill pill-solid pill-sm" type="submit">Email me a sign-in link</button>
+      </form>
+      ${Account.google ? `<div class="or">or</div><button class="pill pill-ghost pill-sm" id="googleBtn" type="button">${GOOGLE_ICON}Continue with Google</button>` : ""}`,
+    sent: `<h2 class="panel-title">Check your email</h2>
+      <p>We sent a sign-in link to <strong>${esc(Account.email())}</strong>. Open it on this device, or type the code from the email.</p>
+      <form class="stack" id="codeForm" novalidate>
+        <label class="field"><span>Code</span><input id="codeInput" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10"></label>
+        <p class="form-msg" id="codeMsg" role="status" aria-live="polite"></p>
+        <div class="btn-row"><button class="pill pill-solid pill-sm" type="submit">Sign in</button></div>
+        <button class="link-btn" type="button" id="otherEmail">Use a different email</button>
+      </form>`,
+    "signed-in": `<h2 class="panel-title">Account</h2>
+      <p>Signed in as <strong>${esc(Account.email())}</strong></p>
+      <p class="sync-line"><span class="${$("syncDot").className}"></span>${esc(syncText())}</p>
+      <button class="pill pill-ghost pill-sm" id="signOutBtn" type="button">Sign out</button>`,
+  };
+  panel.innerHTML = views[phase] || views.off;
+}
+
+function setMsg(id, text, kind = "") {
+  $(id).textContent = text;
+  $(id).className = `form-msg${kind ? " " + kind : ""}`;
+}
+async function signOut() {
+  if (!confirm("Sign out? Your progress stays in your account, and this device starts fresh.")) return;
+  await Account.signOut();
+  toast(`<span class="avatar avatar-md">${GUEST_ICON}</span>`, "Signed out", "Sign in again any time to pick up where you left off.");
+}
+
+$("accountPanel").addEventListener("submit", async e => {
+  e.preventDefault();
+  const btn = e.target.querySelector("button[type=submit]");
+  if (e.target.id === "emailForm") {
+    const email = $("emailInput").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return setMsg("emailMsg", "Enter a valid email address.", "err");
+    btn.disabled = true;
+    setMsg("emailMsg", "Sending…");
+    const err = await Account.sendLink(email);
+    btn.disabled = false;
+    if (err) setMsg("emailMsg", err, "err");
+  } else if (e.target.id === "codeForm") {
+    const code = $("codeInput").value.replace(/\D/g, "");
+    if (code.length < 6) return setMsg("codeMsg", "Enter the code from the email.", "err");
+    btn.disabled = true;
+    setMsg("codeMsg", "Checking…");
+    const err = await Account.verifyCode(code);
+    btn.disabled = false;
+    if (err) setMsg("codeMsg", "That code didn't work. Check it, or ask for a new email.", "err");
+  }
+});
+$("accountPanel").addEventListener("click", e => {
+  if (e.target.closest("#googleBtn")) Account.signInWithGoogle();
+  else if (e.target.closest("#otherEmail")) Account.cancelLink();
+  else if (e.target.closest("#signOutBtn")) signOut();
+});
+$("menuSignOut").addEventListener("click", signOut);
+
+$("teamSelect").innerHTML = `<option value="">No team</option>` +
+  AVATAR_TEAMS.map(t => `<option value="${t}">${esc(team(t).name)}</option>`).join("");
+// Preview the colours on the big avatar before saving
+$("teamSelect").addEventListener("change", () => {
+  paintAvatar(document.querySelector(".avatar-xl"), $("teamSelect").value, $("nameInput").value.trim() || profile.name);
+});
+$("profileForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const name = $("nameInput").value.trim();
+  if (name && !NAME_RULE.test(name)) return setMsg("nameMsg", "Use 3–16 letters, numbers or underscores.", "err");
+  if (name && name !== profile.name && Account.signedIn()) {
+    setMsg("nameMsg", "Checking…");
+    const err = await Account.claimName(name);
+    if (err) return setMsg("nameMsg", err, "err");
+  }
+  profile.name = name;
+  profile.team = $("teamSelect").value;
+  progressChanged();
+  renderProfile();
+  setMsg("nameMsg", "Saved.", "ok");
+});
+
+function setMenu(open) {
+  const menu = $("accountMenu"), btn = $("avatarBtn");
+  if (open === !menu.hidden) return;
+  menu.hidden = !open;
+  btn.setAttribute("aria-expanded", String(open));
+  if (open) {
+    FX.enter(menu, {y: -6, duration: 160});
+    menu.querySelector(".menu-item:not([hidden])").focus({preventScroll: true});
+  }
+}
+$("avatarBtn").addEventListener("click", () => setMenu($("accountMenu").hidden));
+document.addEventListener("click", e => { if (!e.target.closest(".account")) setMenu(false); });
+$("accountMenu").addEventListener("click", e => { if (e.target.closest(".menu-item")) setMenu(false); });
+$("accountMenu").addEventListener("keydown", e => {
+  const items = [...$("accountMenu").querySelectorAll(".menu-item:not([hidden])")];
+  const i = items.indexOf(document.activeElement);
+  if (e.key === "Escape") { setMenu(false); $("avatarBtn").focus(); }
+  else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length].focus();
+  } else if (e.key === "Tab") setMenu(false);
+});
+
+Account.on(() => {
+  renderIdentity();
+  if (currentScreen === "profile") renderProfile();
+});
+
 // ─── INIT ───────────────────────────────────────────────────────────────────
 $("seasonSelect").innerHTML = SEASON_KEYS
   .map(k => `<option value="${k}">${SEASONS[k].label}</option>`).join("");
 setSeason(currentSeasonKey);
+checkBadges(false);
 updateBoard();
+renderIdentity();
 showScreen(location.hash.slice(1) || "play");
+Account.init({get: getSave, apply: applySave, reset: resetSave});
