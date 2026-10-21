@@ -21,12 +21,26 @@ let ownedCards = load('statstack_cards', []);
 if (!Array.isArray(ownedCards)) ownedCards = [];
 // Profile: username, avatar team, lifetime totals and earned badges
 function freshProfile() {
-  return {name: "", team: "", created: Date.now(), stats: {rounds: 0, correct: 0, coinsEarned: 0, packs: 0}, seasons: [], badges: {}};
+  return {
+    name: "", team: "", created: Date.now(),
+    stats: {rounds: 0, correct: 0, coinsEarned: 0, packs: 0, sold: 0, whoRounds: 0, whoCorrect: 0, whoBest: 0, dailies: 0, dailyPerfect: 0},
+    seasons: [], badges: {},
+    // Best Higher or Lower streak this ISO week, for the weekly leaderboard
+    weekly: {week: "", best: 0},
+    // Today's Daily Challenge: puzzle number, one entry per answer, final score
+    daily: {num: 0, answers: [], done: false, score: 0},
+    lineup: {name: "", slots: [null, null, null, null, null, null, null, null]},
+  };
 }
 function readProfile(p) {
   const base = freshProfile();
   const out = {...base, ...(p && typeof p === "object" ? p : {})};
   out.stats = {...base.stats, ...out.stats};
+  out.weekly = {...base.weekly, ...out.weekly};
+  out.daily = {...base.daily, ...out.daily};
+  if (!Array.isArray(out.daily.answers)) out.daily.answers = [];
+  out.lineup = {...base.lineup, ...out.lineup};
+  if (!Array.isArray(out.lineup.slots) || out.lineup.slots.length !== 8) out.lineup.slots = base.lineup.slots;
   if (!Array.isArray(out.seasons)) out.seasons = [];
   if (!out.badges || typeof out.badges !== "object") out.badges = {};
   return out;
@@ -49,7 +63,6 @@ const statTypes = [
   {key: "spg", label: "steals per game", short: "STL"},
   {key: "bpg", label: "blocks per game", short: "BLK"}
 ];
-const PACK_PRICE = 2000;
 
 // ─── IMAGES ─────────────────────────────────────────────────────────────────
 // Transparent silhouette used when a headshot is missing or blocked
@@ -97,7 +110,11 @@ const wins  = ["Nice read", "Most people miss that", "Great eye for stats", "Kee
 const fails = ["87% got that wrong too", "Tough one", "Stats can be deceiving", "Even the pros miss that one"];
 
 // ─── SCREENS ────────────────────────────────────────────────────────────────
-const SCREENS = ["play", "packs", "collection", "profile"];
+const SCREENS = ["play", "who", "daily", "packs", "collection", "locker", "ranks", "profile"];
+// Which top-bar tab each screen belongs to
+const SCREEN_TAB = {play: "play", who: "play", daily: "daily", packs: "packs", collection: "cards", locker: "cards", ranks: "ranks"};
+// Screens defined in js/modes.js register how to draw themselves here
+const SCREEN_HOOKS = {};
 const ALIASES = {home: "play", shop: "packs"}; // links from the previous layout
 let currentScreen = null;
 
@@ -108,11 +125,19 @@ function showScreen(name) {
   currentScreen = name;
   document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.dataset.screen === name));
   document.querySelectorAll(".nav-link").forEach(t => {
-    const on = t.dataset.tab === name;
+    const on = t.dataset.tab === SCREEN_TAB[name];
     t.classList.toggle("active", on);
     if (on) t.setAttribute("aria-current", "page"); else t.removeAttribute("aria-current");
   });
+  const modes = name === "play" || name === "who";
+  $("modebar").hidden = !modes;
+  document.querySelectorAll(".mode-link").forEach(l => {
+    const on = l.dataset.mode === name;
+    l.classList.toggle("active", on);
+    if (on) l.setAttribute("aria-current", "page"); else l.removeAttribute("aria-current");
+  });
   if (changed) FX.enter(document.querySelector(`.screen[data-screen="${name}"]`));
+  if (SCREEN_HOOKS[name]) SCREEN_HOOKS[name]();
   if (name === "packs") renderShop();
   if (name === "collection") { updateCollStats(); renderColl(activeFilter); }
   if (name === "profile") renderProfile();
@@ -135,6 +160,7 @@ function changeSeason() {
   updateBoard();
   if (currentScreen === "play") startNewRound();
   if (currentScreen === "packs") renderShop();
+  if (SCREEN_HOOKS.seasonChanged) SCREEN_HOOKS.seasonChanged();
 }
 
 // ─── PLAYER SELECTION ───────────────────────────────────────────────────────
@@ -288,11 +314,23 @@ function makeGuess(guess, fromKeyboard = false) {
 }
 function nextRound() { startNewRound(); }
 
+// ISO week in UTC, e.g. "2026-W43"; the leaderboard computes the same in SQL
+function isoWeek(d = new Date()) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const n = Math.ceil(((t - start) / 86400000 + 1) / 7);
+  return `${t.getUTCFullYear()}-W${String(n).padStart(2, "0")}`;
+}
 function updateBoard() {
   if (streak > bestStreak) {
     bestStreak = streak;
     save('statstack_bestStreak', bestStreak);
   }
+  const week = isoWeek();
+  if (profile.weekly.week !== week) profile.weekly = {week, best: 0};
+  if (streak > profile.weekly.best) profile.weekly.best = streak;
   save('statstack_coins', coins);
   $("coins").textContent = coins.toLocaleString();
   $("streak").textContent = streak;
@@ -440,32 +478,103 @@ function fitCardNames(root, min) {
 }
 
 // ─── PACKS ──────────────────────────────────────────────────────────────────
-function renderShop() {
-  $("shopCoins").textContent = coins.toLocaleString();
-  $("shopSeason").textContent = currentSeasonKey;
-  $("buyPackBtn").disabled = coins < PACK_PRICE || !!opening;
-  $("packNeed").textContent = coins < PACK_PRICE
-    ? `You need ${(PACK_PRICE - coins).toLocaleString()} more coins. Keep your streak going.`
-    : "";
+// Every card in the game, each tagged with its season
+const ALL_CARDS = SEASON_KEYS.flatMap(k => SEASONS[k].players.map(p => ({...p, season: k})));
+// Old team codes roll up into today's franchise for Team Packs
+const FRANCHISE = {SEA: "OKC", NJN: "BKN", WSB: "WAS", VAN: "MEM", KCK: "SAC", NOH: "NOP", CHH: "CHA"};
+const franchise = code => FRANCHISE[code] || code;
+const ERAS = [
+  {id: "retro", name: "Retro", label: "1984–2000", seasons: k => parseInt(k) < 2000},
+  {id: "2000s", name: "2000s", label: "2001–2010", seasons: k => parseInt(k) >= 2000 && parseInt(k) < 2011},
+  {id: "2010s", name: "2010s", label: "2012–2020", seasons: k => parseInt(k) >= 2011 && parseInt(k) < 2021},
+  {id: "modern", name: "Modern", label: "2021–2026", seasons: k => parseInt(k) >= 2021},
+];
+const STANDARD_ODDS = {legendary: 2, epic: 8, rare: 20, common: 70};
+const PACK_TYPES = [
+  {id: "player", name: "Player Pack", price: 2000, odds: STANDARD_ODDS,
+    blurb: () => `One card from ${currentSeasonKey}, the season you're playing.`,
+    pool: () => ALL_CARDS.filter(c => c.season === currentSeasonKey)},
+  {id: "era", name: "Era Pack", price: 3000, odds: STANDARD_ODDS, choose: "era",
+    blurb: () => "One card from any season in the era you pick.",
+    pool: era => ALL_CARDS.filter(c => ERAS.find(e => e.id === era).seasons(c.season))},
+  {id: "team", name: "Team Pack", price: 3500, odds: STANDARD_ODDS, choose: "team",
+    blurb: () => "One card from your team's history, every season in the game.",
+    pool: t => ALL_CARDS.filter(c => franchise(c.team) === t)},
+  {id: "elite", name: "Elite Pack", price: 8000, odds: {legendary: 8, epic: 32, rare: 60, common: 0},
+    blurb: () => "Rare or better, guaranteed. From any season.",
+    pool: () => ALL_CARDS},
+];
+const PACK_PRICE = PACK_TYPES[0].price;
+let packChoice = load('statstack_packChoice', {era: "retro", team: "BOS"}) || {era: "retro", team: "BOS"};
+
+function rollRarity(odds) {
+  let r = Math.random() * 100;
+  for (const tier of ["legendary", "epic", "rare", "common"]) {
+    if (r < odds[tier]) return tier;
+    r -= odds[tier];
+  }
+  return "common";
 }
 
-function buyPack() {
-  if (coins < PACK_PRICE || opening) return;
-  coins -= PACK_PRICE;
-  const r = Math.random() * 100;
-  const rarity = r < 2 ? "legendary" : r < 10 ? "epic" : r < 30 ? "rare" : "common";
-  let pool = currentPlayers.filter(p => p.rarity === rarity);
-  if (!pool.length) pool = currentPlayers;
+function renderShop() {
+  $("shopCoins").textContent = coins.toLocaleString();
+  const teams = [...new Set(ALL_CARDS.map(c => franchise(c.team)))].sort((a, b) => team(a).name.localeCompare(team(b).name));
+  $("shop").innerHTML = PACK_TYPES.map(t => {
+    const short = Math.max(0, t.price - coins);
+    const chooser = t.choose === "era"
+      ? `<label class="field pack-choose"><span>Era</span><select data-choose="era">${ERAS.map(e => `<option value="${e.id}"${packChoice.era === e.id ? " selected" : ""}>${e.name} · ${e.label}</option>`).join("")}</select></label>`
+      : t.choose === "team"
+      ? `<label class="field pack-choose"><span>Team</span><select data-choose="team">${teams.map(c => `<option value="${c}"${packChoice.team === c ? " selected" : ""}>${esc(team(c).name)}</option>`).join("")}</select></label>`
+      : "";
+    const odds = ["legendary", "epic", "rare", "common"].filter(r => t.odds[r])
+      .map(r => `<li><span class="chip ${r}">${r[0].toUpperCase() + r.slice(1)}</span> ${t.odds[r]}%</li>`).join("");
+    return `<article class="product" data-pack="${t.id}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
+      <div class="product-art pack-${t.id}" aria-hidden="true"><span class="display">STAT<br>STACK</span><span class="pack-art-sub">${t.name}</span></div>
+      <div class="product-info">
+        <h2>${t.name}</h2>
+        <p class="pack-price"><span class="coin" aria-hidden="true"></span><strong>${t.price.toLocaleString()}</strong></p>
+        <p class="muted">${esc(t.blurb())}</p>
+        ${chooser}
+        <ul class="odds">${odds}</ul>
+        <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} pill-sm" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>Open · ${t.price.toLocaleString()}</button>
+        ${short ? `<p class="muted pack-need">${short.toLocaleString()} more coins</p>` : ""}
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function buyPack(typeId = "player") {
+  const type = PACK_TYPES.find(t => t.id === typeId);
+  if (!type || coins < type.price || opening) return;
+  const all = type.pool(packChoice[type.choose]);
+  if (!all.length) return;
+  coins -= type.price;
+  // Fall back a tier at a time if this pool has no card of the rolled rarity
+  const order = ["legendary", "epic", "rare", "common"];
+  let i = order.indexOf(rollRarity(type.odds)), pool = [];
+  while (i < order.length && !(pool = all.filter(c => c.rarity === order[i])).length) i++;
+  if (!pool.length) pool = all;
   // The card is saved before the animation, so leaving mid-opening never loses it
-  const card = {...pick(pool), season: currentSeasonKey, pulled: Date.now()};
+  const card = {...pick(pool), pulled: Date.now()};
   ownedCards.push(card);
   save('statstack_cards', ownedCards);
   profile.stats.packs++;
   updateBoard();
-  openPack(card);
+  openPack(card, type);
   progressChanged();
   renderShop();
 }
+$("shop").addEventListener("click", e => {
+  const btn = e.target.closest("[data-buy]");
+  if (btn) buyPack(btn.dataset.buy);
+});
+$("shop").addEventListener("change", e => {
+  const sel = e.target.closest("[data-choose]");
+  if (!sel) return;
+  packChoice[sel.dataset.choose] = sel.value;
+  save('statstack_packChoice', packChoice);
+  renderShop();
+});
 
 // ─── PACK OPENING ───────────────────────────────────────────────────────────
 // The pack shakes at least three times, and the glow climbs one rarity tier
@@ -498,12 +607,15 @@ function setTier(stage, tier) {
   TIERS.forEach(t => stage.classList.toggle(`tier-${t}`, t === tier));
 }
 
-async function openPack(card) {
+async function openPack(card, type = PACK_TYPES[0]) {
   const stage = $("packStage"), pack = $("pack"), level = TIERS.indexOf(card.rarity);
   opening = {card, level, skipped: false, ready: false, anims: [], wake: null};
   stage.className = "pack-stage";
   setTier(stage, "common");
   pack.hidden = false;
+  pack.className = `pack pack-${type.id}`;
+  pack.setAttribute("style", type.id === "team" ? teamVars(franchise(card.team)) : "");
+  $("packName").textContent = type.name;
   pack.querySelector(".pack-top").style.cssText = "";
   $("mystery").hidden = true;
   $("packHint").textContent = "Tap to skip";
@@ -656,33 +768,102 @@ document.addEventListener("keydown", e => {
 });
 
 // ─── COLLECTION ─────────────────────────────────────────────────────────────
+// Duplicates (same player and season) stack into one tile and can be sold
+const SELL_VALUE = {common: 150, rare: 400, epic: 1000, legendary: 3000};
+const cardKey = c => `${c.name}|${c.season}`;
 let activeFilter = "all";
+
+function groupCards(list) {
+  const groups = new Map();
+  for (const c of list) {
+    const k = cardKey(c);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(c);
+  }
+  return groups;
+}
+function dupeSummary() {
+  let count = 0, value = 0;
+  for (const copies of groupCards(ownedCards).values()) {
+    count += copies.length - 1;
+    value += (copies.length - 1) * SELL_VALUE[copies[0].rarity];
+  }
+  return {count, value};
+}
 
 function updateCollStats() {
   $("totalCards").textContent = ownedCards.length;
   ["legendary", "epic", "rare", "common"].forEach(r => {
     $(r + "Count").textContent = ownedCards.filter(c => c.rarity === r).length;
   });
+  const d = dupeSummary();
+  $("dupeNote").textContent = d.count ? `${d.count} duplicate${d.count === 1 ? "" : "s"} worth ${d.value.toLocaleString()} coins` : "";
+  $("sellAllBtn").hidden = !d.count;
+  $("sellAllBtn").textContent = `Quick sell all duplicates · +${d.value.toLocaleString()}`;
 }
 function renderColl(r) {
   activeFilter = r;
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === r));
   const g = $("collectionGrid");
-  const cards = r === "all" ? ownedCards : ownedCards.filter(c => c.rarity === r);
-  if (!cards.length) {
+  const groups = [...groupCards(ownedCards).entries()]
+    .filter(([, copies]) => r === "all" || copies[0].rarity === r)
+    .map(([key, copies]) => ({key, copies, newest: Math.max(...copies.map(c => c.pulled || 0))}))
+    .sort((a, b) => b.newest - a.newest);
+  if (!groups.length) {
     g.innerHTML = `<p class="empty">${r === "all" ? "No cards yet. Earn 2,000 coins and open a pack." : `No ${r} cards yet.`}</p>`;
     return;
   }
-  g.innerHTML = cards.slice().reverse().map(c => cardHtml(c)).join("");
+  g.innerHTML = groups.map(({key, copies}) => {
+    const n = copies.length, card = copies[n - 1], value = SELL_VALUE[card.rarity];
+    return `<div class="card-cell">${cardHtml(card)}${n > 1 ? `<div class="cell-foot">
+      <span class="dupe-chip" title="${n} copies">×${n}</span>
+      <button class="sell-btn" type="button" data-sell="${esc(key)}" aria-label="Quick sell one ${esc(card.name)} for ${value} coins">Quick sell · <span class="coin" aria-hidden="true"></span>${value.toLocaleString()}</button>
+    </div>` : ""}</div>`;
+  }).join("");
   fitCardNames(g, 14);
   [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
 }
+
+// Remove the newest extra copies, always keeping one of each card
+function sellCopies(key, howMany) {
+  const copies = ownedCards.filter(c => cardKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
+  const sell = copies.slice(0, Math.min(howMany, copies.length - 1));
+  if (!sell.length) return 0;
+  ownedCards = ownedCards.filter(c => !sell.includes(c));
+  const value = sell.length * SELL_VALUE[sell[0].rarity];
+  coins += value;
+  profile.stats.sold += sell.length;
+  return value;
+}
+function afterSale(value, text) {
+  save('statstack_cards', ownedCards);
+  updateBoard();
+  progressChanged();
+  updateCollStats();
+  renderColl(activeFilter);
+  FX.pop($("coins"));
+  FX.feedback("correct");
+  toast(`<span class="toast-icon coin-icon" aria-hidden="true"><span class="coin"></span></span>`, `+${value.toLocaleString()} coins`, text);
+}
+$("collectionGrid").addEventListener("click", e => {
+  const btn = e.target.closest("[data-sell]");
+  if (!btn) return;
+  const name = btn.dataset.sell.split("|")[0];
+  const value = sellCopies(btn.dataset.sell, 1);
+  if (value) afterSale(value, `Sold a duplicate ${name}.`);
+});
+$("sellAllBtn").addEventListener("click", () => {
+  const d = dupeSummary();
+  if (!d.count || !confirm(`Quick sell ${d.count} duplicate card${d.count === 1 ? "" : "s"} for ${d.value.toLocaleString()} coins? You keep one of every card.`)) return;
+  let total = 0;
+  for (const key of groupCards(ownedCards).keys()) total += sellCopies(key, Infinity);
+  afterSale(total, `Sold ${d.count} duplicate${d.count === 1 ? "" : "s"}. One of every card stays in your collection.`);
+});
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
 $("higherBtn").addEventListener("click", () => makeGuess("higher"));
 $("lowerBtn").addEventListener("click", () => makeGuess("lower"));
 $("nextBtn").addEventListener("click", nextRound);
-$("buyPackBtn").addEventListener("click", buyPack);
 $("seasonSelect").addEventListener("change", changeSeason);
 document.querySelectorAll(".filter-btn").forEach(b => b.addEventListener("click", () => renderColl(b.dataset.filter)));
 $("settingsBtn").addEventListener("click", () => $("settingsDialog").showModal());
@@ -813,6 +994,11 @@ const BADGES = [
   {id: "legendary", name: "Legend", desc: "Pull a legendary card", glyph: "★", tier: "gold", goal: 1, value: () => countRarity("legendary")},
   {id: "team-5", name: "Team Player", desc: "5 cards from one team", glyph: "T", tier: "silver", goal: 5, value: bestTeamCount},
   {id: "seasons-5", name: "Time Traveler", desc: "Play 5 different seasons", glyph: "ERA", tier: "silver", goal: 5, value: () => profile.seasons.length},
+  {id: "detective", name: "Detective", desc: "25 right in Who Am I?", glyph: "?", tier: "silver", goal: 25, value: () => profile.stats.whoCorrect},
+  {id: "daily-5", name: "Daily Grind", desc: "Finish 5 Daily Challenges", glyph: "D5", tier: "silver", goal: 5, value: () => profile.stats.dailies},
+  {id: "perfect-day", name: "Perfect Day", desc: "10 out of 10 on a Daily Challenge", glyph: "✓", tier: "gold", goal: 1, value: () => profile.stats.dailyPerfect},
+  {id: "full-five", name: "Starting Five", desc: "Fill your Locker's starting five", glyph: "OVR", tier: "bronze", goal: 5, value: () => profile.lineup.slots.slice(0, 5).filter(Boolean).length},
+  {id: "cash-out", name: "Cash Out", desc: "Quick sell a duplicate", glyph: "¢", tier: "bronze", goal: 1, value: () => profile.stats.sold},
   {id: "bankroll", name: "Bankroll", desc: "Hold 10,000 coins", glyph: "$", tier: "gold", goal: 10000, value: () => coins},
 ];
 function medalHtml(b) { return `<span class="medal ${b.tier}" aria-hidden="true">${b.glyph}</span>`; }
@@ -869,6 +1055,7 @@ function applySave(data) {
   if (currentScreen === "profile") renderProfile();
   if (currentScreen === "collection") { updateCollStats(); renderColl(activeFilter); }
   if (currentScreen === "packs") renderShop();
+  if (SCREEN_HOOKS[currentScreen]) SCREEN_HOOKS[currentScreen]();
 }
 function resetSave() {
   streak = 0;
@@ -1153,10 +1340,13 @@ setSeason(currentSeasonKey);
 checkBadges(false);
 updateBoard();
 renderIdentity();
-showScreen(location.hash.slice(1) || "play");
-Account.init({
-  get: getSave,
-  apply: applySave,
-  reset: resetSave,
-  rename: name => { profile.name = name; progressChanged(); renderIdentity(); },
+// js/modes.js loads after this file, so the first screen is drawn once it has
+document.addEventListener("DOMContentLoaded", () => {
+  showScreen(location.hash.slice(1) || "play");
+  Account.init({
+    get: getSave,
+    apply: applySave,
+    reset: resetSave,
+    rename: name => { profile.name = name; progressChanged(); renderIdentity(); },
+  });
 });

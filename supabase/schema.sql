@@ -42,3 +42,45 @@ as $$
   select not exists (select 1 from public.saves where lower(username) = lower(name));
 $$;
 grant execute on function public.username_available(text) to anon, authenticated;
+
+-- Leaderboards. Saves stay private; this function hands out only usernames,
+-- team colours and one number per player, for players who picked a username.
+create or replace function public.as_score(j jsonb)
+returns int
+language sql
+immutable
+as $$
+  select case when jsonb_typeof(j) = 'number'
+    then least(greatest((j #>> '{}')::numeric, 0), 1000000)::int end;
+$$;
+
+create or replace function public.leaderboard(board text, puzzle int default null)
+returns table (username text, team text, score int)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select s.username, left(coalesce(s.data #>> '{profile,team}', ''), 4) as team, v.score
+  from public.saves s
+  cross join lateral (
+    select case board
+      when 'alltime' then public.as_score(s.data -> 'bestStreak')
+      when 'week' then case
+        when s.data #>> '{profile,weekly,week}' = to_char(now() at time zone 'utc', 'IYYY-"W"IW')
+        then public.as_score(s.data #> '{profile,weekly,best}') end
+      when 'legendaries' then (
+        select count(*)::int
+        from jsonb_array_elements(case when jsonb_typeof(s.data -> 'cards') = 'array' then s.data -> 'cards' else '[]'::jsonb end) c
+        where c ->> 'rarity' = 'legendary')
+      when 'daily' then case
+        when public.as_score(s.data #> '{profile,daily,num}') = puzzle
+         and s.data #>> '{profile,daily,done}' = 'true'
+        then least(public.as_score(s.data #> '{profile,daily,score}'), 10) end
+    end as score
+  ) v
+  where s.username is not null and v.score is not null and (v.score > 0 or board = 'daily')
+  order by v.score desc, s.updated_at asc
+  limit 50;
+$$;
+grant execute on function public.leaderboard(text, int) to anon, authenticated;

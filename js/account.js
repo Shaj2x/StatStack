@@ -87,9 +87,27 @@ const Account = (() => {
         stats,
         badges,
         seasons: [...new Set([...(lp.seasons || []), ...(cp.seasons || [])])],
+        weekly: mergeWeekly(lp.weekly, cp.weekly),
+        daily: mergeDaily(lp.daily, cp.daily),
         created: Math.min(lp.created || Date.now(), cp.created || Date.now()),
       },
     };
+  }
+
+  // Same week: keep the better streak. Same puzzle: keep the run that got further.
+  function mergeWeekly(a = {}, b = {}) {
+    if (a.week !== b.week) return (a.week || "") > (b.week || "") ? a : b;
+    return {week: a.week, best: Math.max(a.best || 0, b.best || 0)};
+  }
+  function mergeDaily(a = {}, b = {}) {
+    if ((a.num || 0) !== (b.num || 0)) return (a.num || 0) > (b.num || 0) ? a : b;
+    return ((a.answers || []).length >= (b.answers || []).length) ? a : b;
+  }
+
+  async function leaderboard(board, puzzle) {
+    if (!client) return {error: "off"};
+    const {data, error} = await client.rpc("leaderboard", {board, puzzle: puzzle == null ? null : puzzle});
+    return error ? {error: friendly(error)} : {rows: data || []};
   }
 
   function setSync(s) { sync = s; emit(); }
@@ -202,6 +220,6 @@ const Account = (() => {
     email: () => (user ? user.email : ""),
     signedIn: () => !!user,
     recovering: () => recovering,
-    changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
+    leaderboard, changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
   };
 })();

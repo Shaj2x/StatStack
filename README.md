@@ -7,6 +7,7 @@ NBA Higher or Lower: a static web app with no build step.
 - `js/app.js` has the game logic
 - `js/data.js` has the player database
 - `js/teams.js` has team names and the colours used for each player's half
+- `js/modes.js` has the Daily Challenge, Who Am I?, the Locker and the leaderboards
 - `js/account.js` handles sign-in and cloud saves; `js/config.js` holds its keys
 
 ## Refreshing player data
@@ -72,8 +73,9 @@ Setting up a Supabase project:
 
 1. Create a free project at supabase.com.
 2. In **SQL Editor**, run `supabase/schema.sql`. It makes the `saves` table
-   (each player can only read and write their own row) and a check that a
-   username is free. Running it again is safe.
+   (each player can only read and write their own row), a check that a
+   username is free, and the `leaderboard` function, which shares only
+   usernames, team colours and scores. Running it again is safe.
 3. Under **Authentication → Sign In / Providers → Email**, keep Email on and
    turn **Confirm email** off, so new accounts can play straight away.
 4. Under **Authentication → URL Configuration**, set the Site URL to
@@ -92,6 +94,25 @@ When a player signs in, cards from the device and the account are combined;
 coins and settings come from whichever was played most recently, and records
 (best streak, totals, badges) keep the higher value. Signing out leaves the
 progress in the account and resets the device to a fresh guest.
+
+## Game modes
+
+- **Higher or Lower** and **Who Am I?** share the Play tab and the season
+  picker. Who Am I? shows a season's stat line and four names; the wrong
+  names are the players with the closest numbers that season.
+- **Daily Challenge**: ten matchups a day, the same for everyone, built from
+  a generator seeded with the day number (Daily #1 is 21 October 2026).
+  Players come from every season, the two numbers are within about 6%, and
+  every other question sets a star against a lesser player who usually edges
+  them. One try per day; results share as an emoji grid.
+- **Packs**: Player (current season), Era, Team (a franchise across every
+  season) and Elite (rare or better). Duplicates stack in the collection and
+  can be quick-sold by rarity.
+- **Locker**: a starting five and a bench from your own cards, with an OVR
+  from each player's ranks in their season.
+- **Ranks**: today's Daily, best streak this week and all-time, and most
+  legendaries. Scores come from players' own saves, so they are trusted as
+  sent.
 
 ## Installable app
 
