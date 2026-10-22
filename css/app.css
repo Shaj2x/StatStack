@@ -123,7 +123,7 @@ button, select { font: inherit; color: inherit; }
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--line);
 }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; text-decoration: none; }
 .brand-mark { display: flex; flex-direction: column; gap: 3px; transform: skewX(-14deg); }
 .brand-mark i { display: block; height: 5px; border-radius: 2px; background: var(--gold); }
 .brand-mark i:nth-child(1) { width: 12px; margin-left: 10px; background: var(--text); }
@@ -147,7 +147,7 @@ button, select { font: inherit; color: inherit; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
   text-decoration: none;
@@ -163,7 +163,7 @@ button, select { font: inherit; color: inherit; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 40px;
+  height: 46px;
   padding-left: 12px;
   border-radius: 999px;
   background: var(--ink-1);
@@ -225,8 +225,8 @@ button, select { font: inherit; color: inherit; }
 .account { position: relative; }
 .avatar-btn {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
   padding: 0;
   border-radius: 50%;
   border: 2px solid var(--line);
@@ -964,7 +964,7 @@ button, select { font: inherit; color: inherit; }
 .coll-counts dd { font-family: var(--display); font-size: 36px; font-variant-numeric: tabular-nums; }
 .filters { display: flex; flex-wrap: wrap; gap: 8px; }
 .filter-btn {
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 16px;
   border-radius: 999px;
   border: 1px solid var(--line);
@@ -1010,7 +1010,7 @@ button, select { font: inherit; color: inherit; }
 .pill-ghost { background: transparent; color: var(--text); border-color: var(--line); }
 .pill-ghost:hover { border-color: var(--muted); }
 .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
-.link-btn { padding: 0; border: 0; background: none; color: var(--gold); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; align-self: flex-start; }
+.link-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; border: 0; background: none; color: var(--gold); font: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; align-self: flex-start; }
 .or { display: flex; align-items: center; gap: 12px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
 .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .sync-line { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--muted); }
@@ -1181,7 +1181,7 @@ button, select { font: inherit; color: inherit; }
 }
 .modebar[hidden] { display: none; }
 .mode-switch { display: flex; gap: 2px; padding: 4px; border-radius: 999px; background: var(--ink-1); border: 1px solid var(--line); min-width: 0; }
-.mode-link { display: inline-flex; align-items: center; min-height: 34px; padding: 0 16px; border-radius: 999px; text-decoration: none; color: var(--muted); font-weight: 800; font-size: 14px; white-space: nowrap; }
+.mode-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; text-decoration: none; color: var(--muted); font-weight: 800; font-size: 14px; white-space: nowrap; }
 .mode-link.active { background: var(--gold); color: var(--ink-0); }
 @media (hover: hover) { .mode-link:not(.active):hover { color: var(--text); } }
 @media (max-width: 520px) {
@@ -1195,9 +1195,29 @@ button, select { font: inherit; color: inherit; }
 }
 
 /* Small tabs above a page title (Collection / Locker) */
-.sub-tabs { display: flex; gap: 18px; margin-bottom: 8px; }
-.sub-tab { padding-bottom: 4px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 14px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none; }
-.sub-tab.active { color: var(--gold); border-color: var(--gold); }
+/* Collection / Sets / Locker: a segmented control with full-size tap targets */
+.sub-tabs { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; border-radius: 999px; background: var(--ink-1); border: 1px solid var(--line); }
+.sub-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 800;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.sub-tab.active { background: var(--solid); color: var(--on-solid); }
+@media (hover: hover) { .sub-tab:not(.active):hover { color: var(--text); background: var(--ink-2); } }
+@media (max-width: 520px) {
+  .page-head > div:has(> .sub-tabs) { flex: 1 1 100%; }
+  .sub-tabs { display: flex; width: 100%; }
+  .sub-tab { flex: 1; padding: 0 8px; }
+}
 
 /* ─── Pack shop ─────────────────────────────────────────────────────────── */
 .shop { flex: 1 1 560px; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
@@ -1229,7 +1249,7 @@ button, select { font: inherit; color: inherit; }
 .product .odds { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
 .product .odds li { gap: 6px; }
 .product .chip { font-size: 10px; padding: 2px 8px; }
-.pack-choose select { height: 42px; font-size: 15px; }
+.pack-choose select { height: 46px; font-size: 15px; }
 .pack-need { margin-top: -4px; }
 .pill-gold { background: linear-gradient(135deg, #fff6cf, #ffc93c 50%, #c9971c); color: #2a1d00; border-color: #ffc93c; }
 /* The pack on the opening stage takes its type's look */
@@ -1247,7 +1267,7 @@ button, select { font: inherit; color: inherit; }
 .card-cell { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .cell-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .dupe-chip { padding: 3px 10px; border-radius: 999px; background: var(--ink-2); border: 1px solid var(--line); font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.sell-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.sell-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; }
 .sell-btn:hover { border-color: var(--gold); }
 .sell-btn .coin { width: 14px; height: 14px; }
 .coin-icon { background: color-mix(in srgb, var(--gold) 18%, var(--ink-2)); }
@@ -1416,7 +1436,7 @@ button, select { font: inherit; color: inherit; }
 
 /* ─── Leaderboards ──────────────────────────────────────────────────────── */
 .board-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
-.board-tab { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+.board-tab { min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
 .board-tab.active { background: var(--solid); color: var(--on-solid); border-color: var(--solid); }
 .board { max-width: 760px; }
 .board-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
@@ -1777,7 +1797,7 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
   .hud-multi { height: 28px; padding: 0 8px; font-size: 13px; }
   .account { order: 3; }
   .nav { order: 4; flex: 1 1 100%; min-width: 0; justify-self: auto; font-size: 14px; }
-  .nav-link { flex: 1; min-width: 0; padding: 0 6px; gap: 6px; min-height: 36px; }
+  .nav-link { flex: 1; min-width: 0; padding: 0 6px; gap: 6px; min-height: 44px; }
   .toast { top: calc(124px + env(safe-area-inset-top, 0px)); }
 }
 @media (max-width: 520px) {
