@@ -1460,6 +1460,36 @@ button, select { font: inherit; color: inherit; }
 .pick-text span { font-size: 13px; color: var(--muted); }
 .picker-empty { padding: 20px; text-align: center; }
 
+/* ─── What's new ────────────────────────────────────────────────────────── */
+.news-dialog { width: min(600px, calc(100% - 32px)); }
+.news-dialog h2 { font-size: 40px; }
+.news-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.news-list li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 14px; background: var(--ink-0); border: 1px solid var(--line); }
+.news-list li div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.news-list strong { font-size: 15px; }
+.news-list li div span { font-size: 13px; color: var(--muted); }
+.news-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: var(--display); font-size: 18px; color: var(--ink-0); }
+.n-daily { background: var(--gold); }
+.n-who { background: var(--r-epic); }
+.n-packs { background: linear-gradient(160deg, #0e2240 0%, #13305a 50%, #005a91 50%, #003a5e 100%); }
+.n-packs i { width: 16px; height: 22px; border-radius: 3px; background: rgba(255, 255, 255, 0.85); }
+.n-sets { background: var(--r-rare); }
+.n-locker { background: linear-gradient(180deg, #8a5a2b, #4a3018); color: var(--gold); }
+.n-ranks { background: var(--r-legendary); }
+.n-reward { background: var(--good); }
+.news-go { min-height: 36px; display: inline-flex; align-items: center; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.news-go:hover { border-color: var(--gold); color: var(--gold); }
+.news-dialog .pill { width: 100%; min-width: 0; }
+@media (max-width: 480px) {
+  .news-list { gap: 6px; }
+  .news-list li { grid-template-columns: 34px minmax(0, 1fr) auto; gap: 10px; padding: 8px 10px; }
+  .news-icon { width: 34px; height: 34px; border-radius: 10px; font-size: 14px; }
+  .news-list strong { font-size: 14px; }
+  .news-list li div span { font-size: 12px; }
+  .news-go { min-height: 32px; padding: 0 10px; font-size: 12px; }
+  .news-dialog h2 { font-size: 32px; }
+}
+
 /* ─── Daily login reward ────────────────────────────────────────────────── */
 .login-dialog { width: min(560px, calc(100% - 32px)); text-align: center; }
 .login-dialog .settings-inner { align-items: center; }

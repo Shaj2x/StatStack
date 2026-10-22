@@ -412,6 +412,30 @@
     </div>
   </dialog>
 
+  <dialog class="settings news-dialog" id="newsDialog" aria-labelledby="newsTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow">Update</p>
+          <h2 id="newsTitle">What's new</h2>
+        </div>
+        <button class="icon-btn" type="button" id="newsClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <ul class="news-list">
+        <li><span class="news-icon n-daily" aria-hidden="true">10</span><div><strong>Daily Challenge</strong><span>Ten hard matchups a day, the same for everyone. Share your score.</span></div><a class="news-go" href="#daily">Play</a></li>
+        <li><span class="news-icon n-who" aria-hidden="true">?</span><div><strong>Who Am I?</strong><span>Read a stat line, name the player. Under the Play tab.</span></div><a class="news-go" href="#who">Try it</a></li>
+        <li><span class="news-icon n-packs" aria-hidden="true"><i></i></span><div><strong>New packs</strong><span>Era, Team and Elite packs. Quick sell your duplicates.</span></div><a class="news-go" href="#packs">Shop</a></li>
+        <li><span class="news-icon n-sets" aria-hidden="true">54</span><div><strong>Sets</strong><span>54 sets to complete, with coins at every milestone.</span></div><a class="news-go" href="#book">View</a></li>
+        <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a starting five with 2K-style ratings and play games for coins.</span></div><a class="news-go" href="#locker">Build</a></li>
+        <li><span class="news-icon n-ranks" aria-hidden="true">#1</span><div><strong>Leaderboards</strong><span>Daily scores, streaks and legendaries. Sign in to get on the board.</span></div><a class="news-go" href="#ranks">Ranks</a></li>
+        <li><span class="news-icon n-reward" aria-hidden="true">7</span><div><strong>Daily rewards</strong><span>Coins every day you play, and a free pack on day 7.</span></div></li>
+      </ul>
+      <button class="pill pill-solid" id="newsDone" type="button">Let's play</button>
+    </div>
+  </dialog>
+
   <dialog class="settings login-dialog" id="loginDialog" aria-labelledby="loginTitle">
     <div class="settings-inner">
       <p class="eyebrow" id="loginEyebrow">Daily reward</p>

@@ -21,7 +21,7 @@ const nextLoginStreak = () => (profile.login.last === yesterdayKey() ? profile.l
 function showLogin() {
   // Wait for a signed-in save to arrive first, so a reward claimed on
   // another device today isn't offered twice
-  if (!loginDue() || Account.phase() === "loading" || document.querySelector("dialog[open]")) return;
+  if (!loginDue() || Account.phase() === "loading" || document.querySelector("dialog[open]") || newsUnseen()) return;
   const n = nextLoginStreak(), slot = (n - 1) % 7, reward = LOGIN_REWARDS[slot];
   $("loginEyebrow").textContent = n === 1 && profile.login.streak > 1 ? "Streak reset · new run" : "Daily reward";
   $("loginTitle").textContent = n === 1 ? "Day 1" : `Day ${n} in a row`;
@@ -60,7 +60,39 @@ $("loginClaim").addEventListener("click", claimLogin);
 // Closing without claiming still claims: the reward is never lost
 $("loginDialog").addEventListener("cancel", e => { e.preventDefault(); claimLogin(); });
 
-document.addEventListener("DOMContentLoaded", () => setTimeout(showLogin, 900));
+// ─── WHAT'S NEW ─────────────────────────────────────────────────────────────
+// Shown once per device for each update, before the daily reward. Bump
+// NEWS_VERSION (and the list in index.html) when there's something new.
+const NEWS_VERSION = "2026-10";
+let newsShownOnce = false; // if storage is blocked, still only show it once per visit
+function newsUnseen() {
+  let seen = "";
+  try { seen = localStorage.getItem("statstack_news") || ""; } catch { return !newsShownOnce; }
+  return seen !== NEWS_VERSION && !newsShownOnce;
+}
+function showNews() {
+  if (!newsUnseen() || document.querySelector("dialog[open]")) return false;
+  newsShownOnce = true;
+  $("newsDialog").showModal();
+  $("newsDone").focus({preventScroll: true});
+  $("newsDialog").scrollTop = 0;
+  return true;
+}
+function closeNews() {
+  newsShownOnce = true;
+  try { localStorage.setItem("statstack_news", NEWS_VERSION); } catch { /* fine */ }
+  if ($("newsDialog").open) $("newsDialog").close();
+}
+$("newsDone").addEventListener("click", closeNews);
+$("newsClose").addEventListener("click", closeNews);
+// Each row's button goes straight to that feature
+$("newsDialog").addEventListener("click", e => { if (e.target.closest(".news-go")) closeNews(); });
+$("newsDialog").addEventListener("close", () => {
+  try { localStorage.setItem("statstack_news", NEWS_VERSION); } catch { /* fine */ }
+  setTimeout(showLogin, 400);
+});
+
+document.addEventListener("DOMContentLoaded", () => setTimeout(() => { if (!showNews()) showLogin(); }, 900));
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") showLogin(); });
 Account.on(() => setTimeout(showLogin, 300));
 
