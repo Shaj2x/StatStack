@@ -21,7 +21,7 @@ const nextLoginStreak = () => (profile.login.last === yesterdayKey() ? profile.l
 function showLogin() {
   // Wait for a signed-in save to arrive first, so a reward claimed on
   // another device today isn't offered twice
-  if (!loginDue() || Account.phase() === "loading" || document.querySelector("dialog[open]") || newsUnseen() || incoming) return;
+  if (!loginDue() || Account.phase() === "loading" || !accountSettled() || document.querySelector("dialog[open]") || newsUnseen() || incoming) return;
   const n = nextLoginStreak(), slot = (n - 1) % 7, reward = LOGIN_REWARDS[slot];
   $("loginEyebrow").textContent = n === 1 && profile.login.streak > 1 ? "Streak reset · new run" : "Daily reward";
   $("loginTitle").textContent = n === 1 ? "Day 1" : `Day ${n} in a row`;
@@ -61,35 +61,57 @@ $("loginClaim").addEventListener("click", claimLogin);
 $("loginDialog").addEventListener("cancel", e => { e.preventDefault(); claimLogin(); });
 
 // ─── WHAT'S NEW ─────────────────────────────────────────────────────────────
-// Shown once per device for each update, before the daily reward. Bump
+// Shown once per account for each update, before the daily reward. Guests
+// never see it. The account remembers it, so other devices skip it too. Bump
 // NEWS_VERSION (and the list in index.html) when there's something new.
 const NEWS_VERSION = "2026-10b";
 let newsShownOnce = false; // if storage is blocked, still only show it once per visit
+// A signed-in save has arrived (or can't), so per-account choices are safe to make
+const accountSettled = () => !Account.signedIn() || Account.lastSync() > 0 || Account.sync() === "error";
 function newsUnseen() {
-  let seen = "";
-  try { seen = localStorage.getItem("statstack_news") || ""; } catch { return !newsShownOnce; }
-  return seen !== NEWS_VERSION && !newsShownOnce;
+  if (newsShownOnce || !Account.signedIn() || !accountSettled()) return false;
+  let seenHere = "";
+  try { seenHere = localStorage.getItem("statstack_news") || ""; } catch { /* fine */ }
+  return profile.newsSeen !== NEWS_VERSION && seenHere !== NEWS_VERSION;
 }
 function showNews() {
   if (!newsUnseen() || document.querySelector("dialog[open]") || incoming) return false;
   newsShownOnce = true;
+  setNewsExpanded(false);
   $("newsDialog").showModal();
   $("newsDone").focus({preventScroll: true});
   $("newsDialog").scrollTop = 0;
   return true;
 }
-function closeNews() {
+function markNewsSeen() {
   newsShownOnce = true;
   try { localStorage.setItem("statstack_news", NEWS_VERSION); } catch { /* fine */ }
+  if (profile.newsSeen === NEWS_VERSION) return;
+  profile.newsSeen = NEWS_VERSION;
+  progressChanged();
+}
+function closeNews() {
+  markNewsSeen();
   if ($("newsDialog").open) $("newsDialog").close();
 }
+function setNewsExpanded(open) {
+  const hidden = $("newsList").children.length - 3;
+  $("newsDialog").classList.toggle("expanded", open);
+  $("newsMore").setAttribute("aria-expanded", String(open));
+  $("newsMore").textContent = open ? "Show less" : `See ${hidden} more`;
+}
+$("newsMore").addEventListener("click", () => {
+  const open = !$("newsDialog").classList.contains("expanded");
+  setNewsExpanded(open);
+  if (open) FX.enter($("newsList").children[3], {y: 6, duration: 220});
+});
 $("newsDone").addEventListener("click", closeNews);
 $("newsClose").addEventListener("click", closeNews);
 // Each row's button goes straight to that feature
 $("newsDialog").addEventListener("click", e => { if (e.target.closest(".news-go")) closeNews(); });
 $("newsSettings").addEventListener("click", () => { closeNews(); setTimeout(() => { renderThemeOptions(); $("settingsDialog").showModal(); }, 50); });
 $("newsDialog").addEventListener("close", () => {
-  try { localStorage.setItem("statstack_news", NEWS_VERSION); } catch { /* fine */ }
+  markNewsSeen();
   setTimeout(showLogin, 400);
 });
 
@@ -178,7 +200,7 @@ function shareLineup() {
 // Opening order: a challenge link first, then What's new, then the daily reward
 document.addEventListener("DOMContentLoaded", () => setTimeout(() => { if (!showChallenge() && !showNews()) showLogin(); }, 900));
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") showLogin(); });
-Account.on(() => setTimeout(showLogin, 300));
+Account.on(() => setTimeout(() => { if (!showNews()) showLogin(); }, 300));
 
 // ─── SETS AND THE COLLECTION BOOK ───────────────────────────────────────────
 // Every set lists real cards, so missing ones show as gaps. Each pays at three

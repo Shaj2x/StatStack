@@ -44,6 +44,8 @@ function freshProfile() {
     trophyChecked: "",
     // Three cards pinned to the profile, shown to other players
     showcase: [null, null, null],
+    // Last What's new update this account has seen
+    newsSeen: "",
   };
 }
 function readProfile(p) {

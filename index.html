@@ -477,17 +477,18 @@
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
         </button>
       </div>
-      <ul class="news-list">
+      <ul class="news-list" id="newsList">
         <li><span class="news-icon n-daily" aria-hidden="true">10</span><div><strong>Daily Challenge</strong><span>Ten hard matchups a day, the same for everyone. Share your score to challenge friends.</span></div><a class="news-go" href="#daily">Play</a></li>
+        <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a five with 2K-style ratings, play for coins, or challenge a friend's five.</span></div><a class="news-go" href="#locker">Build</a></li>
+        <li><span class="news-icon n-ranks" aria-hidden="true">#1</span><div><strong>Ranks and seasons</strong><span>Monthly seasons with a trophy for the top 10. Tap any name to see their cards.</span></div><a class="news-go" href="#ranks">Ranks</a></li>
         <li><span class="news-icon n-who" aria-hidden="true">?</span><div><strong>Who Am I?</strong><span>Read a stat line, name the player. Under the Play tab.</span></div><a class="news-go" href="#who">Try it</a></li>
         <li><span class="news-icon n-packs" aria-hidden="true"><i></i></span><div><strong>New packs</strong><span>Era, Team and Elite packs. Quick sell your duplicates.</span></div><a class="news-go" href="#packs">Shop</a></li>
         <li><span class="news-icon n-sets" aria-hidden="true">54</span><div><strong>Sets</strong><span>54 sets to complete, with coins at every milestone.</span></div><a class="news-go" href="#book">View</a></li>
-        <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a five with 2K-style ratings, play for coins, or challenge a friend's five.</span></div><a class="news-go" href="#locker">Build</a></li>
-        <li><span class="news-icon n-ranks" aria-hidden="true">#1</span><div><strong>Ranks and seasons</strong><span>Monthly seasons with a trophy for the top 10. Tap any name to see their cards.</span></div><a class="news-go" href="#ranks">Ranks</a></li>
         <li><span class="news-icon n-show" aria-hidden="true">★</span><div><strong>Profile showcase</strong><span>Pin your three best cards for everyone to see.</span></div><a class="news-go" href="#profile">Pin</a></li>
         <li><span class="news-icon n-theme" aria-hidden="true">Aa</span><div><strong>Themes and sound</strong><span>Light mode, colour themes and a new sound pack, in Settings.</span></div><button class="news-go" type="button" id="newsSettings">Settings</button></li>
         <li><span class="news-icon n-reward" aria-hidden="true">7</span><div><strong>Daily rewards</strong><span>Coins every day you play, and a free pack on day 7.</span></div></li>
       </ul>
+      <button class="news-more" id="newsMore" type="button" aria-expanded="false" aria-controls="newsList">See 6 more</button>
       <button class="pill pill-solid" id="newsDone" type="button">Let's play</button>
     </div>
   </dialog>

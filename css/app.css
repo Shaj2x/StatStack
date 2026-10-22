@@ -1609,7 +1609,11 @@ button, select { font: inherit; color: inherit; }
 .theme-note { font-size: 13px; }
 
 /* ─── What's new ────────────────────────────────────────────────────────── */
-.news-dialog { width: min(600px, calc(100% - 32px)); }
+dialog.news-dialog { width: min(720px, calc(100% - 32px)); }
+/* Three highlights first; the rest open with "See more" */
+.news-dialog:not(.expanded) .news-list li:nth-child(n+4) { display: none; }
+.news-more { align-self: center; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: none; color: var(--gold); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; }
+.news-more:hover { background: var(--ink-0); }
 .news-dialog h2 { font-size: 40px; }
 .news-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .news-list li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 14px; background: var(--ink-0); border: 1px solid var(--line); }
