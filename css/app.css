@@ -1859,3 +1859,26 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 @media (prefers-reduced-transparency: reduce) {
   .topbar, .verdict { background: var(--ink-0); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
+
+/* Arena nav: tabs, mode switch and season picker use the headline face */
+.nav-link, .mode-link, .season-select, .sub-tab {
+  font-family: var(--display);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.nav { font-size: 20px; }
+.mode-link { font-size: 19px; }
+.season-select { font-size: 20px; }
+.sub-tab { font-size: 19px; }
+@media (max-width: 1000px) { .nav { font-size: 19px; } }
+@media (max-width: 520px) {
+  .mode-link { font-size: 17px; }
+  .season-select { font-size: 18px; }
+}
+@media (max-width: 360px) {
+  .nav { font-size: 16px; }
+  .mode-link { font-size: 14px; padding: 0 7px; }
+  .season-select { font-size: 15px; padding-right: 22px; background-position: right 8px center; }
+  .season-chip { padding-left: 8px; }
+}
