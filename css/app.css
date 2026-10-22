@@ -16,6 +16,7 @@
   /* Arena type: Big Shoulders Display for names, stats and titles; DM Sans for the rest */
   --display: "Big Shoulders Display", "Impact", "Arial Narrow", sans-serif;
   --display-w: 900;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --body: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
@@ -1860,25 +1861,20 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
   .topbar, .verdict { background: var(--ink-0); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
-/* Arena nav: tabs, mode switch and season picker use the headline face */
+/* Scoreboard nav: tabs, mode switch and season picker in monospaced capitals */
 .nav-link, .mode-link, .season-select, .sub-tab {
-  font-family: var(--display);
-  font-weight: 800;
+  font-family: var(--mono);
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 }
-.nav { font-size: 20px; }
-.mode-link { font-size: 19px; }
-.season-select { font-size: 20px; }
-.sub-tab { font-size: 19px; }
-@media (max-width: 1000px) { .nav { font-size: 19px; } }
-@media (max-width: 520px) {
-  .mode-link { font-size: 17px; }
-  .season-select { font-size: 18px; }
-}
+.nav { font-size: 13px; }
+.mode-link { font-size: 13px; }
+.season-select { font-size: 13px; }
+.sub-tab { font-size: 13px; }
 @media (max-width: 360px) {
-  .nav { font-size: 16px; }
-  .mode-link { font-size: 14px; padding: 0 7px; }
-  .season-select { font-size: 15px; padding-right: 22px; background-position: right 8px center; }
+  .nav { font-size: 11.5px; }
+  .mode-link { font-size: 11.5px; padding: 0 7px; }
+  .season-select { font-size: 12px; padding-right: 22px; background-position: right 8px center; }
   .season-chip { padding-left: 8px; }
 }
