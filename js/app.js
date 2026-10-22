@@ -569,7 +569,7 @@ const PACK_TYPES = [
     pool: () => ALL_CARDS},
 ];
 const PACK_PRICE = PACK_TYPES[0].price;
-let packChoice = load('statstack_packChoice', {era: "retro", team: "BOS"}) || {era: "retro", team: "BOS"};
+let packChoice = {era: "retro", team: "BOS", pack: "player", ...load('statstack_packChoice', {})};
 
 function rollRarity(odds) {
   let r = Math.random() * 100;
@@ -580,32 +580,91 @@ function rollRarity(odds) {
   return "common";
 }
 
+// The shop: a shelf of packs to pick from, and a counter with the picked
+// pack's odds, its best cards, how much of it you own, and the buy button
 function renderShop() {
   $("shopCoins").textContent = coins.toLocaleString();
-  const teams = [...new Set(ALL_CARDS.map(c => franchise(c.team)))].sort((a, b) => team(a).name.localeCompare(team(b).name));
-  $("shop").innerHTML = PACK_TYPES.map(t => {
-    const freeCount = t.id === "player" ? profile.freePacks.player : 0;
-    const short = freeCount ? 0 : Math.max(0, t.price - coins);
-    const chooser = t.choose === "era"
-      ? `<label class="field pack-choose"><span>Era</span><select data-choose="era">${ERAS.map(e => `<option value="${e.id}"${packChoice.era === e.id ? " selected" : ""}>${e.name} · ${e.label}</option>`).join("")}</select></label>`
-      : t.choose === "team"
-      ? `<label class="field pack-choose"><span>Team</span><select data-choose="team">${teams.map(c => `<option value="${c}"${packChoice.team === c ? " selected" : ""}>${esc(team(c).name)}</option>`).join("")}</select></label>`
-      : "";
-    const odds = ["legendary", "epic", "rare", "common"].filter(r => t.odds[r])
-      .map(r => `<li><span class="chip ${r}">${r[0].toUpperCase() + r.slice(1)}</span> ${t.odds[r]}%</li>`).join("");
-    return `<article class="product" data-pack="${t.id}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
-      <div class="product-art pack-${t.id}" aria-hidden="true"><span class="display">STAT<br>STACK</span><span class="pack-art-sub">${t.name}</span></div>
-      <div class="product-info">
+  const sel = PACK_TYPES.find(t => t.id === packChoice.pack) || PACK_TYPES[0];
+  $("shop").innerHTML = `<div class="shelf" role="radiogroup" aria-label="Pick a pack">${PACK_TYPES.map(t => {
+    const free = t.id === "player" ? profile.freePacks.player : 0, on = t === sel;
+    return `<button class="shelf-pack${on ? " on" : ""}${!free && coins < t.price ? " short" : ""}" type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-select="${t.id}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
+      <span class="foil pack-${t.id}" aria-hidden="true"><span class="foil-shine"></span><span class="display">STAT<br>STACK</span><span class="pack-art-sub">${t.name}</span>${free ? `<span class="foil-free">${free} free</span>` : ""}</span>
+      <span class="shelf-name">${t.name}</span>
+      <span class="shelf-price"><span class="coin" aria-hidden="true"></span>${free ? "Free" : t.price.toLocaleString()}</span>
+    </button>`;
+  }).join("")}</div>${counterHtml(sel)}`;
+  renderRecentPulls();
+}
+
+function counterHtml(t) {
+  const free = t.id === "player" ? profile.freePacks.player : 0;
+  const short = free ? 0 : Math.max(0, t.price - coins);
+  const pool = t.pool(packChoice[t.choose]).filter(c => t.odds[c.rarity]);
+  const owned = new Set(ownedCards.map(cardKey));
+  const have = pool.filter(c => owned.has(cardKey(c))).length;
+  // The three best players in the pack, each player once
+  const chase = [];
+  for (const c of pool.slice().sort((x, y) => cardOvr(y) - cardOvr(x) || y.ppg - x.ppg)) {
+    if (!chase.some(o => o.name === c.name)) chase.push(c);
+    if (chase.length === 3) break;
+  }
+  const teams = [...new Set(ALL_CARDS.map(c => franchise(c.team)))].sort((x, y) => team(x).name.localeCompare(team(y).name));
+  const chooser = t.choose === "era"
+    ? `<div class="era-chips" role="radiogroup" aria-label="Era">${ERAS.map(e => `<button class="era-chip${packChoice.era === e.id ? " on" : ""}" type="button" role="radio" aria-checked="${packChoice.era === e.id}" data-era="${e.id}"><strong>${e.name}</strong><span>${e.label}</span></button>`).join("")}</div>`
+    : t.choose === "team"
+    ? `<label class="field pack-choose"><span>Team</span><select data-choose="team">${teams.map(c => `<option value="${c}"${packChoice.team === c ? " selected" : ""}>${esc(team(c).name)}</option>`).join("")}</select></label>`
+    : "";
+  const tiers = TIERS.slice().reverse().filter(r => t.odds[r]);
+  return `<section class="counter pack-tone-${t.id}" aria-label="${t.name}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
+    <div class="counter-main">
+      <div class="counter-head">
         <h2>${t.name}</h2>
-        <p class="pack-price"><span class="coin" aria-hidden="true"></span><strong>${t.price.toLocaleString()}</strong></p>
         <p class="muted">${esc(t.blurb())}</p>
-        ${chooser}
-        <ul class="odds">${odds}</ul>
-        <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} pill-sm" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>${freeCount ? `Open free · ${freeCount} left` : `Open · ${t.price.toLocaleString()}`}</button>
-        ${short ? `<p class="muted pack-need">${short.toLocaleString()} more coins</p>` : ""}
       </div>
-    </article>`;
-  }).join("");
+      ${chooser}
+      <div class="odds-block">
+        <div class="odds-bar" role="img" aria-label="Odds: ${tiers.map(r => `${r} ${t.odds[r]}%`).join(", ")}">${tiers.map(r => `<i class="${r}" style="flex:${t.odds[r]}"></i>`).join("")}</div>
+        <ul class="odds-key">${tiers.map(r => `<li class="${r}"><b></b>${r[0].toUpperCase() + r.slice(1)} <strong>${t.odds[r]}%</strong></li>`).join("")}</ul>
+      </div>
+      <div class="chase">
+        <h3>Chase cards</h3>
+        <div class="chase-row">${chase.map(c => `<span class="chase-card${owned.has(cardKey(c)) ? " owned" : ""}">${miniTile(c)}${owned.has(cardKey(c)) ? `<span class="chase-owned">Owned</span>` : ""}</span>`).join("")}</div>
+      </div>
+    </div>
+    <div class="counter-buy">
+      <div class="own-meter">
+        <span>You own <strong>${have.toLocaleString()}</strong> of ${pool.length.toLocaleString()} cards in this pack</span>
+        <span class="meter"><i style="width:${pool.length ? Math.max(have ? 2 : 0, Math.round(100 * have / pool.length)) : 0}%"></i></span>
+      </div>
+      <p class="buy-price"><span class="coin" aria-hidden="true"></span>${free ? "Free" : t.price.toLocaleString()}</p>
+      <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} buy-btn" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>${free ? `Open free · ${free} left` : "Open pack"}</button>
+      ${short ? `<div class="save-up">
+        <span class="meter"><i style="width:${Math.round(100 * coins / t.price)}%"></i></span>
+        <span><strong>${short.toLocaleString()}</strong> more coins to go</span>
+        <span class="earn">Earn coins: <a href="#play">Play</a> · <a href="#daily">Daily</a> · <a href="#locker">Battles</a></span>
+      </div>` : ""}
+    </div>
+  </section>`;
+}
+
+// The reveal area shows your latest pulls until a pack is opened
+function renderRecentPulls() {
+  const recent = ownedCards.slice().sort((a, b) => (b.pulled || 0) - (a.pulled || 0)).slice(0, 6);
+  $("revealEmpty").innerHTML = recent.length
+    ? `<h3>Recent pulls</h3><div class="recent-row">${recent.map(c => `<span class="chase-card">${miniTile(c)}</span>`).join("")}</div>
+       <p class="muted">${profile.stats.packs.toLocaleString()} pack${profile.stats.packs === 1 ? "" : "s"} opened. Pick a pack and open it here.</p>`
+    : `<p class="muted">Your new card appears here.</p>`;
+}
+
+function selectPack(id, focus) {
+  if (!PACK_TYPES.some(t => t.id === id) || packChoice.pack === id) return;
+  packChoice.pack = id;
+  save('statstack_packChoice', packChoice);
+  FX.sound("tap");
+  renderShop();
+  const btn = $("shop").querySelector(`[data-select="${id}"]`);
+  if (focus) btn.focus({preventScroll: true});
+  FX.enter($("shop").querySelector(".counter"), {y: 8, duration: 220});
 }
 
 function buyPack(typeId = "player") {
@@ -633,7 +692,38 @@ function buyPack(typeId = "player") {
 }
 $("shop").addEventListener("click", e => {
   const btn = e.target.closest("[data-buy]");
-  if (btn) buyPack(btn.dataset.buy);
+  if (btn) return buyPack(btn.dataset.buy);
+  const pack = e.target.closest("[data-select]");
+  if (pack) return selectPack(pack.dataset.select);
+  const era = e.target.closest("[data-era]");
+  if (era && packChoice.era !== era.dataset.era) {
+    packChoice.era = era.dataset.era;
+    save('statstack_packChoice', packChoice);
+    renderShop();
+  }
+});
+// Arrow keys move along the shelf
+$("shop").addEventListener("keydown", e => {
+  const pack = e.target.closest("[data-select]");
+  if (!pack || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  e.preventDefault();
+  const i = PACK_TYPES.findIndex(t => t.id === pack.dataset.select);
+  const step = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+  selectPack(PACK_TYPES[(i + step + PACK_TYPES.length) % PACK_TYPES.length].id, true);
+});
+// Packs tilt toward the pointer, and their foil catches the light
+$("shop").addEventListener("pointermove", e => {
+  const foil = e.target.closest(".foil");
+  if (!foil || FX.reduced() || e.pointerType === "touch") return;
+  const r = foil.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+  foil.style.setProperty("--ry", `${(x - 0.5) * 22}deg`);
+  foil.style.setProperty("--rx", `${(0.5 - y) * 18}deg`);
+  foil.style.setProperty("--mx", `${x * 100}%`);
+  foil.style.setProperty("--my", `${y * 100}%`);
+});
+$("shop").addEventListener("pointerout", e => {
+  const foil = e.target.closest(".foil");
+  if (foil && !foil.contains(e.relatedTarget)) ["--rx", "--ry", "--mx", "--my"].forEach(v => foil.style.removeProperty(v));
 });
 $("shop").addEventListener("change", e => {
   const sel = e.target.closest("[data-choose]");
