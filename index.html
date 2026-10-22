@@ -4,6 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0b0d12">
+<script>
+// Apply the saved theme before anything draws, so the page never flashes the wrong colours
+(function () {
+  try {
+    var t = localStorage.getItem("statstack_theme") || "dark";
+    if (t === "auto") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    var r = document.documentElement, v = JSON.parse(localStorage.getItem("statstack_theme_vars") || "null");
+    if (t === "team" && !v) t = "dark";
+    r.dataset.theme = t;
+    if (t === "team") for (var k in v) r.style.setProperty(k, v[k]);
+  } catch (e) {}
+})();
+</script>
 <meta name="description" content="NBA Higher or Lower: guess whose stat is bigger, build a streak, collect player cards.">
 <title>StatStack - NBA Higher or Lower</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -15,7 +28,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800;900&family=DM+Sans:opsz,wght@9..40,400..800&family=JetBrains+Mono:wght@700&display=swap">
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -30,21 +43,24 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"></path></svg>
         <span>Play</span>
       </a>
+      <a class="nav-link" href="#daily" data-tab="daily">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path><path d="M9 15l2 2 4-4"></path></svg>
+        <span>Daily</span>
+      </a>
       <a class="nav-link" href="#packs" data-tab="packs">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M5 7h14M9 3l1 4M15 3l-1 4"></path></svg>
         <span>Packs</span>
       </a>
-      <a class="nav-link" href="#collection" data-tab="collection">
+      <a class="nav-link" href="#collection" data-tab="cards">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6" width="12" height="15" rx="2"></rect><path d="M8 3h11a2 2 0 0 1 2 2v12"></path></svg>
-        <span>Collection</span>
+        <span>Cards</span>
+      </a>
+      <a class="nav-link" href="#ranks" data-tab="ranks">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>
+        <span>Ranks</span>
       </a>
     </nav>
     <div class="topbar-right">
-      <label class="season-chip">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
-        <span class="visually-hidden">Season</span>
-        <select class="season-select" id="seasonSelect"></select>
-      </label>
       <div class="hud" aria-label="Your progress">
         <span class="hud-item hud-coins" title="Coins"><span class="coin" aria-hidden="true"></span><span class="visually-hidden">Coins</span><span id="coins">0</span></span>
         <span class="hud-item hud-streak" title="Streak"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c1.2 4 5.5 6.2 5.5 11.5A5.5 5.5 0 0 1 6.5 13.5c0-3 1.7-4.6 2.3-7.3 1.6 1.2 2.6 2.6 2.7 4.6C13 9 12.9 5.6 12 2z"></path></svg><span class="visually-hidden">Streak</span><span id="streak">0</span></span>
@@ -82,6 +98,17 @@
   </header>
 
   <main class="screens">
+    <div class="modebar" id="modebar" hidden>
+      <nav class="mode-switch" aria-label="Game mode">
+        <a class="mode-link" href="#play" data-mode="play">Higher or Lower</a>
+        <a class="mode-link" href="#who" data-mode="who">Who Am I?</a>
+      </nav>
+      <label class="season-chip">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>
+        <span class="visually-hidden">Season</span>
+        <select class="season-select" id="seasonSelect"></select>
+      </label>
+    </div>
     <!-- PLAY -->
     <section class="screen" id="screen-play" data-screen="play" aria-label="Game">
       <div class="duel" id="duel">
@@ -138,25 +165,7 @@
         <div class="balance"><span class="hud-label">Coins</span> <strong id="shopCoins">0</strong></div>
       </div>
       <div class="packs-layout">
-        <div class="pack-panel">
-          <div class="pack-art" aria-hidden="true">
-            <span class="display">STAT<br>STACK</span>
-            <span class="pack-art-sub">Player Pack</span>
-          </div>
-          <div class="pack-info">
-            <h2>Player Pack</h2>
-            <p class="pack-price"><strong>2,000</strong> coins</p>
-            <ul class="odds">
-              <li><span class="chip legendary">Legendary</span> 2%</li>
-              <li><span class="chip epic">Epic</span> 8%</li>
-              <li><span class="chip rare">Rare</span> 20%</li>
-              <li><span class="chip common">Common</span> 70%</li>
-            </ul>
-            <p class="muted">One card from <strong id="shopSeason">—</strong>, the season you're playing.</p>
-            <button class="pill pill-solid pill-wide" id="buyPackBtn" type="button">Open pack</button>
-            <p class="muted" id="packNeed"></p>
-          </div>
-        </div>
+        <div class="shop" id="shop"></div>
         <div class="reveal-slot">
           <div class="pack-stage" id="packStage" hidden>
             <div class="pack-glow" aria-hidden="true"></div>
@@ -168,7 +177,7 @@
               <div class="pack-top"><span>Tear here</span></div>
               <div class="pack-body">
                 <span class="display">STAT<br>STACK</span>
-                <span class="pack-art-sub">Player Pack</span>
+                <span class="pack-art-sub" id="packName">Player Pack</span>
               </div>
             </div>
             <div class="pack-flash" aria-hidden="true"></div>
@@ -184,7 +193,14 @@
     <!-- COLLECTION -->
     <section class="screen page" id="screen-collection" data-screen="collection" aria-labelledby="collTitle">
       <div class="page-head">
-        <h1 class="display" id="collTitle">Collection</h1>
+        <div>
+          <nav class="sub-tabs" aria-label="Cards">
+            <a class="sub-tab active" href="#collection" aria-current="page">Collection</a>
+            <a class="sub-tab" href="#book">Sets</a>
+            <a class="sub-tab" href="#locker">Locker</a>
+          </nav>
+          <h1 class="display" id="collTitle">Collection</h1>
+        </div>
         <dl class="coll-counts">
           <div><dt>Total</dt><dd id="totalCards">0</dd></div>
           <div><dt>Legendary</dt><dd id="legendaryCount">0</dd></div>
@@ -200,8 +216,130 @@
         <button class="filter-btn" type="button" data-filter="rare">Rare</button>
         <button class="filter-btn" type="button" data-filter="common">Common</button>
       </div>
+      <div class="coll-tools">
+        <p class="muted" id="dupeNote"></p>
+        <button class="pill pill-ghost pill-sm" id="sellAllBtn" type="button" hidden>Quick sell duplicates</button>
+      </div>
       <div class="cards-grid" id="collectionGrid"></div>
     </section>
+    <!-- WHO AM I? -->
+    <section class="screen page who" id="screen-who" data-screen="who" aria-labelledby="whoTitle">
+      <div class="who-layout">
+        <article class="who-card" id="whoCard">
+          <div class="who-top">
+            <p class="eyebrow" id="whoEyebrow">Who am I?</p>
+            <span class="who-season" id="whoSeason"></span>
+          </div>
+          <h1 class="display who-title" id="whoTitle">Who am I?</h1>
+          <img class="who-photo" id="whoPhoto" src="" alt="" hidden>
+          <dl class="who-stats" id="whoStats"></dl>
+          <div class="who-clue">
+            <button class="pill pill-ghost pill-sm" id="whoHint" type="button">Show team · half coins</button>
+            <span class="who-team" id="whoTeam" hidden></span>
+          </div>
+          <div class="who-options" id="whoOptions"></div>
+          <p class="who-result" id="whoResult" role="status" aria-live="polite"></p>
+          <button class="pill pill-solid pill-sm who-next" id="whoNext" type="button" hidden>Next player</button>
+        </article>
+        <aside class="who-side">
+          <dl class="mini-stats">
+            <div><dt>Streak</dt><dd id="whoStreak">0</dd></div>
+            <div><dt>Right</dt><dd id="whoRight">0</dd></div>
+            <div><dt>Best</dt><dd id="whoBest">0</dd></div>
+          </dl>
+          <p class="muted">Read the stat line, then pick the player. Right answers pay 25 coins, or 12 if you peek at the team. The other names are players with similar numbers that season.</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- DAILY CHALLENGE -->
+    <section class="screen page daily" id="screen-daily" data-screen="daily" aria-labelledby="dailyTitle">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow" id="dailyDate"></p>
+          <h1 class="display" id="dailyTitle">Daily</h1>
+        </div>
+        <ol class="daily-dots" id="dailyDots" aria-label="Progress"></ol>
+      </div>
+      <div id="dailyBody"></div>
+    </section>
+
+    <!-- LOCKER -->
+    <section class="screen page" id="screen-locker" data-screen="locker" aria-labelledby="lockerTitle">
+      <div class="page-head">
+        <div>
+          <nav class="sub-tabs" aria-label="Cards">
+            <a class="sub-tab" href="#collection">Collection</a>
+            <a class="sub-tab" href="#book">Sets</a>
+            <a class="sub-tab active" href="#locker" aria-current="page">Locker</a>
+          </nav>
+          <h1 class="display" id="lockerTitle">Locker</h1>
+        </div>
+        <dl class="coll-counts" id="lockerTotals"></dl>
+      </div>
+      <div class="locker-layout">
+        <div class="court" id="court"></div>
+        <aside class="panel locker-side">
+          <label class="field">
+            <span>Lineup name</span>
+            <input id="lineupName" maxlength="24" placeholder="My Starting Five">
+          </label>
+          <div class="ovr-badge"><span>Team OVR</span><strong id="teamOvr">—</strong></div>
+          <dl class="stat-grid locker-stats" id="lineupStats"></dl>
+          <p class="muted">Tap a spot to put one of your cards there. Starters count toward Team OVR; the bench is for show.</p>
+          <button class="link-btn" id="clearLineup" type="button">Clear lineup</button>
+        </aside>
+      </div>
+      <h2 class="section-title">Bench</h2>
+      <div class="bench" id="bench"></div>
+
+      <section class="battles" aria-labelledby="battleTitle">
+        <div class="battle-head">
+          <h2 class="section-title" id="battleTitle">Lineup Battles</h2>
+          <p class="battle-record" id="battleRecord"></p>
+        </div>
+        <div id="battleBody"></div>
+      </section>
+    </section>
+
+    <!-- SETS (collection book) -->
+    <section class="screen page" id="screen-book" data-screen="book" aria-labelledby="bookTitle">
+      <div class="page-head">
+        <div>
+          <nav class="sub-tabs" aria-label="Cards">
+            <a class="sub-tab" href="#collection">Collection</a>
+            <a class="sub-tab active" href="#book" aria-current="page">Sets</a>
+            <a class="sub-tab" href="#locker">Locker</a>
+          </nav>
+          <h1 class="display" id="bookTitle">Sets</h1>
+        </div>
+        <dl class="coll-counts" id="bookTotals"></dl>
+      </div>
+      <div class="filters" role="group" aria-label="Set type" id="bookTabs">
+        <button class="filter-btn active" type="button" data-kind="era">Eras</button>
+        <button class="filter-btn" type="button" data-kind="team">Teams</button>
+        <button class="filter-btn" type="button" data-kind="season">Seasons</button>
+      </div>
+      <ul class="set-grid" id="setGrid"></ul>
+    </section>
+
+    <!-- RANKS -->
+    <section class="screen page" id="screen-ranks" data-screen="ranks" aria-labelledby="ranksTitle">
+      <div class="page-head">
+        <h1 class="display" id="ranksTitle">Ranks</h1>
+        <button class="pill pill-ghost pill-sm" id="ranksRefresh" type="button">Refresh</button>
+      </div>
+      <nav class="board-tabs" id="boardTabs" aria-label="Leaderboard">
+        <button class="board-tab" type="button" data-board="season">Season</button>
+        <button class="board-tab" type="button" data-board="daily">Today's Daily</button>
+        <button class="board-tab" type="button" data-board="week">Streak this week</button>
+        <button class="board-tab" type="button" data-board="alltime">Best streak ever</button>
+        <button class="board-tab" type="button" data-board="legendaries">Legendaries</button>
+      </nav>
+      <p class="board-intro" id="boardIntro"></p>
+      <div class="board" id="board" aria-live="polite"></div>
+    </section>
+
     <!-- PROFILE -->
     <section class="screen page" id="screen-profile" data-screen="profile" aria-labelledby="profileTitle">
       <div class="profile-hero">
@@ -229,6 +367,16 @@
         </form>
         <div class="panel account-panel" id="accountPanel"></div>
       </div>
+
+      <section aria-labelledby="showcaseTitle" class="profile-section">
+        <h2 class="section-title" id="showcaseTitle">Showcase <span class="muted">Other players see these on the leaderboard</span></h2>
+        <div class="showcase" id="showcase"></div>
+      </section>
+
+      <section aria-labelledby="trophyTitle" class="profile-section" id="trophySection" hidden>
+        <h2 class="section-title" id="trophyTitle">Trophies</h2>
+        <ul class="trophy-list" id="trophyList"></ul>
+      </section>
 
       <section aria-labelledby="statsTitle" class="profile-section">
         <h2 class="section-title" id="statsTitle">Stats</h2>
@@ -289,6 +437,102 @@
     </div>
   </dialog>
 
+  <dialog class="settings player-dialog" id="playerDialog" aria-labelledby="playerName">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div class="player-head">
+          <span class="avatar avatar-md" id="playerAvatar"></span>
+          <div><h2 id="playerName">Player</h2><p class="muted" id="playerSub"></p></div>
+        </div>
+        <button class="icon-btn" type="button" id="playerClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <dl class="mini-stats player-stats" id="playerStats"></dl>
+      <h3>Showcase</h3>
+      <ul class="showcase-row" id="playerShowcase"></ul>
+    </div>
+  </dialog>
+
+  <dialog class="settings challenge-dialog" id="challengeDialog" aria-labelledby="challengeTitle">
+    <div class="settings-inner">
+      <p class="eyebrow">Challenge</p>
+      <h2 id="challengeTitle">You've been challenged</h2>
+      <div id="challengeBody"></div>
+      <div class="btn-row">
+        <button class="pill pill-solid pill-sm" id="challengeGo" type="button">Accept</button>
+        <button class="pill pill-ghost pill-sm" id="challengeLater" type="button">Not now</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="settings news-dialog" id="newsDialog" aria-labelledby="newsTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow">Update</p>
+          <h2 id="newsTitle">What's new</h2>
+        </div>
+        <button class="icon-btn" type="button" id="newsClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <ul class="news-list">
+        <li><span class="news-icon n-daily" aria-hidden="true">10</span><div><strong>Daily Challenge</strong><span>Ten hard matchups a day, the same for everyone. Share your score to challenge friends.</span></div><a class="news-go" href="#daily">Play</a></li>
+        <li><span class="news-icon n-who" aria-hidden="true">?</span><div><strong>Who Am I?</strong><span>Read a stat line, name the player. Under the Play tab.</span></div><a class="news-go" href="#who">Try it</a></li>
+        <li><span class="news-icon n-packs" aria-hidden="true"><i></i></span><div><strong>New packs</strong><span>Era, Team and Elite packs. Quick sell your duplicates.</span></div><a class="news-go" href="#packs">Shop</a></li>
+        <li><span class="news-icon n-sets" aria-hidden="true">54</span><div><strong>Sets</strong><span>54 sets to complete, with coins at every milestone.</span></div><a class="news-go" href="#book">View</a></li>
+        <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a five with 2K-style ratings, play for coins, or challenge a friend's five.</span></div><a class="news-go" href="#locker">Build</a></li>
+        <li><span class="news-icon n-ranks" aria-hidden="true">#1</span><div><strong>Ranks and seasons</strong><span>Monthly seasons with a trophy for the top 10. Tap any name to see their cards.</span></div><a class="news-go" href="#ranks">Ranks</a></li>
+        <li><span class="news-icon n-show" aria-hidden="true">★</span><div><strong>Profile showcase</strong><span>Pin your three best cards for everyone to see.</span></div><a class="news-go" href="#profile">Pin</a></li>
+        <li><span class="news-icon n-theme" aria-hidden="true">Aa</span><div><strong>Themes and sound</strong><span>Light mode, colour themes and a new sound pack, in Settings.</span></div><button class="news-go" type="button" id="newsSettings">Settings</button></li>
+        <li><span class="news-icon n-reward" aria-hidden="true">7</span><div><strong>Daily rewards</strong><span>Coins every day you play, and a free pack on day 7.</span></div></li>
+      </ul>
+      <button class="pill pill-solid" id="newsDone" type="button">Let's play</button>
+    </div>
+  </dialog>
+
+  <dialog class="settings login-dialog" id="loginDialog" aria-labelledby="loginTitle">
+    <div class="settings-inner">
+      <p class="eyebrow" id="loginEyebrow">Daily reward</p>
+      <h2 id="loginTitle">Day 1 streak</h2>
+      <p class="muted" id="loginLede">Come back every day. Each day in a row pays more, and day 7 is a free pack.</p>
+      <ol class="login-days" id="loginDays"></ol>
+      <button class="pill pill-solid" id="loginClaim" type="button">Claim</button>
+    </div>
+  </dialog>
+
+  <dialog class="settings set-dialog" id="setDialog" aria-labelledby="setTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow" id="setKind"></p>
+          <h2 id="setTitle">Set</h2>
+        </div>
+        <button class="icon-btn" type="button" id="setClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <p class="muted" id="setInfo"></p>
+      <div class="set-bar"><b id="setBar"></b></div>
+      <ul class="set-cards" id="setCards"></ul>
+    </div>
+  </dialog>
+
+  <dialog class="settings picker" id="pickerDialog" aria-labelledby="pickerTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <h2 id="pickerTitle">Pick a card</h2>
+        <button class="icon-btn" type="button" id="pickerClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <input class="picker-search" id="pickerSearch" type="search" placeholder="Search your cards" aria-label="Search your cards">
+      <ul class="picker-list" id="pickerList"></ul>
+      <button class="pill pill-ghost pill-sm" id="pickerRemove" type="button" hidden>Empty this spot</button>
+    </div>
+  </dialog>
+
   <dialog class="settings" id="settingsDialog" aria-labelledby="settingsTitle">
     <form method="dialog" class="settings-inner">
       <div class="settings-head">
@@ -298,7 +542,13 @@
         </button>
       </div>
       <label class="switch-row"><span>Sound effects</span><input type="checkbox" role="switch" id="soundToggle"></label>
+      <label class="slider-row" id="volumeRow"><span>Volume</span><input type="range" id="volumeSlider" min="0" max="100" step="5" aria-label="Sound volume"><output id="volumeOut">70%</output></label>
       <label class="switch-row" id="hapticsRow"><span>Vibration</span><input type="checkbox" role="switch" id="hapticsToggle"></label>
+      <fieldset class="theme-pick">
+        <legend>Theme</legend>
+        <div class="theme-options" id="themeOptions"></div>
+        <p class="muted theme-note" id="themeNote" hidden>Pick a team on your profile to use its colours.</p>
+      </fieldset>
       <div class="install" id="installPanel" hidden>
         <p><strong>Get the app.</strong> <span id="installNote">Add StatStack to your home screen. It opens full-screen and works offline.</span></p>
         <button class="pill pill-solid" id="installBtn" type="button" hidden>Install</button>
@@ -323,5 +573,7 @@
 <script src="js/fx.js"></script>
 <script src="js/account.js"></script>
 <script src="js/app.js"></script>
+<script src="js/modes.js"></script>
+<script src="js/goals.js"></script>
 </body>
 </html>

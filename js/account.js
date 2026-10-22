@@ -87,9 +87,34 @@ const Account = (() => {
         stats,
         badges,
         seasons: [...new Set([...(lp.seasons || []), ...(cp.seasons || [])])],
+        weekly: mergeWeekly(lp.weekly, cp.weekly),
+        daily: mergeDaily(lp.daily, cp.daily),
+        login: (lp.login || {}).last > (cp.login || {}).last ? lp.login : cp.login || lp.login,
+        monthPts: Object.fromEntries([...new Set([...Object.keys(lp.monthPts || {}), ...Object.keys(cp.monthPts || {})])]
+          .map(m => [m, Math.max((lp.monthPts || {})[m] || 0, (cp.monthPts || {})[m] || 0)])),
+        trophies: [...new Map([...(cp.trophies || []), ...(lp.trophies || [])].map(t => [t.month, t])).values()],
+        sets: Object.fromEntries([...new Set([...Object.keys(lp.sets || {}), ...Object.keys(cp.sets || {})])]
+          .map(id => [id, Math.max((lp.sets || {})[id] || 0, (cp.sets || {})[id] || 0)])),
+        battle: ["w", "l", "best", "legendWins"].reduce((b, k) => ({...b, [k]: Math.max((lp.battle || {})[k] || 0, (cp.battle || {})[k] || 0)}), {...(newer.profile || {}).battle}),
         created: Math.min(lp.created || Date.now(), cp.created || Date.now()),
       },
     };
+  }
+
+  // Same week: keep the better streak. Same puzzle: keep the run that got further.
+  function mergeWeekly(a = {}, b = {}) {
+    if (a.week !== b.week) return (a.week || "") > (b.week || "") ? a : b;
+    return {week: a.week, best: Math.max(a.best || 0, b.best || 0)};
+  }
+  function mergeDaily(a = {}, b = {}) {
+    if ((a.num || 0) !== (b.num || 0)) return (a.num || 0) > (b.num || 0) ? a : b;
+    return ((a.answers || []).length >= (b.answers || []).length) ? a : b;
+  }
+
+  async function leaderboard(board, puzzle, period) {
+    if (!client) return {error: "off"};
+    const {data, error} = await client.rpc("leaderboard", {board, puzzle: puzzle == null ? null : puzzle, period: period || null});
+    return error ? {error: friendly(error)} : {rows: data || []};
   }
 
   function setSync(s) { sync = s; emit(); }
@@ -202,6 +227,6 @@ const Account = (() => {
     email: () => (user ? user.email : ""),
     signedIn: () => !!user,
     recovering: () => recovering,
-    changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
+    leaderboard, changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
   };
 })();
