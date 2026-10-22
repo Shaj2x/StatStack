@@ -96,6 +96,15 @@ function dailyState(run = activeRun()) {
   return run.d.done ? "done" : "playing";
 }
 
+// Icon, title and line for each rule tile on the Daily intro
+const DAILY_RULES = [
+  [`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>`, "Every era", "1984 to today, side by side."],
+  [`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7h14M5 7l-3 7a4 4 0 0 0 6 0zM19 7l-3 7a4 4 0 0 0 6 0z"></path></svg>`, "Every one is close", "The two numbers are within a few percent."],
+  [`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path></svg>`, "Stars lie", "Half the questions put a big name against someone who might beat them."],
+  [`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>`, "One try", "Everyone gets the same puzzle today."],
+];
+const CUP_SVG = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>`;
+
 function renderDots(run) {
   const d = run.d, playing = dailyState(run) !== "intro";
   $("dailyDots").innerHTML = Array.from({length: DAILY_LENGTH}, (_, i) => {
@@ -140,6 +149,7 @@ function renderDaily() {
     ? `From ${d.from || "a friend"} · Daily #${num}`
     : new Date().toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric"});
   renderDots(run);
+  $("dailyDots").hidden = state === "intro";
 
   if (state === "intro") {
     const rival = rivals[num];
@@ -150,18 +160,30 @@ function renderDaily() {
         <button class="pill pill-solid" id="dailyStart" type="button">Take the challenge</button>
         <button class="pill pill-ghost" id="dailyDrop" type="button">Back to today's Daily</button>
       </div>
-    </div>` : `<div class="panel daily-intro">
-      ${rival ? `<p class="eyebrow">${esc(rival.from || "A friend")} scored ${rival.score}/10 on this one. Beat it.</p>` : ""}
-      <h2 class="panel-title">Today's 10 matchups</h2>
-      <ul class="daily-rules">
-        <li><strong>Every era.</strong> 1984 to today, side by side.</li>
-        <li><strong>Every one is close.</strong> The two numbers are within a few percent.</li>
-        <li><strong>Stars lie.</strong> Half the questions put a big name against someone who might beat them.</li>
-        <li><strong>One try.</strong> Everyone gets the same puzzle today.</li>
-      </ul>
-      <p>50 coins for each right answer, and a 250-coin bonus for a perfect 10. Your score also counts toward this month's season.</p>
-      <button class="pill pill-solid" id="dailyStart" type="button">Start Daily #${num}</button>
+    </div>` : `<div class="daily-hero court-art">
+      <span class="daily-hero-num" aria-hidden="true">#${num}</span>
+      <div class="daily-hero-main">
+        <p class="eyebrow">${rival ? `${esc(rival.from || "A friend")} scored ${rival.score}/10 on this one. Beat it.` : "One try · same puzzle for everyone"}</p>
+        <h2 class="daily-hero-title">Today's ${DAILY_LENGTH} matchups</h2>
+        <ol class="daily-tickets" aria-hidden="true">${Array.from({length: DAILY_LENGTH}, (_, i) => `<li><span>${i + 1}</span></li>`).join("")}</ol>
+        <div class="daily-cta">
+          <button class="pill pill-solid" id="dailyStart" type="button">Start Daily #${num}</button>
+          <span class="daily-resets">New puzzle in <strong id="dailyCountdown">—</strong></span>
+        </div>
+      </div>
+    </div>
+    <ul class="daily-rules-grid">${DAILY_RULES.map(([icon, title, text]) => `<li>
+      <span class="rule-icon" aria-hidden="true">${icon}</span><strong>${title}</strong><span>${text}</span>
+    </li>`).join("")}</ul>
+    <div class="daily-rewards">
+      <div><span class="coin" aria-hidden="true"></span><strong>50</strong><span>coins per right answer</span></div>
+      <div><span class="reward-star" aria-hidden="true">★</span><strong>+250</strong><span>bonus for a perfect 10</span></div>
+      <div><span class="reward-cup" aria-hidden="true">${CUP_SVG}</span><strong>Season</strong><span>points toward ${new Date().toLocaleDateString(undefined, {month: "long", timeZone: "UTC"})}</span></div>
     </div>`;
+    if (!run.challenge) {
+      tickCountdown();
+      dailyTimer = setInterval(tickCountdown, 1000);
+    }
     return;
   }
 
@@ -193,7 +215,7 @@ function renderDaily() {
   // Done: score, share, countdown, and how everyone else did
   const reward = run.challenge ? 0 : d.score * 50 + (d.score === DAILY_LENGTH ? 250 : 0);
   body.innerHTML = `<div class="daily-done">
-    <div class="panel daily-result">
+    <div class="panel daily-result court-art">
       <p class="eyebrow">${run.challenge ? "Challenge result" : "Your score"}</p>
       <p class="daily-score display">${d.score}<span>/${DAILY_LENGTH}</span></p>
       <p class="daily-grid" aria-label="${d.score} right out of ${DAILY_LENGTH}">${emojiGrid(d.answers)}</p>
@@ -348,7 +370,14 @@ function renderWho() {
   const img = $("whoPhoto");
   if (done) setImg(img, answer); else img.removeAttribute("src");
   img.hidden = !done;
-  $("whoStats").innerHTML = statTypes.map(s => `<div><dt>${s.short}</dt><dd>${one(answer[s.key])}</dd></div>`).join("");
+  // Each stat shows where it ranks among this season's players: a clue in itself
+  $("whoStats").innerHTML = statTypes.map(s => {
+    const rank = currentPlayers.filter(p => p[s.key] > answer[s.key]).length + 1;
+    const fill = Math.round(100 * (1 - (rank - 1) / Math.max(currentPlayers.length, 1)));
+    return `<div><dt>${s.short}</dt><dd>${one(answer[s.key])}</dd>
+      <span class="who-bar" aria-hidden="true"><i style="width:${fill}%"></i></span>
+      <span class="who-rank">${ordinal(rank)}<span class="who-of"> of ${currentPlayers.length}</span></span></div>`;
+  }).join("");
   $("whoHint").hidden = hint || done;
   $("whoTeam").hidden = !(hint || done);
   $("whoTeam").textContent = team(answer.team).name || answer.team;
@@ -360,6 +389,9 @@ function renderWho() {
   $("whoStreak").textContent = whoStreak;
   $("whoRight").textContent = profile.stats.whoCorrect.toLocaleString();
   $("whoBest").textContent = profile.stats.whoBest;
+  const acc = profile.stats.whoRounds ? Math.round(100 * profile.stats.whoCorrect / profile.stats.whoRounds) : 0;
+  $("whoAcc").style.setProperty("--acc", acc);
+  $("whoAccNum").textContent = profile.stats.whoRounds ? `${acc}%` : "—";
 }
 
 function answerWho(i) {

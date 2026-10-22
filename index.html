@@ -225,13 +225,17 @@
     <!-- WHO AM I? -->
     <section class="screen page who" id="screen-who" data-screen="who" aria-labelledby="whoTitle">
       <div class="who-layout">
-        <article class="who-card" id="whoCard">
+        <article class="who-card court-art" id="whoCard">
           <div class="who-top">
             <p class="eyebrow" id="whoEyebrow">Who am I?</p>
             <span class="who-season" id="whoSeason"></span>
           </div>
           <h1 class="display who-title" id="whoTitle">Who am I?</h1>
           <img class="who-photo" id="whoPhoto" src="" alt="" hidden>
+          <div class="who-mystery" aria-hidden="true">
+            <svg viewBox="0 0 200 220"><path d="M100 18c-27 0-46 21-46 49 0 20 9 36 22 45v12c-38 7-66 30-70 66v30h188v-30c-4-36-32-59-70-66v-12c13-9 22-25 22-45 0-28-19-49-46-49z"></path></svg>
+            <span>?</span>
+          </div>
           <dl class="who-stats" id="whoStats"></dl>
           <div class="who-clue">
             <button class="pill pill-ghost pill-sm" id="whoHint" type="button">Show team · half coins</button>
@@ -242,12 +246,19 @@
           <button class="pill pill-solid pill-sm who-next" id="whoNext" type="button" hidden>Next player</button>
         </article>
         <aside class="who-side">
-          <dl class="mini-stats">
-            <div><dt>Streak</dt><dd id="whoStreak">0</dd></div>
-            <div><dt>Right</dt><dd id="whoRight">0</dd></div>
-            <div><dt>Best</dt><dd id="whoBest">0</dd></div>
-          </dl>
-          <p class="muted">Read the stat line, then pick the player. Right answers pay 25 coins, or 12 if you peek at the team. The other names are players with similar numbers that season.</p>
+          <div class="who-score">
+            <div class="who-acc" id="whoAcc" role="img" aria-label="Accuracy"><strong id="whoAccNum">—</strong><span>right</span></div>
+            <dl class="mini-stats who-mini">
+              <div class="is-streak"><dt>Streak</dt><dd id="whoStreak">0</dd></div>
+              <div><dt>Right</dt><dd id="whoRight">0</dd></div>
+              <div><dt>Best</dt><dd id="whoBest">0</dd></div>
+            </dl>
+          </div>
+          <ol class="who-how">
+            <li><strong>Read the stat line.</strong> The bars show where each number ranks this season.</li>
+            <li><strong>Pick the player.</strong> The other names had similar numbers that year.</li>
+            <li><strong>Get paid.</strong> 25 coins, or 12 if you peek at the team.</li>
+          </ol>
         </aside>
       </div>
     </section>
