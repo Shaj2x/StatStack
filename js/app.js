@@ -530,6 +530,20 @@ function fitCardNames(root, min) {
 // ─── PACKS ──────────────────────────────────────────────────────────────────
 // Every card in the game, each tagged with its season
 const ALL_CARDS = SEASON_KEYS.flatMap(k => SEASONS[k].players.map(p => ({...p, season: k})));
+// Saved cards keep a copy of their player's photo ID; refresh it from the
+// current data so photo fixes reach cards already pulled. Cards from seasons
+// that have since been re-entered fall back to the player's ID by name.
+const CARD_IMG = new Map(ALL_CARDS.map(c => [`${c.name}|${c.season}`, c.img]));
+const NAME_IMG = new Map(ALL_CARDS.filter(c => c.img).map(c => [c.name, c.img]));
+function refreshCardImgs(cards) {
+  for (const c of cards) {
+    const key = `${c.name}|${c.season}`;
+    if (CARD_IMG.has(key)) c.img = CARD_IMG.get(key);
+    else if (NAME_IMG.has(c.name)) c.img = NAME_IMG.get(c.name);
+  }
+  return cards;
+}
+refreshCardImgs(ownedCards);
 // Old team codes roll up into today's franchise for Team Packs
 const FRANCHISE = {SEA: "OKC", NJN: "BKN", WSB: "WAS", VAN: "MEM", KCK: "SAC", NOH: "NOP", CHH: "CHA"};
 const franchise = code => FRANCHISE[code] || code;
@@ -1169,7 +1183,7 @@ function getSave() {
 function applySave(data) {
   coins = parseInt(data.coins) || 0;
   bestStreak = parseInt(data.bestStreak) || 0;
-  ownedCards = Array.isArray(data.cards) ? data.cards : [];
+  ownedCards = refreshCardImgs(Array.isArray(data.cards) ? data.cards : []);
   profile = readProfile(data.profile);
   updatedAt = data.updatedAt || 0;
   save('statstack_coins', coins);
