@@ -162,7 +162,7 @@
     <section class="screen page" id="screen-packs" data-screen="packs" aria-labelledby="packsTitle">
       <div class="page-head">
         <h1 class="display" id="packsTitle">Packs</h1>
-        <div class="balance"><span class="hud-label">Coins</span> <strong id="shopCoins">0</strong></div>
+        <div class="wallet"><span class="coin" aria-hidden="true"></span><strong id="shopCoins">0</strong><span class="hud-label">coins</span></div>
       </div>
       <div class="packs-layout">
         <div class="shop" id="shop"></div>
@@ -185,7 +185,7 @@
           </div>
           <p class="visually-hidden" id="packStatus" role="status" aria-live="polite"></p>
           <div id="revealedCard" hidden></div>
-          <p class="muted reveal-empty" id="revealEmpty">Your new card appears here.</p>
+          <div class="reveal-empty" id="revealEmpty"></div>
         </div>
       </div>
     </section>

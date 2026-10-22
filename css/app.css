@@ -2004,3 +2004,112 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
   .who-of { display: none; }
   .who-rank { text-align: center; }
 }
+
+/* ─── Pack shop: shelf, counter and recent pulls ─── */
+.wallet { display: inline-flex; align-items: center; gap: 10px; padding: 10px 18px 10px 12px; border-radius: 999px; background: var(--ink-1); border: 1px solid var(--line); }
+.wallet .coin { width: 28px; height: 28px; }
+.wallet strong { font-family: var(--display); font-weight: var(--display-w); font-size: 30px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
+.shop { display: flex; flex-direction: column; gap: 16px; }
+.shelf {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(8px, 2vw, 22px);
+  padding: 26px clamp(12px, 2.5vw, 28px) 18px; border-radius: 26px; border: 1px solid var(--line);
+  background: radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 70%), linear-gradient(180deg, var(--ink-1), var(--ink-0));
+  position: relative;
+}
+/* the shelf's lip */
+.shelf::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: 64px; height: 10px; border-radius: 6px; background: linear-gradient(180deg, color-mix(in srgb, var(--text) 10%, transparent), transparent); pointer-events: none; }
+.shelf-pack { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 0 4px; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; min-width: 0; -webkit-tap-highlight-color: transparent; }
+.foil {
+  --rx: 0deg; --ry: 0deg; --mx: 50%; --my: 30%;
+  position: relative; z-index: 1; width: 100%; max-width: 150px; aspect-ratio: 5 / 7.4; border-radius: 12px; padding: 12%;
+  display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; text-align: left;
+  transform: perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(0);
+  transition: transform 260ms var(--ease-out), box-shadow 260ms ease, filter 260ms ease;
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.5);
+  /* crimped top and bottom edges, like a real foil pack */
+  -webkit-mask: radial-gradient(4px at 50% 0, #0000 98%, #000) 0 0 / 10px 51% repeat-x, radial-gradient(4px at 50% 100%, #0000 98%, #000) 0 100% / 10px 51% repeat-x;
+  mask: radial-gradient(4px at 50% 0, #0000 98%, #000) 0 0 / 10px 51% repeat-x, radial-gradient(4px at 50% 100%, #0000 98%, #000) 0 100% / 10px 51% repeat-x;
+}
+.foil .display { position: relative; font-size: clamp(18px, 2.6vw, 34px); line-height: 0.9; color: #fff; }
+.foil .pack-art-sub { position: relative; font-size: clamp(7px, 0.8vw, 10px); font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.85); }
+.foil-shine {
+  position: absolute; inset: 0; pointer-events: none; mix-blend-mode: color-dodge; opacity: 0.55;
+  background:
+    radial-gradient(circle at var(--mx) var(--my), rgba(255, 255, 255, 0.55), transparent 45%),
+    linear-gradient(115deg, transparent 20%, rgba(255, 120, 200, 0.25) 35%, rgba(120, 220, 255, 0.25) 45%, rgba(255, 240, 140, 0.25) 55%, transparent 70%);
+  background-size: 100% 100%, 250% 250%;
+  background-position: 0 0, var(--mx) var(--my);
+}
+.foil-free { position: absolute; top: 8px; right: 8px; padding: 3px 8px; border-radius: 999px; background: var(--good); color: #04130a; font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.shelf-name { font-family: var(--display); font-weight: var(--display-w); font-size: clamp(14px, 1.7vw, 19px); line-height: 1; text-transform: uppercase; margin-top: 8px; text-align: center; }
+.shelf-price { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; font-size: 14px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.shelf-price .coin { width: 14px; height: 14px; }
+.shelf-pack.short .shelf-price { color: var(--muted); }
+.shelf-pack:not(.on) .foil { filter: saturate(0.75) brightness(0.8); }
+@media (hover: hover) { .shelf-pack:not(.on):hover .foil { filter: none; transform: perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(-6px); } }
+.shelf-pack.on .foil { transform: perspective(700px) rotateX(var(--rx)) rotateY(var(--ry)) translateY(-12px) scale(1.04); box-shadow: 0 0 0 3px var(--gold), 0 24px 40px rgba(0, 0, 0, 0.55), 0 0 40px color-mix(in srgb, var(--gold) 35%, transparent); animation: pack-float 3s ease-in-out infinite; }
+.shelf-pack.on .shelf-name { color: var(--gold); }
+@keyframes pack-float { 50% { translate: 0 -5px; } }
+.shelf-pack:focus-visible { outline: none; }
+.shelf-pack:focus-visible .foil { outline: 3px solid var(--text); outline-offset: 4px; }
+@media (prefers-reduced-motion: reduce) { .shelf-pack.on .foil { animation: none; } .foil { transition: none; } }
+
+.counter { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, 1fr); gap: 20px; padding: clamp(18px, 2.5vw, 26px); border-radius: 26px; background: var(--ink-1); border: 1px solid var(--line); }
+.counter-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.counter-head h2 { font-family: var(--display); font-weight: var(--display-w); font-size: clamp(30px, 4vw, 44px); line-height: 0.95; text-transform: uppercase; }
+.counter-head p { margin-top: 4px; }
+.era-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.era-chip { min-height: 52px; display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 6px 10px; border-radius: 14px; border: 2px solid var(--line); background: var(--ink-0); color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+.era-chip strong { font-size: 14px; }
+.era-chip span { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.era-chip.on { border-color: #e08a2c; background: color-mix(in srgb, #e08a2c 16%, var(--ink-0)); }
+.odds-block { display: flex; flex-direction: column; gap: 8px; }
+.odds-bar { display: flex; gap: 3px; height: 14px; border-radius: 7px; overflow: hidden; }
+.odds-bar i { min-width: 6px; }
+.odds-bar .legendary, .odds-key .legendary b { background: var(--r-legendary); }
+.odds-bar .epic, .odds-key .epic b { background: var(--r-epic); }
+.odds-bar .rare, .odds-key .rare b { background: var(--r-rare); }
+.odds-bar .common, .odds-key .common b { background: var(--r-common); }
+.odds-bar .legendary { box-shadow: 0 0 12px var(--r-legendary); }
+.odds-key { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.odds-key li { display: inline-flex; align-items: center; gap: 6px; }
+.odds-key b { width: 10px; height: 10px; border-radius: 3px; }
+.odds-key strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.chase h3, .reveal-empty h3 { font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+.chase-row { display: grid; grid-template-columns: repeat(3, minmax(0, 120px)); gap: 12px; }
+.chase-card { position: relative; display: block; aspect-ratio: 5 / 7; }
+.chase-row .chase-card:not(.owned) .mini-photo { filter: brightness(0.15) saturate(0); }
+.chase-owned { position: absolute; z-index: 2; top: 6px; right: 6px; padding: 2px 7px; border-radius: 999px; background: var(--good); color: #04130a; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.counter-buy { display: flex; flex-direction: column; gap: 14px; justify-content: flex-end; padding: 18px; border-radius: 20px; background: var(--ink-0); border: 1px solid var(--line); }
+.own-meter { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
+.own-meter strong { color: var(--text); }
+.meter { display: block; height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--text) 10%, transparent); overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 55%, transparent), var(--gold)); }
+.buy-price { display: flex; align-items: center; gap: 10px; margin-top: auto; font-family: var(--display); font-weight: var(--display-w); font-size: 44px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
+.buy-price .coin { width: 32px; height: 32px; }
+.buy-btn { width: 100%; min-width: 0; }
+.buy-btn:not(:disabled) { animation: buy-pulse 2.6s ease-in-out infinite; }
+@keyframes buy-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 22%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .buy-btn:not(:disabled) { animation: none; } }
+.save-up { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.save-up strong { color: var(--text); }
+.earn a { color: var(--gold); font-weight: 800; text-decoration: none; display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; justify-content: center; padding: 0 4px; }
+.earn a:hover { text-decoration: underline; }
+
+.reveal-empty { width: 100%; display: flex; flex-direction: column; gap: 12px; text-align: center; }
+.recent-row { display: grid; grid-template-columns: repeat(3, minmax(0, 110px)); justify-content: center; gap: 12px; }
+
+@media (max-width: 760px) {
+  .counter { grid-template-columns: 1fr; }
+  .era-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .shelf { padding: 18px 10px 12px; gap: 6px; }
+  .shelf::after { bottom: 56px; }
+  .foil { border-radius: 8px; padding: 10%; }
+  .shelf-name { font-size: 12px; }
+  .shelf-price { font-size: 12px; }
+  .chase-row, .recent-row { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .buy-price { font-size: 36px; }
+  .wallet strong { font-size: 24px; }
+}
