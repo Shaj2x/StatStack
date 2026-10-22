@@ -38,6 +38,12 @@ function freshProfile() {
     sets: {},
     // Lineup Battles record
     battle: {w: 0, l: 0, streak: 0, best: 0, legendWins: 0},
+    // Seasons: Daily Challenge points per month (UTC "YYYY-MM"), top-10 finishes
+    monthPts: {},
+    trophies: [],
+    trophyChecked: "",
+    // Three cards pinned to the profile, shown to other players
+    showcase: [null, null, null],
   };
 }
 function readProfile(p) {
@@ -52,6 +58,9 @@ function readProfile(p) {
   out.freePacks = {...base.freePacks, ...out.freePacks};
   out.battle = {...base.battle, ...out.battle};
   if (!out.sets || typeof out.sets !== "object") out.sets = {};
+  if (!out.monthPts || typeof out.monthPts !== "object") out.monthPts = {};
+  if (!Array.isArray(out.trophies)) out.trophies = [];
+  if (!Array.isArray(out.showcase) || out.showcase.length !== 3) out.showcase = [null, null, null];
   if (!Array.isArray(out.lineup.slots) || out.lineup.slots.length !== 8) out.lineup.slots = base.lineup.slots;
   if (!Array.isArray(out.seasons)) out.seasons = [];
   if (!out.badges || typeof out.badges !== "object") out.badges = {};
@@ -484,6 +493,7 @@ function flipCard(card) {
   card.querySelector(".pcard").setAttribute("aria-hidden", String(on));
   card.querySelector(".pback").setAttribute("aria-hidden", String(!on));
   FX.haptic("commit");
+  FX.sound("flip");
 }
 document.addEventListener("click", e => {
   const card = e.target.closest(".flipcard");
@@ -883,7 +893,7 @@ function afterSale(value, text) {
   updateCollStats();
   renderColl(activeFilter);
   FX.pop($("coins"));
-  FX.feedback("correct");
+  FX.feedback("coin");
   toast(`<span class="toast-icon coin-icon" aria-hidden="true"><span class="coin"></span></span>`, `+${value.toLocaleString()} coins`, text);
 }
 $("collectionGrid").addEventListener("click", e => {
@@ -979,6 +989,78 @@ $("soundToggle").addEventListener("change", e => FX.setSetting("sound", e.target
 $("hapticsToggle").checked = FX.settings.haptics;
 $("hapticsToggle").addEventListener("change", e => { FX.setSetting("haptics", e.target.checked); if (e.target.checked) FX.haptic("correct"); });
 $("hapticsRow").hidden = !FX.canVibrate;
+
+// Volume: one master level for every sound; dragging it plays a tick to judge by
+$("volumeSlider").value = Math.round(FX.volume() * 100);
+$("volumeOut").textContent = `${$("volumeSlider").value}%`;
+$("volumeRow").hidden = !FX.settings.sound;
+$("soundToggle").addEventListener("change", e => { $("volumeRow").hidden = !e.target.checked; });
+$("volumeSlider").addEventListener("input", e => {
+  FX.setVolume(e.target.value / 100);
+  $("volumeOut").textContent = `${e.target.value}%`;
+});
+$("volumeSlider").addEventListener("change", () => FX.sound("coin"));
+
+// ─── THEMES ─────────────────────────────────────────────────────────────────
+// Dark is the original look; cards, duel halves and packs keep their own
+// colours in every theme. "My team" is built from the avatar team's colours.
+const THEMES = [
+  {id: "auto", name: "Auto", swatch: ["#0b0d12", "#f3f4f7", "#ffd166"]},
+  {id: "dark", name: "Dark", swatch: ["#0b0d12", "#14171f", "#ffd166"]},
+  {id: "light", name: "Light", swatch: ["#f3f4f7", "#ffffff", "#a66b00"]},
+  {id: "hardwood", name: "Hardwood", swatch: ["#17100a", "#2e2016", "#ff9f43"]},
+  {id: "neon", name: "Neon", swatch: ["#08081c", "#19193d", "#3ff5e1"]},
+  {id: "team", name: "My team"},
+];
+const systemLight = matchMedia("(prefers-color-scheme: light)");
+let themeChoice = (() => { try { return localStorage.getItem("statstack_theme") || "dark"; } catch { return "dark"; } })();
+
+function teamThemeVars() {
+  if (!profile.team || !TEAMS[profile.team]) return null;
+  const t = team(profile.team);
+  return {
+    "--ink-0": `color-mix(in srgb, ${t.bg2} 32%, #07080b)`,
+    "--ink-1": `color-mix(in srgb, ${t.bg} 22%, #12141a)`,
+    "--ink-2": `color-mix(in srgb, ${t.bg} 32%, #1a1d25)`,
+    "--line": `color-mix(in srgb, ${t.bg} 45%, #262a34)`,
+    "--gold": t.accent,
+    "--bar": `linear-gradient(180deg, color-mix(in srgb, ${t.bg} 34%, #12141a), color-mix(in srgb, ${t.bg2} 32%, #07080b))`,
+  };
+}
+function applyTheme(choice = themeChoice) {
+  themeChoice = choice;
+  const root = document.documentElement;
+  let theme = choice === "auto" ? (systemLight.matches ? "light" : "dark") : choice;
+  const vars = theme === "team" ? teamThemeVars() : null;
+  if (theme === "team" && !vars) theme = "dark";
+  ["--ink-0", "--ink-1", "--ink-2", "--line", "--gold", "--bar"].forEach(k => root.style.removeProperty(k));
+  if (vars) Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+  root.dataset.theme = theme;
+  try {
+    localStorage.setItem("statstack_theme", choice);
+    if (vars) localStorage.setItem("statstack_theme_vars", JSON.stringify(vars));
+  } catch { /* fine */ }
+  // Phone status bar matches the page
+  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(document.body).backgroundColor;
+  $("themeNote").hidden = !(choice === "team" && !vars);
+  document.querySelectorAll('#themeOptions input').forEach(i => { i.checked = i.value === choice; });
+}
+function renderThemeOptions() {
+  const t = profile.team && TEAMS[profile.team] ? team(profile.team) : null;
+  $("themeOptions").innerHTML = THEMES.map(th => {
+    const sw = th.id === "team" ? (t ? [t.bg2, t.bg, t.accent] : ["#2a2f3a", "#15181f", "#a9afbf"]) : th.swatch;
+    return `<label class="theme-opt">
+      <input type="radio" name="theme" value="${th.id}"${th.id === themeChoice ? " checked" : ""}>
+      <span class="swatch" aria-hidden="true" style="background:linear-gradient(135deg, ${sw[0]} 0 50%, ${sw[1]} 50%)"><i style="background:${sw[2]}"></i></span>
+      <span>${th.name}</span>
+    </label>`;
+  }).join("");
+}
+$("themeOptions").addEventListener("change", e => { if (e.target.name === "theme") applyTheme(e.target.value); });
+systemLight.addEventListener("change", () => { if (themeChoice === "auto") applyTheme(); });
+$("settingsBtn").addEventListener("click", renderThemeOptions);
+renderThemeOptions();
+applyTheme();
 
 // ─── INSTALL / OFFLINE ──────────────────────────────────────────────────────
 const isStandalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
@@ -1175,6 +1257,7 @@ function renderProfile() {
       <span>${label}</span></div></li>`;
   }).join("");
   renderAccountPanel();
+  if (SCREEN_HOOKS.profileExtras) SCREEN_HOOKS.profileExtras();
 }
 
 let panelPhase = null;
@@ -1339,6 +1422,7 @@ $("profileForm").addEventListener("submit", async e => {
   profile.name = name;
   profile.team = $("teamSelect").value;
   progressChanged();
+  if (themeChoice === "team") applyTheme();
   renderProfile();
   setMsg("nameMsg", "Saved.", "ok");
 });

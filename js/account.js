@@ -90,6 +90,9 @@ const Account = (() => {
         weekly: mergeWeekly(lp.weekly, cp.weekly),
         daily: mergeDaily(lp.daily, cp.daily),
         login: (lp.login || {}).last > (cp.login || {}).last ? lp.login : cp.login || lp.login,
+        monthPts: Object.fromEntries([...new Set([...Object.keys(lp.monthPts || {}), ...Object.keys(cp.monthPts || {})])]
+          .map(m => [m, Math.max((lp.monthPts || {})[m] || 0, (cp.monthPts || {})[m] || 0)])),
+        trophies: [...new Map([...(cp.trophies || []), ...(lp.trophies || [])].map(t => [t.month, t])).values()],
         sets: Object.fromEntries([...new Set([...Object.keys(lp.sets || {}), ...Object.keys(cp.sets || {})])]
           .map(id => [id, Math.max((lp.sets || {})[id] || 0, (cp.sets || {})[id] || 0)])),
         battle: ["w", "l", "best", "legendWins"].reduce((b, k) => ({...b, [k]: Math.max((lp.battle || {})[k] || 0, (cp.battle || {})[k] || 0)}), {...(newer.profile || {}).battle}),
@@ -108,9 +111,9 @@ const Account = (() => {
     return ((a.answers || []).length >= (b.answers || []).length) ? a : b;
   }
 
-  async function leaderboard(board, puzzle) {
+  async function leaderboard(board, puzzle, period) {
     if (!client) return {error: "off"};
-    const {data, error} = await client.rpc("leaderboard", {board, puzzle: puzzle == null ? null : puzzle});
+    const {data, error} = await client.rpc("leaderboard", {board, puzzle: puzzle == null ? null : puzzle, period: period || null});
     return error ? {error: friendly(error)} : {rows: data || []};
   }
 

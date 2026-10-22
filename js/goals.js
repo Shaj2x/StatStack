@@ -21,7 +21,7 @@ const nextLoginStreak = () => (profile.login.last === yesterdayKey() ? profile.l
 function showLogin() {
   // Wait for a signed-in save to arrive first, so a reward claimed on
   // another device today isn't offered twice
-  if (!loginDue() || Account.phase() === "loading" || document.querySelector("dialog[open]") || newsUnseen()) return;
+  if (!loginDue() || Account.phase() === "loading" || document.querySelector("dialog[open]") || newsUnseen() || incoming) return;
   const n = nextLoginStreak(), slot = (n - 1) % 7, reward = LOGIN_REWARDS[slot];
   $("loginEyebrow").textContent = n === 1 && profile.login.streak > 1 ? "Streak reset · new run" : "Daily reward";
   $("loginTitle").textContent = n === 1 ? "Day 1" : `Day ${n} in a row`;
@@ -50,7 +50,7 @@ function claimLogin() {
   progressChanged();
   $("loginDialog").close();
   FX.pop($("coins"));
-  FX.feedback("reveal");
+  FX.feedback("claim");
   toast(CHECK_ICON, reward === "pack" ? "Free Player Pack added" : `+${reward} coins`,
     reward === "pack" ? "Open it from the Packs tab." : `Day ${n} streak. See you tomorrow.`);
   if (currentScreen === "packs") renderShop();
@@ -63,7 +63,7 @@ $("loginDialog").addEventListener("cancel", e => { e.preventDefault(); claimLogi
 // ─── WHAT'S NEW ─────────────────────────────────────────────────────────────
 // Shown once per device for each update, before the daily reward. Bump
 // NEWS_VERSION (and the list in index.html) when there's something new.
-const NEWS_VERSION = "2026-10";
+const NEWS_VERSION = "2026-10b";
 let newsShownOnce = false; // if storage is blocked, still only show it once per visit
 function newsUnseen() {
   let seen = "";
@@ -71,7 +71,7 @@ function newsUnseen() {
   return seen !== NEWS_VERSION && !newsShownOnce;
 }
 function showNews() {
-  if (!newsUnseen() || document.querySelector("dialog[open]")) return false;
+  if (!newsUnseen() || document.querySelector("dialog[open]") || incoming) return false;
   newsShownOnce = true;
   $("newsDialog").showModal();
   $("newsDone").focus({preventScroll: true});
@@ -87,12 +87,96 @@ $("newsDone").addEventListener("click", closeNews);
 $("newsClose").addEventListener("click", closeNews);
 // Each row's button goes straight to that feature
 $("newsDialog").addEventListener("click", e => { if (e.target.closest(".news-go")) closeNews(); });
+$("newsSettings").addEventListener("click", () => { closeNews(); setTimeout(() => { renderThemeOptions(); $("settingsDialog").showModal(); }, 50); });
 $("newsDialog").addEventListener("close", () => {
   try { localStorage.setItem("statstack_news", NEWS_VERSION); } catch { /* fine */ }
   setTimeout(showLogin, 400);
 });
 
-document.addEventListener("DOMContentLoaded", () => setTimeout(() => { if (!showNews()) showLogin(); }, 900));
+// ─── CHALLENGE A FRIEND ─────────────────────────────────────────────────────
+// Links carry ?c=<base64url JSON>: {t:"d", n, s, a, u} for a Daily score or
+// {t:"l", u, n, k:[5 card keys]} for a lineup. Everything is checked before use.
+function readChallengeLink() {
+  const url = new URL(location.href), raw = url.searchParams.get("c");
+  if (!raw) return null;
+  url.searchParams.delete("c");
+  history.replaceState(null, "", url.pathname + url.search + url.hash);
+  try {
+    const bytes = Uint8Array.from(atob(raw.replace(/-/g, "+").replace(/_/g, "/")), ch => ch.charCodeAt(0));
+    const p = JSON.parse(new TextDecoder().decode(bytes));
+    const from = typeof p.u === "string" && NAME_RULE.test(p.u) ? p.u : "";
+    if (p.t === "d" && Number.isInteger(p.n) && p.n >= 1 && p.n <= dailyNumber() + 1 && Number.isInteger(p.s) && p.s >= 0 && p.s <= 10) {
+      return {type: "daily", num: p.n, score: p.s, from};
+    }
+    if (p.t === "l" && Array.isArray(p.k) && p.k.length === 5) {
+      const cards = p.k.map(cardByKey);
+      if (cards.every(Boolean) && new Set(cards.map(c => c.name)).size === 5) {
+        const name = typeof p.n === "string" ? p.n.replace(/[^\w '’.-]/g, "").slice(0, 24) : "";
+        return {type: "lineup", keys: p.k, cards, from, name};
+      }
+    }
+  } catch { /* a broken link just opens the game */ }
+  return null;
+}
+let incoming = readChallengeLink();
+
+function showChallenge() {
+  const c = incoming;
+  if (!c || document.querySelector("dialog[open]")) return false;
+  const who = esc(c.from || "A friend"), today = dailyNumber();
+  let body = "", go = "Accept";
+  if (c.type === "daily") {
+    const mine = profile.daily.num === c.num && profile.daily.done ? profile.daily.score : null;
+    body = `<p class="challenge-score"><strong>${c.score}/10</strong> on Daily #${c.num}</p>` + (
+      c.num > today ? `<p class="muted">That Daily isn't out where you are yet. Come back tomorrow and play it.</p>`
+      : mine !== null ? `<p class="muted">You already played it and scored ${mine}/10.</p>`
+      : c.num === today ? `<p class="muted">It's today's Daily. Play it to see who wins.</p>`
+      : `<p class="muted">Play the same 10 matchups. Challenges don't pay coins or change today's Daily.</p>`);
+    go = c.num > today ? "OK" : mine !== null ? "See result" : "Play it";
+  } else {
+    body = `<p class="muted">${who}'s lineup${c.name ? ` <strong>${esc(c.name)}</strong>` : ""} · OVR ${teamOvr(c.cards)}</p>
+      <ul class="battle-five challenge-five">${c.cards.map(card => `<li>${miniTile(card)}</li>`).join("")}</ul>
+      <p class="muted">${starters().length < 5 ? "Fill your starting five in the Locker, then play them. " : ""}Challenge games don't pay coins or count toward your record.</p>`;
+    go = "Play them";
+  }
+  $("challengeTitle").textContent = `${c.from || "A friend"} challenged you`;
+  $("challengeBody").innerHTML = body;
+  $("challengeGo").textContent = go;
+  $("challengeDialog").showModal();
+  return true;
+}
+$("challengeGo").addEventListener("click", () => {
+  const c = incoming, today = dailyNumber();
+  incoming = null;
+  $("challengeDialog").close();
+  if (!c) return;
+  if (c.type === "daily") {
+    rivals[c.num] = {from: c.from, score: c.score};
+    if (c.num < today && !(profile.daily.num === c.num && profile.daily.done)) {
+      challengeRun = {num: c.num, answers: [], done: false, score: 0, started: false, from: c.from};
+    }
+    saveChallenge();
+    if (c.num <= today) location.hash = "#daily";
+    if (currentScreen === "daily") SCREEN_HOOKS.daily();
+  } else {
+    lineupChallenge = {from: c.from, name: c.name, keys: c.keys};
+    save('statstack_lineup_challenge', lineupChallenge);
+    location.hash = "#locker";
+    if (currentScreen === "locker") SCREEN_HOOKS.locker();
+  }
+});
+$("challengeLater").addEventListener("click", () => { incoming = null; $("challengeDialog").close(); });
+$("challengeDialog").addEventListener("close", () => { incoming = null; setTimeout(() => { if (!showNews()) showLogin(); }, 400); });
+
+function shareLineup() {
+  const keys = profile.lineup.slots.slice(0, 5);
+  if (keys.some(k => !k)) return;
+  const link = challengeLink({t: "l", u: profile.name || "", n: profile.lineup.name || "", k: keys});
+  shareText(`My StatStack five${profile.lineup.name ? ` "${profile.lineup.name}"` : ""} (OVR ${teamOvr(starters())}). Think you can beat them? ${link}`);
+}
+
+// Opening order: a challenge link first, then What's new, then the daily reward
+document.addEventListener("DOMContentLoaded", () => setTimeout(() => { if (!showChallenge() && !showNews()) showLogin(); }, 900));
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") showLogin(); });
 Account.on(() => setTimeout(showLogin, 300));
 
@@ -143,6 +227,7 @@ function checkSets(announce) {
   save('statstack_updated', updatedAt);
   updateBoard();
   Account.changed();
+  if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => FX.sound("claim"), 600 + k * 2600));
   if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => toast(
     `<span class="toast-icon coin-icon" aria-hidden="true"><span class="coin"></span></span>`,
     i === 2 ? `Set complete: ${set.name}` : `${set.name} · ${tierGoal(set, i)} card${tierGoal(set, i) === 1 ? "" : "s"}`,
@@ -223,6 +308,7 @@ const OPP_NAMES = ["Glass Cleaners", "Splash Club", "Paint Patrol", "Fast Break 
   "Bench Mob", "Showtime Select", "Twin Towers", "Retro Ballers", "Pick and Roll", "Hardwood Heroes", "Night Shift", "Full Court Press"];
 let battleLevel = load('statstack_battleLevel', "pro") || "pro";
 let opponent = null, battleBusy = false, lastResult = null;
+let lineupChallenge = load('statstack_lineup_challenge', null);
 
 const starters = () => profile.lineup.slots.slice(0, 5).map(ownedByKey).filter(Boolean);
 const teamOvr = cards => Math.round(cards.reduce((s, c) => s + cardOvr(c), 0) / cards.length);
@@ -259,10 +345,15 @@ function renderBattles() {
     return;
   }
   if (battleBusy) return;
-  if (!opponent || opponent.level !== battleLevel) opponent = makeOpponent(battleLevel);
+  // A friend's lineup from a challenge link takes the opponent's spot until played
+  if (lineupChallenge) {
+    const cards = lineupChallenge.keys.map(cardByKey).filter(Boolean);
+    opponent = {level: "challenge", challenge: true, name: `${lineupChallenge.from || "Friend"}'s ${lineupChallenge.name || "Five"}`, cards};
+  } else if (!opponent || opponent.challenge || opponent.level !== battleLevel) opponent = makeOpponent(battleLevel);
   const my = teamOvr(mine), level = DIFFICULTY.find(d => d.id === battleLevel);
   const odds = Math.round(100 / (1 + Math.exp(-(my - teamOvr(opponent.cards)) / 3)));
   body.innerHTML = `<div class="panel battle-panel">
+    ${opponent.challenge ? `<p class="challenge-banner">Challenge from <strong>${esc(lineupChallenge.from || "a friend")}</strong> · no coins or record, just the result <button class="link-btn" type="button" id="skipChallenge">Skip</button></p>` : ""}
     <div class="battle-levels" role="group" aria-label="Difficulty">${DIFFICULTY.map(d =>
       `<button class="filter-btn${d.id === battleLevel ? " active" : ""}" type="button" data-level="${d.id}" aria-pressed="${d.id === battleLevel}">${d.name} · <span class="coin" aria-hidden="true"></span>${d.pay}</button>`).join("")}</div>
     <div class="battle-matchup">
@@ -271,9 +362,10 @@ function renderBattles() {
       ${battleTeamHtml(opponent.name, opponent.cards, "them")}
     </div>
     <div class="battle-foot">
-      <p class="muted">About <strong>${odds}%</strong> to win · a win pays ${level.pay} coins</p>
+      <p class="muted">About <strong>${odds}%</strong> to win${opponent.challenge ? "" : ` · a win pays ${level.pay} coins`}</p>
       <div class="btn-row">
-        <button class="pill pill-ghost pill-sm" type="button" id="newOpponent">New opponent</button>
+        <button class="pill pill-ghost pill-sm" type="button" id="shareLineup">Challenge a friend</button>
+        ${opponent.challenge ? "" : `<button class="pill pill-ghost pill-sm" type="button" id="newOpponent">New opponent</button>`}
         <button class="pill pill-solid pill-sm" type="button" id="playBattle">Play game</button>
       </div>
     </div>
@@ -333,10 +425,20 @@ async function playBattle() {
     $(`qt${i}`).textContent = game.qThem[i];
     FX.countUp($("sbUs"), u0, us, {duration: step * 0.8, decimals: 0});
     FX.countUp($("sbThem"), t0, them, {duration: step * 0.8, decimals: 0});
-    FX.haptic("commit");
+    if (i < 3) FX.feedback("tick"); else FX.feedback("buzzer");
   }
   await new Promise(r => setTimeout(r, step));
 
+  if (opponent.challenge) {
+    battleBusy = false;
+    lastResult = {...game, pay: 0, opp: opponent.name, challenge: true};
+    lineupChallenge = null;
+    save('statstack_lineup_challenge', null);
+    opponent = makeOpponent(battleLevel);
+    FX.feedback(game.win ? "win" : "lose");
+    renderBattles();
+    return;
+  }
   const b = profile.battle;
   if (game.win) {
     b.w++;
@@ -354,7 +456,7 @@ async function playBattle() {
   opponent = makeOpponent(battleLevel);
   updateBoard();
   progressChanged();
-  FX.feedback(game.win ? "correct" : "wrong");
+  FX.feedback(game.win ? "win" : "lose");
   renderBattles();
   if (game.win) FX.pop($("coins"));
 }
@@ -363,7 +465,7 @@ function showResult(r, animate = true) {
   const el = $("battleGame");
   el.innerHTML = `<div class="battle-result ${r.win ? "win" : "loss"}">
     <p class="battle-score display">${r.win ? "W" : "L"} ${r.us}–${r.them}</p>
-    <p>vs ${esc(r.opp)} · ${r.win ? `+${r.pay} coins` : "No coins this time"}</p>
+    <p>vs ${esc(r.opp)} · ${r.challenge ? (r.win ? "You won the challenge" : "They won this one") : r.win ? `+${r.pay} coins` : "No coins this time"}</p>
     <p class="battle-mvp"><span>Player of the game</span><strong>${esc(r.mvp.card.name)}</strong> ${r.mvp.pts} PTS · ${r.mvp.reb} REB · ${r.mvp.ast} AST</p>
   </div>`;
   if (animate) FX.enter(el.firstElementChild, {y: 10, duration: 240});
@@ -381,6 +483,12 @@ $("battleBody").addEventListener("click", e => {
     lastResult = null;
     renderBattles();
   } else if (e.target.closest("#playBattle")) playBattle();
+  else if (e.target.closest("#shareLineup")) shareLineup();
+  else if (e.target.closest("#skipChallenge")) {
+    lineupChallenge = null;
+    save('statstack_lineup_challenge', null);
+    renderBattles();
+  }
 });
 const lockerScreen = SCREEN_HOOKS.locker;
 SCREEN_HOOKS.locker = () => { lockerScreen(); renderBattles(); };
@@ -395,4 +503,5 @@ BADGES.push(
   {id: "first-w", name: "First W", desc: "Win a Lineup Battle", glyph: "W", tier: "bronze", goal: 1, value: () => profile.battle.w},
   {id: "win-streak", name: "Dynasty", desc: "Win 5 Lineup Battles in a row", glyph: "W5", tier: "silver", goal: 5, value: () => profile.battle.best},
   {id: "giant-slayer", name: "Giant Slayer", desc: "Beat a Legend team", glyph: "GS", tier: "gold", goal: 1, value: () => profile.battle.legendWins},
+  {id: "top-10", name: "Top 10", desc: "Finish a season in the top 10", glyph: "🏆", tier: "gold", goal: 1, value: () => profile.trophies.length},
 );
