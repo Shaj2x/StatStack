@@ -2113,3 +2113,6 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
   .buy-price { font-size: 36px; }
   .wallet strong { font-size: 24px; }
 }
+/* "All sets" splits the grid with a heading per kind */
+.set-group { grid-column: 1 / -1; padding-top: 12px; }
+.set-group:first-child { padding-top: 0; }
