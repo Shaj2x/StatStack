@@ -96,6 +96,7 @@ const Account = (() => {
         sets: Object.fromEntries([...new Set([...Object.keys(lp.sets || {}), ...Object.keys(cp.sets || {})])]
           .map(id => [id, Math.max((lp.sets || {})[id] || 0, (cp.sets || {})[id] || 0)])),
         battle: ["w", "l", "best", "legendWins"].reduce((b, k) => ({...b, [k]: Math.max((lp.battle || {})[k] || 0, (cp.battle || {})[k] || 0)}), {...(newer.profile || {}).battle}),
+        newsSeen: [lp.newsSeen || "", cp.newsSeen || ""].sort().pop(),
         created: Math.min(lp.created || Date.now(), cp.created || Date.now()),
       },
     };
