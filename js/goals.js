@@ -258,7 +258,7 @@ function checkSets(announce) {
 }
 PROGRESS_HOOKS.push(checkSets);
 
-let bookKind = "era";
+let bookKind = "all";
 function milestoneHtml(set, have) {
   return SET_KINDS[set.kind].tiers.map((_, i) => {
     const goal = tierGoal(set, i), got = have >= goal;
@@ -272,19 +272,25 @@ function renderBook() {
   const milestones = SETS.reduce((n, s) => n + setTiersMet(s, setProgress(s, owned)), 0);
   $("bookTotals").innerHTML = `<div><dt>Complete</dt><dd>${complete}/${SETS.length}</dd></div>
     <div><dt>Milestones</dt><dd>${milestones}/${SETS.length * 3}</dd></div>`;
-  $("setGrid").innerHTML = SETS.filter(s => s.kind === bookKind).map(set => {
-    const have = setProgress(set, owned), total = set.cards.length, met = setTiersMet(set, have);
-    const goal = met < 3 ? tierGoal(set, met) : 0;
-    const next = met < 3 ? `Next: ${goal} card${goal === 1 ? "" : "s"} · ${SET_KINDS[set.kind].pay[met].toLocaleString()} coins` : "Complete";
-    const lead = set.kind === "team" ? set.id.slice(5) : set.cards[0].team;
-    return `<li><button class="set-card${met === 3 ? " complete" : ""}" type="button" data-set="${set.id}" style="${teamVars(lead)}">
-      <span class="set-name">${esc(set.name)}</span>
-      <span class="set-sub">${esc(set.sub)}</span>
-      <span class="set-count"><strong>${have}</strong> / ${total}</span>
-      <span class="set-bar"><b style="width:${(have / total) * 100}%"></b>${milestoneHtml(set, have)}</span>
-      <span class="set-next">${next}</span>
-    </button></li>`;
-  }).join("");
+  // "All" lists every set, grouped under a heading for each kind
+  const kinds = bookKind === "all" ? Object.keys(SET_KINDS) : [bookKind];
+  $("setGrid").innerHTML = kinds.map(kind => (bookKind === "all"
+    ? `<li class="set-group"><h2 class="section-title">${SET_KINDS[kind].label} sets</h2></li>` : "") +
+    SETS.filter(s => s.kind === kind).map(set => setCardHtml(set, owned)).join("")).join("");
+}
+
+function setCardHtml(set, owned) {
+  const have = setProgress(set, owned), total = set.cards.length, met = setTiersMet(set, have);
+  const goal = met < 3 ? tierGoal(set, met) : 0;
+  const next = met < 3 ? `Next: ${goal} card${goal === 1 ? "" : "s"} · ${SET_KINDS[set.kind].pay[met].toLocaleString()} coins` : "Complete";
+  const lead = set.kind === "team" ? set.id.slice(5) : set.cards[0].team;
+  return `<li><button class="set-card${met === 3 ? " complete" : ""}" type="button" data-set="${set.id}" style="${teamVars(lead)}">
+    <span class="set-name">${esc(set.name)}</span>
+    <span class="set-sub">${esc(set.sub)}</span>
+    <span class="set-count"><strong>${have}</strong> / ${total}</span>
+    <span class="set-bar"><b style="width:${(have / total) * 100}%"></b>${milestoneHtml(set, have)}</span>
+    <span class="set-next">${next}</span>
+  </button></li>`;
 }
 
 function openSet(id) {
