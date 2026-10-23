@@ -2218,3 +2218,15 @@ dialog.trade-dialog { width: min(860px, calc(100% - 32px)); }
   .add-friend { grid-template-columns: 1fr; }
   .friend-grid { grid-template-columns: 1fr; }
 }
+
+/* ─── OVR on the front of the card ─── */
+.pcard-ovr { position: absolute; top: 14cqw; left: 6cqw; z-index: 3; display: flex; flex-direction: column; align-items: center; line-height: 0.9; color: #fff; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55); }
+.pcard-ovr b { font-family: var(--display); font-weight: var(--display-w); font-size: 17cqw; letter-spacing: -0.01em; }
+.pcard-ovr span { font-size: 4.2cqw; font-weight: 800; letter-spacing: 0.14em; margin-top: 0.6cqw; opacity: 0.9; }
+.legendary .pcard-ovr { color: #2a1d00; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6); }
+
+/* ─── Collection: search and sort ─── */
+.coll-sortbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.coll-search { flex: 1 1 240px; min-width: 0; height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; }
+.coll-sort { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--muted); }
+.coll-sort select { height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; font-weight: 700; }
