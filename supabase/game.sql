@@ -179,7 +179,12 @@ begin
     'month_pts', (select coalesce(jsonb_object_agg(month, total), '{}'::jsonb) from (
       select public._daily_month(num) as month, sum(score) as total from public.daily_runs
       where owner = u and done group by public._daily_month(num)) m),
-    'trophies', public._trophies(u)
+    'trophies', public._trophies(u),
+    'event', public._event(),
+    'social', jsonb_build_object(
+      'requests', (select count(*) from public.friendships f where u in (f.a, f.b) and not f.accepted and f.requested_by <> u),
+      'challenges', (select count(*) from public.challenges c where c.to_id = u and not c.seen),
+      'trades', (select count(*) from public.trades t where t.to_id = u and t.status = 'open'))
   );
 end $$;
 
@@ -546,6 +551,35 @@ begin
     'login', jsonb_build_object('last', to_char(w.login_last, 'YYYY-MM-DD'), 'streak', w.login_streak, 'best', w.login_best));
 end $$;
 
+-- ─── WEEKEND PACKS ──────────────────────────────────────────────────────────
+-- Each weekend (Friday to Sunday, UTC) one limited pack is in the shop, and
+-- the theme rotates every week. js/app.js has the same schedule and pools.
+create or replace function public._event(at timestamptz default now()) returns jsonb language sql stable as $$
+  with d as (select (at at time zone 'utc')::date as day),
+  w as (select day, floor((day - date '2026-10-19') / 7.0)::int as week from d),
+  e as (
+    select w.*, (array['playoff', 'bigs', 'scorers', 'dimes', 'lockdown'])[1 + ((w.week % 5) + 5) % 5] as id from w
+  )
+  select jsonb_build_object(
+    'id', id,
+    'live', extract(isodow from day) >= 5,
+    'starts', to_char(date '2026-10-19' + week * 7 + 4, 'YYYY-MM-DD'),
+    'ends', to_char(date '2026-10-19' + week * 7 + 7, 'YYYY-MM-DD'),
+    'price', case id when 'playoff' then 5000 else 4000 end,
+    'odds', case id when 'playoff' then '{"legendary": 5, "epic": 20, "rare": 75, "common": 0}'::jsonb
+                    else '{"legendary": 4, "epic": 12, "rare": 34, "common": 50}'::jsonb end)
+  from e;
+$$;
+create or replace function public._event_has(id text, c public.catalog) returns boolean language sql immutable as $$
+  select case id
+    when 'playoff' then c.rarity <> 'common'
+    when 'bigs' then c.rpg >= 9
+    when 'scorers' then c.ppg >= 22
+    when 'dimes' then c.apg >= 7
+    when 'lockdown' then c.spg >= 1.6 or c.bpg >= 1.8
+    else false end;
+$$;
+
 -- ─── PACKS ──────────────────────────────────────────────────────────────────
 -- p_choice is the era or franchise for those packs; p_season the season the
 -- player is on, for Player Packs
@@ -554,31 +588,37 @@ returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   u uuid := public._uid();
   w public.wallets;
-  price int := (public.game_rules() -> 'prices' ->> p_type)::int;
+  ev jsonb := public._event();
+  price int := case when p_type = 'event' then (ev ->> 'price')::int else (public.game_rules() -> 'prices' ->> p_type)::int end;
   odds jsonb := case when p_type = 'elite' then '{"legendary": 8, "epic": 32, "rare": 60, "common": 0}'::jsonb
+                     when p_type = 'event' then ev -> 'odds'
                      else '{"legendary": 2, "epic": 8, "rare": 20, "common": 70}'::jsonb end;
   tiers text[] := array['legendary', 'epic', 'rare', 'common'];
   free boolean;
   roll float8 := random() * 100;
   i int := 4;
+  t int;
   card public.catalog;
   o public.owned_cards;
 begin
   if price is null then raise exception 'Unknown pack'; end if;
+  if p_type = 'event' and not (ev ->> 'live')::boolean then raise exception 'That pack is only in the shop at the weekend'; end if;
   w := public._wallet(u);
   free := p_type = 'player' and w.free_packs > 0;
   if not free and w.coins < price then raise exception 'Not enough coins'; end if;
-  -- Roll a rarity, then fall back a tier at a time if the pool has none of it
+  -- Roll a rarity, then fall back a tier at a time (down, then up) if the pool has none of it
   for k in 1..4 loop
     if roll < (odds ->> tiers[k])::float8 then i := k; exit; end if;
     roll := roll - (odds ->> tiers[k])::float8;
   end loop;
-  for k in i..4 loop
+  foreach t in array array[i, i + 1, i + 2, i + 3, i - 1, i - 2, i - 3] loop
+    continue when t < 1 or t > 4;
     select * into card from public.catalog c
-    where c.ord >= 0 and c.rarity = tiers[k] and case p_type
+    where c.ord >= 0 and c.rarity = tiers[t] and case p_type
       when 'player' then c.season = p_season
       when 'era' then c.era = p_choice
       when 'team' then c.franchise = p_choice
+      when 'event' then public._event_has(ev ->> 'id', c)
       else true end
     order by random() limit 1;
     exit when card.key is not null;
@@ -829,11 +869,306 @@ language sql stable security definer set search_path = public as $$
   limit 50;
 $$;
 
+-- ─── FRIENDS ────────────────────────────────────────────────────────────────
+-- One row per pair (a < b). A request is a row that isn't accepted yet.
+create table if not exists public.friendships (
+  a uuid not null references auth.users (id) on delete cascade,
+  b uuid not null references auth.users (id) on delete cascade,
+  requested_by uuid not null,
+  accepted boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (a, b),
+  check (a < b)
+);
+create index if not exists friendships_b on public.friendships (b);
+
+-- A challenge sent straight to a friend: a Daily score or a lineup to beat
+create table if not exists public.challenges (
+  id bigserial primary key,
+  from_id uuid not null references auth.users (id) on delete cascade,
+  to_id uuid not null references auth.users (id) on delete cascade,
+  kind text not null check (kind in ('daily', 'lineup')),
+  payload jsonb not null,
+  seen boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists challenges_to on public.challenges (to_id) where not seen;
+
+-- Card swaps between friends. give: the sender's cards, want: the friend's.
+create table if not exists public.trades (
+  id bigserial primary key,
+  from_id uuid not null references auth.users (id) on delete cascade,
+  to_id uuid not null references auth.users (id) on delete cascade,
+  give bigint[] not null,
+  want bigint[] not null,
+  status text not null default 'open' check (status in ('open', 'accepted', 'declined', 'cancelled', 'void')),
+  created_at timestamptz not null default now(),
+  done_at timestamptz
+);
+create index if not exists trades_from on public.trades (from_id, status);
+create index if not exists trades_to on public.trades (to_id, status);
+
+alter table public.friendships enable row level security;
+alter table public.challenges enable row level security;
+alter table public.trades enable row level security;
+revoke all on public.friendships, public.challenges, public.trades from anon, authenticated;
+
+create or replace function public._user_named(p_name text) returns uuid language sql stable as $$
+  select id from public.saves where lower(username) = lower(trim(p_name)) limit 1;
+$$;
+create or replace function public._name_of(u uuid) returns text language sql stable as $$
+  select username from public.saves where id = u;
+$$;
+create or replace function public._are_friends(x uuid, y uuid) returns boolean language sql stable as $$
+  select exists (select 1 from public.friendships where a = least(x, y) and b = greatest(x, y) and accepted);
+$$;
+-- The friend a name points to, or an error
+create or replace function public._friend(u uuid, p_name text) returns uuid language plpgsql stable as $$
+declare f uuid := public._user_named(p_name);
+begin
+  if f is null or not public._are_friends(u, f) then raise exception 'You''re not friends with %', p_name; end if;
+  return f;
+end $$;
+
+-- Send a request, or accept theirs if they already asked
+create or replace function public.friend_request(p_name text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  u uuid := public._uid();
+  f uuid := public._user_named(p_name);
+  fr public.friendships;
+begin
+  if public._name_of(u) is null then raise exception 'Pick a username on your profile first'; end if;
+  if f is null then raise exception 'No player called %', p_name; end if;
+  if f = u then raise exception 'That''s you'; end if;
+  select * into fr from public.friendships where a = least(u, f) and b = greatest(u, f) for update;
+  if found then
+    if fr.accepted then return jsonb_build_object('status', 'friends'); end if;
+    if fr.requested_by = f then
+      update public.friendships set accepted = true where a = fr.a and b = fr.b;
+      return jsonb_build_object('status', 'friends');
+    end if;
+    return jsonb_build_object('status', 'sent');
+  end if;
+  if (select count(*) from public.friendships where (a = u or b = u)) >= 200 then raise exception 'That''s a lot of friends. Remove some first.'; end if;
+  insert into public.friendships (a, b, requested_by) values (least(u, f), greatest(u, f), u);
+  return jsonb_build_object('status', 'sent');
+end $$;
+
+create or replace function public.friend_respond(p_name text, p_accept boolean)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := public._uid(); f uuid := public._user_named(p_name);
+begin
+  if p_accept then
+    update public.friendships set accepted = true where a = least(u, f) and b = greatest(u, f) and requested_by = f and not accepted;
+  else
+    delete from public.friendships where a = least(u, f) and b = greatest(u, f) and not accepted;
+  end if;
+  return jsonb_build_object('ok', found);
+end $$;
+
+-- Unfriend, cancel a request, and call off any open trades between the two
+create or replace function public.friend_remove(p_name text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare u uuid := public._uid(); f uuid := public._user_named(p_name);
+begin
+  delete from public.friendships where a = least(u, f) and b = greatest(u, f);
+  update public.trades set status = 'cancelled', done_at = now()
+  where status = 'open' and ((from_id = u and to_id = f) or (from_id = f and to_id = u));
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- Friends, requests both ways, and each friend's record and showcase
+create or replace function public.friends_list()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'username', s.username,
+    'team', left(coalesce(s.data #>> '{profile,team}', ''), 4),
+    'status', case when f.accepted then 'friend' when f.requested_by = public._uid() then 'outgoing' else 'incoming' end,
+    'best', coalesce(w.hl_best, 0),
+    'wins', coalesce(w.battle_w, 0), 'losses', coalesce(w.battle_l, 0),
+    'legends', (select count(*) from public.owned_cards o join public.catalog c on c.key = o.card where o.owner = s.id and c.rarity = 'legendary'),
+    'cards', (select count(*) from public.owned_cards o where o.owner = s.id),
+    'daily', (select jsonb_build_object('num', r.num, 'score', r.score) from public.daily_runs r
+              where r.owner = s.id and r.done order by r.num desc limit 1),
+    'showcase', coalesce((
+      select jsonb_agg(x) from (
+        select x from jsonb_array_elements(
+          case when jsonb_typeof(s.data #> '{profile,showcase}') = 'array' then s.data #> '{profile,showcase}' else '[]'::jsonb end) x
+        where jsonb_typeof(x) = 'string' and exists (
+          select 1 from public.owned_cards o join public.catalog c on c.key = o.card
+          where o.owner = s.id and c.name || '|' || c.season = x #>> '{}')
+        limit 3) q), '[]'::jsonb)
+  ) order by f.accepted, lower(s.username)), '[]'::jsonb)
+  from public.friendships f
+  join public.saves s on s.id = case when f.a = public._uid() then f.b else f.a end
+  left join public.wallets w on w.id = s.id
+  where public._uid() in (f.a, f.b) and s.username is not null;
+$$;
+
+-- A friend's cards, to pick from when offering a trade
+create or replace function public.friend_cards(p_name text)
+returns jsonb language plpgsql stable security definer set search_path = public as $$
+declare u uuid := public._uid(); f uuid := public._friend(u, p_name);
+begin
+  return public._cards_json(f);
+end $$;
+
+-- ─── CHALLENGES SENT TO A FRIEND ────────────────────────────────────────────
+-- p_kind 'daily': your finished score on Daily p_num. p_kind 'lineup': five
+-- of your cards as "Name|Season" keys, and a lineup name.
+create or replace function public.challenge_send(p_name text, p_kind text, p_num int default null,
+  p_keys text[] default null, p_lineup text default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  u uuid := public._uid();
+  f uuid := public._friend(u, p_name);
+  payload jsonb;
+  sc int;
+begin
+  if p_kind = 'daily' then
+    select score into sc from public.daily_runs where owner = u and num = p_num and done;
+    if sc is null then raise exception 'Finish that Daily first'; end if;
+    payload := jsonb_build_object('n', p_num, 's', sc);
+  elsif p_kind = 'lineup' then
+    if cardinality(p_keys) <> 5 or (select count(distinct split_part(k, '|', 1)) from unnest(p_keys) k) <> 5
+       or exists (select 1 from unnest(p_keys) k where not exists (
+         select 1 from public.owned_cards o join public.catalog c on c.key = o.card
+         where o.owner = u and c.name || '|' || c.season = k)) then
+      raise exception 'Your lineup has cards you don''t own';
+    end if;
+    payload := jsonb_build_object('k', to_jsonb(p_keys), 'name', left(regexp_replace(coalesce(p_lineup, ''), '[^\w ''’.-]', '', 'g'), 24));
+  else
+    raise exception 'Unknown challenge';
+  end if;
+  if (select count(*) from public.challenges where to_id = f and not seen) >= 20 then
+    raise exception '% has a full inbox. Try again later.', p_name;
+  end if;
+  insert into public.challenges (from_id, to_id, kind, payload) values (u, f, p_kind, payload);
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.challenge_inbox()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', c.id, 'from', public._name_of(c.from_id), 'kind', c.kind,
+    'payload', c.payload, 'at', floor(extract(epoch from c.created_at) * 1000)) order by c.created_at), '[]'::jsonb)
+  from public.challenges c where c.to_id = public._uid() and not c.seen;
+$$;
+
+create or replace function public.challenge_seen(p_id bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  update public.challenges set seen = true where id = p_id and to_id = public._uid();
+  return jsonb_build_object('ok', found);
+end $$;
+
+-- ─── TRADES ─────────────────────────────────────────────────────────────────
+-- Offer up to five of your cards for up to five of a friend's. Nothing moves
+-- until they accept, and then only if both sides still own every card.
+create or replace function public.trade_offer(p_name text, p_give bigint[], p_want bigint[])
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  u uuid := public._uid();
+  f uuid := public._friend(u, p_name);
+  g bigint[] := coalesce(p_give, '{}');
+  wt bigint[] := coalesce(p_want, '{}');
+  tid bigint;
+begin
+  if cardinality(g) + cardinality(wt) = 0 then raise exception 'Pick some cards to swap'; end if;
+  if cardinality(g) > 5 or cardinality(wt) > 5 then raise exception 'Up to five cards each way'; end if;
+  if (select count(distinct x) from unnest(g) x) <> cardinality(g) or (select count(distinct x) from unnest(wt) x) <> cardinality(wt) then
+    raise exception 'A card is in there twice';
+  end if;
+  if (select count(*) from public.owned_cards where id = any(g) and owner = u) <> cardinality(g) then
+    raise exception 'You don''t own all of those cards';
+  end if;
+  if (select count(*) from public.owned_cards where id = any(wt) and owner = f) <> cardinality(wt) then
+    raise exception '% doesn''t own all of those cards any more', p_name;
+  end if;
+  if (select count(*) from public.trades where from_id = u and status = 'open') >= 10 then
+    raise exception 'You have 10 offers waiting. Cancel one first.';
+  end if;
+  insert into public.trades (from_id, to_id, give, want) values (u, f, g, wt) returning id into tid;
+  return jsonb_build_object('id', tid);
+end $$;
+
+create or replace function public.trade_respond(p_id bigint, p_accept boolean)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  u uuid := public._uid();
+  t public.trades;
+  moved bigint[];
+begin
+  select * into t from public.trades where id = p_id and to_id = u and status = 'open' for update;
+  if not found then raise exception 'That offer is gone'; end if;
+  if not p_accept then
+    update public.trades set status = 'declined', done_at = now() where id = p_id;
+    return jsonb_build_object('status', 'declined');
+  end if;
+  if not public._are_friends(u, t.from_id) then raise exception 'You''re not friends any more'; end if;
+  -- Lock both sides' cards, then check nobody sold or traded them meanwhile
+  perform 1 from public.owned_cards where id = any(t.give || t.want) for update;
+  if (select count(*) from public.owned_cards where id = any(t.give) and owner = t.from_id) <> cardinality(t.give)
+     or (select count(*) from public.owned_cards where id = any(t.want) and owner = u) <> cardinality(t.want) then
+    update public.trades set status = 'void', done_at = now() where id = p_id;
+    return jsonb_build_object('status', 'void', 'message', 'Some of those cards were sold or traded already, so the offer is off.');
+  end if;
+  update public.owned_cards set owner = u where id = any(t.give);
+  update public.owned_cards set owner = t.from_id where id = any(t.want);
+  update public.trades set status = 'accepted', done_at = now() where id = p_id;
+  -- Other offers that included these cards can't happen now
+  moved := t.give || t.want;
+  update public.trades set status = 'void', done_at = now()
+  where status = 'open' and id <> p_id and (give && moved or want && moved);
+  return jsonb_build_object('status', 'accepted', 'cards', public._cards_json(u));
+end $$;
+
+create or replace function public.trade_cancel(p_id bigint)
+returns jsonb language plpgsql security definer set search_path = public as $$
+begin
+  update public.trades set status = 'cancelled', done_at = now() where id = p_id and from_id = public._uid() and status = 'open';
+  return jsonb_build_object('ok', found);
+end $$;
+
+-- Open offers both ways, plus the last week's finished ones
+create or replace function public.trades_list()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', t.id,
+    'dir', case when t.from_id = public._uid() then 'out' else 'in' end,
+    'with', public._name_of(case when t.from_id = public._uid() then t.to_id else t.from_id end),
+    'status', t.status,
+    'give', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.give)),
+    'want', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.want)),
+    'at', floor(extract(epoch from coalesce(t.done_at, t.created_at)) * 1000)
+  ) order by t.status <> 'open', coalesce(t.done_at, t.created_at) desc), '[]'::jsonb)
+  from public.trades t
+  where public._uid() in (t.from_id, t.to_id) and (t.status = 'open' or t.done_at > now() - interval '7 days');
+$$;
+
+-- What's waiting for the player: friend requests, challenges and offers
+create or replace function public.social_counts()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'requests', (select count(*) from public.friendships f where public._uid() in (f.a, f.b) and not f.accepted and f.requested_by <> public._uid()),
+    'challenges', (select count(*) from public.challenges c where c.to_id = public._uid() and not c.seen),
+    'trades', (select count(*) from public.trades t where t.to_id = public._uid() and t.status = 'open'));
+$$;
+
+-- The player's cards and coins, after a trade changed them
+create or replace function public.my_cards()
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('cards', public._cards_json(public._uid()),
+    'coins', (select coins from public.wallets where id = public._uid()));
+$$;
+
 -- ─── ACCESS ─────────────────────────────────────────────────────────────────
 -- Functions are callable by everyone unless revoked; the helpers stay private
 revoke execute on function public._uid(), public._wallet(uuid), public._stat(public.catalog, text), public._rarity_rank(text),
   public._utc_today(), public._daily_today(), public._daily_month(int), public._elapsed(timestamptz), public._cards_json(uuid),
-  public._trophies(uuid), public._make_daily(), public._daily_run(uuid, int), public._lineup_ovr(uuid, text[])
+  public._trophies(uuid), public._make_daily(), public._daily_run(uuid, int), public._lineup_ovr(uuid, text[]),
+  public._event(timestamptz), public._event_has(text, public.catalog), public._user_named(text), public._name_of(uuid),
+  public._are_friends(uuid, uuid), public._friend(uuid, text)
   from public, anon, authenticated;
 revoke execute on function public.game_state(int), public.hl_next(text), public.hl_answer(uuid, text),
   public.who_next(text), public.who_hint(uuid), public.who_answer(uuid, int), public.daily_next(int),
@@ -845,6 +1180,16 @@ grant execute on function public.game_state(int), public.hl_next(text), public.h
   public.daily_answer(int, text), public.claim_login(), public.open_pack(text, text, text),
   public.sell_copies(text, int), public.sell_all_copies(), public.claim_sets(),
   public.battle_opponent(text, text[]), public.battle_play(uuid) to authenticated;
+revoke execute on function public.friend_request(text), public.friend_respond(text, boolean), public.friend_remove(text),
+  public.friends_list(), public.friend_cards(text), public.challenge_send(text, text, int, text[], text),
+  public.challenge_inbox(), public.challenge_seen(bigint), public.trade_offer(text, bigint[], bigint[]),
+  public.trade_respond(bigint, boolean), public.trade_cancel(bigint), public.trades_list(),
+  public.social_counts(), public.my_cards() from public, anon;
+grant execute on function public.friend_request(text), public.friend_respond(text, boolean), public.friend_remove(text),
+  public.friends_list(), public.friend_cards(text), public.challenge_send(text, text, int, text[], text),
+  public.challenge_inbox(), public.challenge_seen(bigint), public.trade_offer(text, bigint[], bigint[]),
+  public.trade_respond(bigint, boolean), public.trade_cancel(bigint), public.trades_list(),
+  public.social_counts(), public.my_cards() to authenticated;
 grant execute on function public.daily_puzzle(int), public.leaderboard(text, int, text), public.game_rules() to anon, authenticated;
 
 -- ─── MOVING EXISTING ACCOUNTS ACROSS ────────────────────────────────────────

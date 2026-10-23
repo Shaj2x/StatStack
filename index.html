@@ -88,6 +88,7 @@
         <button class="avatar-btn" id="avatarBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="accountMenu" aria-label="Account menu">
           <span class="avatar" data-avatar></span>
           <span class="sync-dot" id="syncDot" hidden></span>
+          <span class="notify-dot" id="notifyDot" hidden></span>
         </button>
         <div class="account-menu" id="accountMenu" role="menu" aria-label="Account" hidden>
           <div class="menu-head">
@@ -97,6 +98,10 @@
           <a class="menu-item" role="menuitem" href="#profile">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>
             Profile &amp; badges
+          </a>
+          <a class="menu-item" role="menuitem" href="#friends">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20c1-3.6 3.5-5.5 6.5-5.5s5.5 1.9 6.5 5.5"></path><circle cx="17" cy="9" r="2.8"></circle><path d="M16 14.6c2.6 0 4.6 1.6 5.5 4.6"></path></svg>
+            Friends &amp; trades<span class="menu-count" id="friendsCount" hidden></span>
           </a>
           <button class="menu-item" role="menuitem" type="button" id="settingsBtn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
@@ -292,6 +297,17 @@
         <ol class="daily-dots" id="dailyDots" aria-label="Progress"></ol>
       </div>
       <div id="dailyBody"></div>
+    </section>
+
+    <!-- FRIENDS -->
+    <section class="screen page" id="screen-friends" data-screen="friends" aria-labelledby="friendsTitle">
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Play with friends</p>
+          <h1 class="display" id="friendsTitle">Friends</h1>
+        </div>
+      </div>
+      <div id="friendsBody"></div>
     </section>
 
     <!-- LOCKER -->
@@ -510,6 +526,8 @@
         </button>
       </div>
       <ul class="news-list" id="newsList">
+        <li><span class="news-icon n-friends" aria-hidden="true">+1</span><div><strong>Friends and trades</strong><span>Add friends by username, see their records, send them your Daily score or lineup to beat, and swap cards.</span></div><a class="news-go" href="#friends">Friends</a></li>
+        <li><span class="news-icon n-event" aria-hidden="true">!</span><div><strong>Weekend packs</strong><span>A limited pack every Friday to Sunday with a new theme each week. This weekend: Playoff Heroes.</span></div><a class="news-go" href="#packs">Shop</a></li>
         <li><span class="news-icon n-clock" aria-hidden="true">8</span><div><strong>Shot clock and fair play</strong><span>Answer in 6–8 seconds; fast right answers pay a bonus. The server now keeps every account's coins, cards and scores, so the leaderboards are fair.</span></div><a class="news-go" href="#play">Play</a></li>
         <li><span class="news-icon n-daily" aria-hidden="true">10</span><div><strong>Daily Challenge</strong><span>Ten hard matchups a day, the same for everyone. Share your score to challenge friends.</span></div><a class="news-go" href="#daily">Play</a></li>
         <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a five with 2K-style ratings, play for coins, or challenge a friend's five.</span></div><a class="news-go" href="#locker">Build</a></li>
@@ -550,6 +568,35 @@
       <p class="muted" id="setInfo"></p>
       <div class="set-bar"><b id="setBar"></b></div>
       <ul class="set-cards" id="setCards"></ul>
+    </div>
+  </dialog>
+
+  <dialog class="settings trade-dialog" id="tradeDialog" aria-labelledby="tradeTitle">
+    <div class="settings-inner">
+      <div class="settings-head">
+        <div>
+          <p class="eyebrow">Trade</p>
+          <h2 id="tradeTitle">Trade</h2>
+        </div>
+        <button class="icon-btn" type="button" id="tradeClose" aria-label="Close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+        </button>
+      </div>
+      <p class="muted">Pick up to five cards each way. Nothing moves until they accept.</p>
+      <div class="trade-cols">
+        <section aria-labelledby="tradeGiveH">
+          <h3 id="tradeGiveH">You give <span id="tradeGiveN">0/5</span></h3>
+          <input class="picker-search" id="tradeGiveSearch" type="search" placeholder="Search your cards" aria-label="Search your cards">
+          <ul class="trade-pick" id="tradeGive"></ul>
+        </section>
+        <section aria-labelledby="tradeWantH">
+          <h3 id="tradeWantH">You get <span id="tradeWantN">0/5</span></h3>
+          <input class="picker-search" id="tradeWantSearch" type="search" placeholder="Search their cards" aria-label="Search their cards">
+          <ul class="trade-pick" id="tradeWant"></ul>
+        </section>
+      </div>
+      <p class="form-msg" id="tradeMsg" role="status" aria-live="polite"></p>
+      <button class="pill pill-solid" id="tradeSend" type="button" disabled>Send offer</button>
     </div>
   </dialog>
 
@@ -610,5 +657,6 @@
 <script src="js/app.js"></script>
 <script src="js/modes.js"></script>
 <script src="js/goals.js"></script>
+<script src="js/social.js"></script>
 </body>
 </html>
