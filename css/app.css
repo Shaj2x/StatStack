@@ -1625,6 +1625,8 @@ dialog.news-dialog { width: min(720px, calc(100% - 32px)); }
 .news-list li div span { font-size: 13px; color: var(--muted); }
 .news-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: var(--display); font-weight: var(--display-w); font-size: 18px; color: var(--ink-0); }
 .n-clock { background: var(--bad); color: #fff; }
+.n-friends { background: var(--r-rare); }
+.n-event { background: linear-gradient(150deg, #7a1f8f, #d4375e 55%, #ffb547); color: #fff; }
 .n-daily { background: var(--gold); }
 .n-who { background: var(--r-epic); }
 .n-packs { background: linear-gradient(160deg, #0e2240 0%, #13305a 50%, #005a91 50%, #003a5e 100%); }
@@ -2015,7 +2017,7 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 .wallet strong { font-family: var(--display); font-weight: var(--display-w); font-size: 30px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
 .shop { display: flex; flex-direction: column; gap: 16px; }
 .shelf {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(8px, 2vw, 22px);
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: clamp(8px, 2vw, 22px);
   padding: 26px clamp(12px, 2.5vw, 28px) 18px; border-radius: 26px; border: 1px solid var(--line);
   background: radial-gradient(80% 60% at 50% 100%, color-mix(in srgb, var(--gold) 10%, transparent), transparent 70%), linear-gradient(180deg, var(--ink-1), var(--ink-0));
   position: relative;
@@ -2139,3 +2141,80 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 .shot-clock.clocking { display: grid; }
 .who-top { gap: 12px; }
 .auth-note { font-size: 13px; color: var(--muted); }
+
+/* ─── Weekend pack: holographic foil with a countdown tag ─── */
+.pack-event { background: linear-gradient(150deg, #3a0f5e 0%, #7a1f8f 30%, #d4375e 55%, #ffb547 80%, #fff1b8 100%); }
+.pack-event.ev-bigs { background: linear-gradient(150deg, #052a33 0%, #0b6b6b 40%, #31c6a0 70%, #d9ffe9 100%); }
+.pack-event.ev-scorers { background: linear-gradient(150deg, #3b0a00 0%, #a8240b 40%, #ff7a1a 70%, #ffe08a 100%); }
+.pack-event.ev-dimes { background: linear-gradient(150deg, #071a4a 0%, #1d4bd8 40%, #59b7ff 70%, #e6f6ff 100%); }
+.pack-event.ev-lockdown { background: linear-gradient(150deg, #101010 0%, #3b3b3b 40%, #8a8f98 70%, #f2f4f7 100%); }
+.pack.pack-event { background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.2) 45%, transparent 60%), linear-gradient(150deg, #3a0f5e 0%, #7a1f8f 30%, #d4375e 55%, #ffb547 80%, #fff1b8 100%); }
+.pack.pack-event .pack-top { background-color: #3a0f5e; }
+.foil.pack-event .foil-shine { opacity: 0.9; }
+.foil-limited { position: absolute; top: 52%; left: 50%; translate: -50% -50%; padding: 3px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.6); color: #fff; font-family: var(--mono); font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; }
+.shelf-pack.locked .foil { filter: grayscale(0.85) brightness(0.6); }
+.event-when { display: inline-flex; align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: var(--ink-2); color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+.event-when.live { background: color-mix(in srgb, var(--bad) 22%, var(--ink-0)); color: #ff9b9b; }
+@media (max-width: 520px) { .foil-limited { font-size: 7px; padding: 2px 4px; } }
+
+/* ─── Friends and trades ─── */
+.notify-dot { position: absolute; top: 0; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 0 2px var(--ink-0); }
+.menu-count { margin-left: auto; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--bad); color: #fff; font-size: 12px; font-weight: 800; display: inline-grid; place-items: center; }
+#friendsBody { display: flex; flex-direction: column; gap: 22px; }
+.friends-empty { max-width: 620px; }
+.friends-empty .pill { align-self: flex-start; }
+.add-friend { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; max-width: 620px; }
+.add-friend .form-msg { grid-column: 1 / -1; }
+.add-friend input { height: 46px; }
+.friends-sec { display: flex; flex-direction: column; gap: 12px; }
+.fr-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.fr-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-radius: 16px; background: var(--ink-1); border: 1px solid var(--line); }
+.fr-row .btn-row { display: flex; gap: 8px; }
+.friend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+.friend {
+  --team-bg: #2a2f3a; --team-bg2: #15181f; --team-accent: var(--gold);
+  display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 22px; border: 1px solid var(--line);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--team-bg) 30%, var(--ink-1)), var(--ink-1) 60%);
+}
+.friend-head { display: flex; align-items: center; gap: 12px; }
+.friend-head div { display: flex; flex-direction: column; min-width: 0; }
+.friend-head strong { font-family: var(--display); font-weight: var(--display-w); font-size: 24px; line-height: 1; text-transform: uppercase; overflow-wrap: anywhere; }
+.friend-head span:not(.avatar) { font-size: 13px; color: var(--muted); }
+.friend-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.friend-stats div { padding: 8px; border-radius: 12px; background: var(--ink-0); text-align: center; }
+.friend-stats dt { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+.friend-stats dd { font-family: var(--display); font-weight: var(--display-w); font-size: 22px; line-height: 1.1; }
+.friend-daily { font-size: 14px; color: var(--muted); }
+.friend-daily strong { color: var(--text); }
+.friend-show, .trade-strip { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 84px)); gap: 8px; }
+.friend-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; }
+.friend-actions .link-btn { margin-left: auto; min-height: 44px; }
+.trade-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.trade { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: var(--ink-1); border: 1px solid var(--line); }
+.trade.closed { opacity: 0.75; }
+.trade-line { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.trade-status { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.trade-sides { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.trade-sides > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.trade-label { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.trade-swap { font-size: 24px; color: var(--gold); }
+.trade .btn-row { display: flex; gap: 8px; }
+.trade-strip { grid-template-columns: repeat(5, minmax(0, 64px)); }
+dialog.trade-dialog { width: min(860px, calc(100% - 32px)); }
+.trade-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.trade-cols section { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.trade-cols h3 { display: flex; justify-content: space-between; }
+.trade-cols h3 span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.trade-pick { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; max-height: min(calc(46vh / var(--z, 1)), 420px); overflow-y: auto; padding: 4px; }
+.trade-card { display: block; width: 100%; padding: 0; border: 0; background: none; border-radius: 12px; cursor: pointer; opacity: 0.8; transition: opacity 150ms ease, transform 120ms var(--ease-out); }
+.trade-card:hover { opacity: 1; }
+.trade-card.on { opacity: 1; outline: 3px solid var(--gold); outline-offset: 2px; }
+.trade-card:active { transform: scale(0.97); }
+.trade-none { grid-column: 1 / -1; padding: 12px 0; }
+@media (max-width: 640px) {
+  .trade-cols { grid-template-columns: 1fr; }
+  .trade-sides { grid-template-columns: 1fr; }
+  .trade-swap { transform: rotate(90deg); justify-self: center; }
+  .add-friend { grid-template-columns: 1fr; }
+  .friend-grid { grid-template-columns: 1fr; }
+}

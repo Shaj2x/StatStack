@@ -117,6 +117,22 @@ with coins capped at 50,000. New accounts start fresh: coins and cards earned
 as a guest stay on that device. Until `game.sql` is installed, signed-in
 players keep score in their save as before.
 
+### Friends, trades and weekend packs
+
+Signed-in players with a username can add friends by username (Friends &
+trades, in the account menu). A friend's card shows their best streak,
+battle record, legendaries, last Daily score and showcase. You can send a
+friend your Daily score or your starting five to beat; it lands in their
+inbox and opens like a challenge link. Friends can offer each other up to
+five cards each way. Nothing moves until the other side accepts, and the
+server checks both sides still own every card at that moment.
+
+Every weekend (Friday to Sunday, UTC) the shop has one limited pack with
+better odds. The theme rotates weekly: Playoff Heroes, Glass Cleaners
+(9+ rebounds), Bucket Getters (22+ points), Dime Droppers (7+ assists) and
+Lockdown (1.6+ steals or 1.8+ blocks). The schedule is in both
+`supabase/game.sql` and `js/app.js`.
+
 Guests play entirely in the browser, with the same rules and clocks; nothing
 they do reaches the leaderboards. Signing out resets the device to a fresh
 guest.

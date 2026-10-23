@@ -133,7 +133,7 @@ const wins  = ["Nice read", "Most people miss that", "Great eye for stats", "Kee
 const fails = ["87% got that wrong too", "Tough one", "Stats can be deceiving", "Even the pros miss that one"];
 
 // ─── SCREENS ────────────────────────────────────────────────────────────────
-const SCREENS = ["play", "who", "daily", "packs", "collection", "book", "locker", "ranks", "profile"];
+const SCREENS = ["play", "who", "daily", "packs", "collection", "book", "locker", "ranks", "profile", "friends"];
 // Which top-bar tab each screen belongs to
 const SCREEN_TAB = {play: "play", who: "play", daily: "daily", packs: "packs", collection: "cards", book: "cards", locker: "cards", ranks: "ranks"};
 // Screens defined in js/modes.js register how to draw themselves here
@@ -692,6 +692,42 @@ const PACK_TYPES = [
     blurb: () => "Rare or better, guaranteed. From any season.",
     pool: () => ALL_CARDS},
 ];
+// ─── WEEKEND PACKS ──────────────────────────────────────────────────────────
+// One limited pack each weekend (Friday to Sunday, UTC), a new theme every
+// week. supabase/game.sql deals them for accounts on the same schedule.
+const EVENTS = {
+  playoff: {name: "Playoff Heroes", blurb: "Rare or better from every era. Better odds at an epic or legendary.", price: 5000,
+    odds: {legendary: 5, epic: 20, rare: 75, common: 0}, has: c => c.rarity !== "common"},
+  bigs: {name: "Glass Cleaners", blurb: "Every card averaged 9+ rebounds a game.", has: c => c.rpg >= 9},
+  scorers: {name: "Bucket Getters", blurb: "Every card scored 22+ points a game.", has: c => c.ppg >= 22},
+  dimes: {name: "Dime Droppers", blurb: "Every card dished 7+ assists a game.", has: c => c.apg >= 7},
+  lockdown: {name: "Lockdown", blurb: "Every card had 1.6+ steals or 1.8+ blocks a game.", has: c => c.spg >= 1.6 || c.bpg >= 1.8},
+};
+const EVENT_ORDER = ["playoff", "bigs", "scorers", "dimes", "lockdown"];
+const EVENT_ODDS = {legendary: 4, epic: 12, rare: 34, common: 50};
+const DAY_MS = 86400000, EVENT_EPOCH = Date.UTC(2026, 9, 19); // a Monday
+function eventAt(now = Date.now()) {
+  const d = new Date(now), day = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const week = Math.floor((day - EVENT_EPOCH) / (7 * DAY_MS));
+  const id = EVENT_ORDER[((week % 5) + 5) % 5], dow = new Date(day).getUTCDay();
+  const starts = EVENT_EPOCH + (week * 7 + 4) * DAY_MS;
+  return {id, ...EVENTS[id], price: EVENTS[id].price || 4000, odds: EVENTS[id].odds || EVENT_ODDS,
+    live: dow === 5 || dow === 6 || dow === 0, starts, ends: starts + 3 * DAY_MS};
+}
+// "2d 4h", "5h 12m", "9m"
+function timeLeft(ms) {
+  const m = Math.max(0, Math.floor(ms / 60000)), d = Math.floor(m / 1440), h = Math.floor(m / 60) % 24;
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m % 60}m` : `${m % 60}m`;
+}
+const EVENT_PACK = {
+  id: "event", event: true,
+  get name() { return eventAt().name; },
+  get price() { return eventAt().price; },
+  get odds() { return eventAt().odds; },
+  blurb: () => eventAt().blurb,
+  pool: () => ALL_CARDS.filter(eventAt().has),
+};
+PACK_TYPES.push(EVENT_PACK);
 const PACK_PRICE = PACK_TYPES[0].price;
 let packChoice = {era: "retro", team: "BOS", pack: "player", ...load('statstack_packChoice', {})};
 
@@ -711,8 +747,9 @@ function renderShop() {
   const sel = PACK_TYPES.find(t => t.id === packChoice.pack) || PACK_TYPES[0];
   $("shop").innerHTML = `<div class="shelf" role="radiogroup" aria-label="Pick a pack">${PACK_TYPES.map(t => {
     const free = t.id === "player" ? profile.freePacks.player : 0, on = t === sel;
-    return `<button class="shelf-pack${on ? " on" : ""}${!free && coins < t.price ? " short" : ""}" type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-select="${t.id}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
-      <span class="foil pack-${t.id}" aria-hidden="true"><span class="foil-shine"></span><span class="display">STAT<br>STACK</span><span class="pack-art-sub">${t.name}</span>${free ? `<span class="foil-free">${free} free</span>` : ""}</span>
+    const ev = t.event ? eventAt() : null;
+    return `<button class="shelf-pack${on ? " on" : ""}${!free && coins < t.price ? " short" : ""}${ev && !ev.live ? " locked" : ""}" type="button" role="radio" aria-checked="${on}" tabindex="${on ? 0 : -1}" data-select="${t.id}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
+      <span class="foil pack-${t.id}${ev ? ` ev-${ev.id}` : ""}" aria-hidden="true"><span class="foil-shine"></span><span class="display">STAT<br>STACK</span><span class="pack-art-sub">${t.name}</span>${free ? `<span class="foil-free">${free} free</span>` : ""}${ev ? `<span class="foil-limited">${ev.live ? `${timeLeft(ev.ends - Date.now())} left` : "Fri"}</span>` : ""}</span>
       <span class="shelf-name">${t.name}</span>
       <span class="shelf-price"><span class="coin" aria-hidden="true"></span>${free ? "Free" : t.price.toLocaleString()}</span>
     </button>`;
@@ -742,6 +779,7 @@ function counterHtml(t) {
   return `<section class="counter pack-tone-${t.id}" aria-label="${t.name}" style="${t.id === "team" ? teamVars(packChoice.team) : ""}">
     <div class="counter-main">
       <div class="counter-head">
+        ${t.event ? `<p class="event-when${eventAt().live ? " live" : ""}">${eventAt().live ? `Weekend only · ends in ${timeLeft(eventAt().ends - Date.now())}` : `Back Friday · opens in ${timeLeft(eventAt().starts - Date.now())}`}</p>` : ""}
         <h2>${t.name}</h2>
         <p class="muted">${esc(t.blurb())}</p>
       </div>
@@ -761,7 +799,7 @@ function counterHtml(t) {
         <span class="meter"><i style="width:${pool.length ? Math.max(have ? 2 : 0, Math.round(100 * have / pool.length)) : 0}%"></i></span>
       </div>
       <p class="buy-price"><span class="coin" aria-hidden="true"></span>${free ? "Free" : t.price.toLocaleString()}</p>
-      <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} buy-btn" type="button" data-buy="${t.id}"${short || opening || buying ? " disabled" : ""}>${free ? `Open free · ${free} left` : "Open pack"}</button>
+      <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} buy-btn" type="button" data-buy="${t.id}"${short || opening || buying || (t.event && !eventAt().live) ? " disabled" : ""}>${free ? `Open free · ${free} left` : t.event && !eventAt().live ? "Back Friday" : "Open pack"}</button>
       ${short ? `<div class="save-up">
         <span class="meter"><i style="width:${Math.round(100 * coins / t.price)}%"></i></span>
         <span><strong>${short.toLocaleString()}</strong> more coins to go</span>
@@ -795,7 +833,7 @@ let buying = false;
 async function buyPack(typeId = "player") {
   const type = PACK_TYPES.find(t => t.id === typeId);
   const free = typeId === "player" && profile.freePacks.player > 0;
-  if (!type || (!free && coins < type.price) || opening || buying) return;
+  if (!type || (!free && coins < type.price) || opening || buying || (type.event && !eventAt().live)) return;
   let card;
   if (Account.ranked()) {
     // The server takes the coins and deals the card
@@ -1498,6 +1536,7 @@ function applyGame(st) {
   streak = st.hl.streak;
   multiplier = Math.floor(streak / 3) + 1;
   if (SCREEN_HOOKS.gameReset) SCREEN_HOOKS.gameReset();
+  if (SCREEN_HOOKS.gameState) SCREEN_HOOKS.gameState(st);
   checkBadges(false);
   updateBoard();
   renderIdentity();

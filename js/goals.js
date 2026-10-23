@@ -85,7 +85,7 @@ $("loginDialog").addEventListener("cancel", e => { e.preventDefault(); claimLogi
 // Shown once per account for each update, before the daily reward. Guests
 // never see it. The account remembers it, so other devices skip it too. Bump
 // NEWS_VERSION (and the list in index.html) when there's something new.
-const NEWS_VERSION = "2026-10c";
+const NEWS_VERSION = "2026-10d";
 let newsShownOnce = false; // if storage is blocked, still only show it once per visit
 // A signed-in save has arrived (or can't), so per-account choices are safe to make
 const accountSettled = () => Account.settled();
