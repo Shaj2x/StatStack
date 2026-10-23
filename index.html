@@ -17,13 +17,20 @@
   } catch (e) {}
 })();
 // Big screens: scale the whole game up, so a large monitor doesn't get a
-// laptop-sized game. The layout is designed for about 1500 × 860.
+// laptop-sized game. The layout is designed for about 1500 × 860. Players
+// can make it bigger or smaller on each device (Settings → Size).
 (function () {
   function fit() {
-    var z = Math.min(innerWidth / 1500, innerHeight / 860);
-    z = Math.max(1, Math.min(2.4, Math.floor(z * 20) / 20));
+    var auto = Math.max(1, Math.min(2.4, Math.min(innerWidth / 1500, innerHeight / 860)));
+    var own = 1;
+    try { own = parseFloat(localStorage.getItem("statstack_size")) || 1; } catch (e) {}
+    // Never so big that the layout for this screen width stops fitting
+    var room = innerWidth >= 1000 ? 1000 : innerWidth >= 760 ? 760 : 360;
+    var most = Math.max(1, innerWidth / room);
+    var z = Math.max(0.7, Math.min(3, most, Math.floor(auto * own * 20) / 20));
     document.documentElement.style.setProperty("--z", z);
   }
+  window.fitSize = fit;
   fit();
   addEventListener("resize", fit);
 })();
@@ -569,6 +576,7 @@
         </button>
       </div>
       <label class="switch-row"><span>Sound effects</span><input type="checkbox" role="switch" id="soundToggle"></label>
+      <label class="slider-row"><span>Size</span><input type="range" id="sizeSlider" min="70" max="150" step="5" aria-label="Size of the game on this device"><output id="sizeOut">100%</output></label>
       <label class="slider-row" id="volumeRow"><span>Volume</span><input type="range" id="volumeSlider" min="0" max="100" step="5" aria-label="Sound volume"><output id="volumeOut">70%</output></label>
       <label class="switch-row" id="hapticsRow"><span>Vibration</span><input type="checkbox" role="switch" id="hapticsToggle"></label>
       <fieldset class="theme-pick">
