@@ -1626,6 +1626,8 @@ dialog.news-dialog { width: min(720px, calc(100% - 32px)); }
 .news-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: var(--display); font-weight: var(--display-w); font-size: 18px; color: var(--ink-0); }
 .n-clock { background: var(--bad); color: #fff; }
 .n-friends { background: var(--r-rare); }
+.n-fx { background: conic-gradient(from 200deg, #ff5f6d, #ffc371, #6dffb0, #4fd8ff, #8b7bff, #ff5f6d); color: #fff; }
+.n-ovr { background: var(--gold); }
 .n-event { background: linear-gradient(150deg, #7a1f8f, #d4375e 55%, #ffb547); color: #fff; }
 .n-daily { background: var(--gold); }
 .n-who { background: var(--r-epic); }
@@ -2230,3 +2232,67 @@ dialog.trade-dialog { width: min(860px, calc(100% - 32px)); }
 .coll-search { flex: 1 1 240px; min-width: 0; height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; }
 .coll-sort { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 800; color: var(--muted); }
 .coll-sort select { height: 44px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--ink-1); color: var(--text); font: inherit; font-weight: 700; }
+
+/* ─── Weekly card finishes (cards from that week's weekend pack) ─── */
+.fx-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.fx .pcard-photo { z-index: 2; }
+.fx-tag { position: absolute; top: 15cqw; right: 5cqw; z-index: 4; padding: 1cqw 3cqw; border-radius: 999px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 3.6cqw; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; backdrop-filter: blur(4px); }
+.fx-note { margin-top: 6px; font-size: 14px; color: var(--muted); }
+.fx-note strong { color: var(--gold); }
+
+.fx-chrome { --frame: #e8eef5; }
+.fx-chrome .fx-layer { mix-blend-mode: overlay; background: linear-gradient(135deg, rgba(255,255,255,.7), rgba(150,160,175,.1) 28%, rgba(255,255,255,.65) 48%, rgba(110,120,140,.15) 68%, rgba(255,255,255,.55)); }
+.fx-chrome .pcard { box-shadow: 0 0 0 3px #e8eef5, 0 0 0 5px #8b95a3, 0 12px 30px rgba(0,0,0,.45); }
+
+.fx-neon { --frame: #ff3fd8; }
+.fx-neon .fx-layer { background: linear-gradient(180deg, rgba(10,0,30,.55), rgba(10,0,30,.15) 50%, rgba(10,0,30,.6)), repeating-linear-gradient(0deg, rgba(63,245,225,.08) 0 2px, transparent 2px 6px); }
+.fx-neon .pcard { box-shadow: 0 0 0 2px #ff3fd8, 0 0 18px #ff3fd8, inset 0 0 22px rgba(63,245,225,.6), 0 12px 30px rgba(0,0,0,.5); }
+.fx-neon .pcard-ovr b { color: #3ff5e1; text-shadow: 0 0 12px #3ff5e1; }
+
+.fx-galaxy { --frame: #8f7bff; }
+.fx-galaxy .fx-layer { background:
+  radial-gradient(1.2px 1.2px at 20% 30%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 70% 20%, #fff 50%, transparent 51%),
+  radial-gradient(1.4px 1.4px at 40% 70%, #fff 50%, transparent 51%), radial-gradient(1px 1px at 85% 60%, #fff 50%, transparent 51%),
+  radial-gradient(1px 1px at 10% 80%, #fff 50%, transparent 51%), radial-gradient(1.2px 1.2px at 55% 45%, #fff 50%, transparent 51%),
+  radial-gradient(60% 50% at 30% 30%, rgba(143,123,255,.55), transparent 70%), radial-gradient(60% 50% at 75% 75%, rgba(255,90,200,.45), transparent 70%),
+  linear-gradient(160deg, rgba(8,6,30,.75), rgba(20,10,60,.55)); }
+.fx-galaxy .pcard { box-shadow: 0 0 0 2px #8f7bff, 0 0 24px rgba(143,123,255,.55), 0 12px 30px rgba(0,0,0,.5); }
+
+.fx-lava { --frame: #ff6a1a; }
+.fx-lava .fx-layer { mix-blend-mode: screen; background: radial-gradient(80% 60% at 50% 110%, rgba(255,120,20,.95), transparent 70%), radial-gradient(50% 40% at 15% 80%, rgba(255,40,0,.7), transparent 70%), linear-gradient(0deg, rgba(120,10,0,.4), transparent 60%); }
+.fx-lava .pcard { box-shadow: 0 0 0 2px #ff6a1a, 0 0 22px rgba(255,90,20,.6), 0 12px 30px rgba(0,0,0,.5); }
+
+.fx-ice { --frame: #bfefff; }
+.fx-ice .fx-layer { mix-blend-mode: screen; background: linear-gradient(160deg, rgba(190,240,255,.55), rgba(90,170,255,.15) 50%, rgba(220,250,255,.5)), repeating-linear-gradient(60deg, rgba(255,255,255,.12) 0 1px, transparent 1px 9px), repeating-linear-gradient(-60deg, rgba(255,255,255,.1) 0 1px, transparent 1px 11px); }
+.fx-ice .pcard { box-shadow: 0 0 0 2px #bfefff, 0 0 20px rgba(150,220,255,.6), 0 12px 30px rgba(0,0,0,.45); }
+
+.fx-gold { --frame: #ffd34d; }
+.fx-gold .fx-layer { mix-blend-mode: overlay; background: linear-gradient(135deg, #fff1b0, #d9a417 30%, #fff3c4 50%, #b8860b 70%, #ffe27a); opacity: .85; }
+.fx-gold .pcard { box-shadow: 0 0 0 3px #ffd34d, 0 0 0 5px #8a6408, 0 0 24px rgba(255,201,60,.5), 0 12px 30px rgba(0,0,0,.45); }
+
+.fx-retro { --frame: #f2e3c3; }
+.fx-retro .pcard { filter: sepia(.45) saturate(1.2); box-shadow: 0 0 0 4px #f2e3c3, 0 0 0 6px #b5462f, 0 12px 30px rgba(0,0,0,.45); }
+.fx-retro .fx-layer { mix-blend-mode: multiply; background: radial-gradient(circle, rgba(120,60,20,.25) 1px, transparent 1.5px) 0 0 / 6px 6px, linear-gradient(180deg, rgba(242,227,195,.35), rgba(181,70,47,.15)); }
+
+.fx-prism { --frame: #fff; }
+.fx-prism .fx-layer { mix-blend-mode: color-dodge; opacity: .65; background: conic-gradient(from 200deg at 60% 40%, #ff5f6d, #ffc371, #f9f871, #6dffb0, #4fd8ff, #8b7bff, #ff7ad9, #ff5f6d); }
+.fx-prism .pcard { box-shadow: 0 0 0 2px #fff, 0 0 26px rgba(255,255,255,.35), 0 12px 30px rgba(0,0,0,.45); }
+
+/* Small tiles: a coloured ring in the week's colour */
+.mini.fx-chrome { --rc: #e8eef5; } .mini.fx-neon { --rc: #ff3fd8; } .mini.fx-galaxy { --rc: #8f7bff; } .mini.fx-lava { --rc: #ff6a1a; }
+.mini.fx-ice { --rc: #bfefff; } .mini.fx-gold { --rc: #ffd34d; } .mini.fx-retro { --rc: #f2e3c3; } .mini.fx-prism { --rc: #fff; }
+.mini.fx::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .55; mix-blend-mode: screen; background: linear-gradient(160deg, var(--rc), transparent 55%); }
+
+/* ─── In-game confirmation ─── */
+dialog.confirm-dialog { width: min(460px, calc(100% - 32px)); }
+.confirm-dialog h2 { font-size: 30px; }
+.confirm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 4px; }
+.confirm-row .pill { min-width: 0; width: 100%; }
+.pill-danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+.confirm-coins { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: var(--display-w); font-size: 40px; line-height: 1; color: var(--gold); }
+.confirm-coins .coin { width: 30px; height: 30px; }
+.confirm-cards { list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.confirm-cards li { position: relative; }
+.confirm-n { position: absolute; z-index: 3; bottom: 6px; right: 6px; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 800; }
+.confirm-more { font-size: 13px; }
+.confirm-row .pill { white-space: nowrap; }

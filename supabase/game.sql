@@ -36,6 +36,8 @@ create table if not exists public.owned_cards (
   pulled timestamptz not null default now()
 );
 create index if not exists owned_cards_owner on public.owned_cards (owner);
+-- A special finish from a weekend pack (null for a plain card)
+alter table public.owned_cards add column if not exists style text;
 
 -- A question or opponent handed out and waiting for an answer
 create table if not exists public.rounds (
@@ -129,7 +131,7 @@ create or replace function public._elapsed(t timestamptz) returns float8 languag
 $$;
 
 create or replace function public._cards_json(u uuid) returns jsonb language sql stable as $$
-  select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card, floor(extract(epoch from o.pulled) * 1000)) order by o.pulled, o.id), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card, floor(extract(epoch from o.pulled) * 1000), o.style) order by o.pulled, o.id), '[]'::jsonb)
   from public.owned_cards o where o.owner = u;
 $$;
 
@@ -566,6 +568,8 @@ create or replace function public._event(at timestamptz default now()) returns j
     'starts', to_char(date '2026-10-19' + week * 7 + 4, 'YYYY-MM-DD'),
     'ends', to_char(date '2026-10-19' + week * 7 + 7, 'YYYY-MM-DD'),
     'price', case id when 'playoff' then 5000 else 4000 end,
+    -- This week's card finish: every card from the pack comes in it
+    'style', (array['chrome', 'neon', 'galaxy', 'lava', 'ice', 'gold', 'retro', 'prism'])[1 + ((week % 8) + 8) % 8],
     'odds', case id when 'playoff' then '{"legendary": 5, "epic": 20, "rare": 75, "common": 0}'::jsonb
                     else '{"legendary": 4, "epic": 12, "rare": 34, "common": 50}'::jsonb end)
   from e;
@@ -629,13 +633,16 @@ begin
     free_packs = free_packs - free::int,
     packs = packs + 1
   where id = u returning * into w;
-  insert into public.owned_cards (owner, card) values (u, card.key) returning * into o;
-  return jsonb_build_object('card', jsonb_build_array(o.id, o.card, floor(extract(epoch from o.pulled) * 1000)),
+  insert into public.owned_cards (owner, card, style)
+  values (u, card.key, case when p_type = 'event' then ev ->> 'style' end) returning * into o;
+  return jsonb_build_object('card', jsonb_build_array(o.id, o.card, floor(extract(epoch from o.pulled) * 1000), o.style),
     'coins', w.coins, 'free_packs', w.free_packs, 'packs', w.packs);
 end $$;
 
--- Sell up to p_count extra copies of one card, newest first, always keeping one
-create or replace function public.sell_copies(p_card text, p_count int)
+-- Sell up to p_count extra copies of one card (and finish), newest first,
+-- always keeping one
+drop function if exists public.sell_copies(text, int);
+create or replace function public.sell_copies(p_card text, p_count int, p_style text default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare
   u uuid := public._uid();
@@ -645,9 +652,10 @@ declare
 begin
   w := public._wallet(u);
   select array_agg(id) into ids from (
-    select id from public.owned_cards where owner = u and card = p_card
-    order by pulled desc, id desc offset 0
-    limit greatest(0, least(p_count, (select count(*) from public.owned_cards where owner = u and card = p_card) - 1))
+    select id from public.owned_cards where owner = u and card = p_card and style is not distinct from p_style
+    order by pulled desc, id desc
+    limit greatest(0, least(p_count, (select count(*) from public.owned_cards
+      where owner = u and card = p_card and style is not distinct from p_style) - 1))
   ) s;
   if ids is null then return jsonb_build_object('sold', 0, 'value', 0, 'removed', '[]'::jsonb, 'coins', w.coins); end if;
   delete from public.owned_cards where id = any(ids);
@@ -668,7 +676,7 @@ declare
 begin
   w := public._wallet(u);
   select array_agg(id), coalesce(sum((public.game_rules() -> 'sell' ->> rarity)::int), 0) into ids, value from (
-    select o.id, c.rarity, row_number() over (partition by o.card order by o.pulled, o.id) as n
+    select o.id, c.rarity, row_number() over (partition by o.card, o.style order by o.pulled, o.id) as n
     from public.owned_cards o join public.catalog c on c.key = o.card where o.owner = u
   ) s where n > 1;
   if ids is null then return jsonb_build_object('sold', 0, 'value', 0, 'removed', '[]'::jsonb, 'coins', w.coins); end if;
@@ -1138,8 +1146,8 @@ returns jsonb language sql stable security definer set search_path = public as $
     'dir', case when t.from_id = public._uid() then 'out' else 'in' end,
     'with', public._name_of(case when t.from_id = public._uid() then t.to_id else t.from_id end),
     'status', t.status,
-    'give', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.give)),
-    'want', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.want)),
+    'give', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card, 0, o.style)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.give)),
+    'want', (select coalesce(jsonb_agg(jsonb_build_array(o.id, o.card, 0, o.style)), '[]'::jsonb) from public.owned_cards o where o.id = any(t.want)),
     'at', floor(extract(epoch from coalesce(t.done_at, t.created_at)) * 1000)
   ) order by t.status <> 'open', coalesce(t.done_at, t.created_at) desc), '[]'::jsonb)
   from public.trades t
@@ -1173,12 +1181,12 @@ revoke execute on function public._uid(), public._wallet(uuid), public._stat(pub
 revoke execute on function public.game_state(int), public.hl_next(text), public.hl_answer(uuid, text),
   public.who_next(text), public.who_hint(uuid), public.who_answer(uuid, int), public.daily_next(int),
   public.daily_answer(int, text), public.claim_login(), public.open_pack(text, text, text),
-  public.sell_copies(text, int), public.sell_all_copies(), public.claim_sets(),
+  public.sell_copies(text, int, text), public.sell_all_copies(), public.claim_sets(),
   public.battle_opponent(text, text[]), public.battle_play(uuid) from public, anon;
 grant execute on function public.game_state(int), public.hl_next(text), public.hl_answer(uuid, text),
   public.who_next(text), public.who_hint(uuid), public.who_answer(uuid, int), public.daily_next(int),
   public.daily_answer(int, text), public.claim_login(), public.open_pack(text, text, text),
-  public.sell_copies(text, int), public.sell_all_copies(), public.claim_sets(),
+  public.sell_copies(text, int, text), public.sell_all_copies(), public.claim_sets(),
   public.battle_opponent(text, text[]), public.battle_play(uuid) to authenticated;
 revoke execute on function public.friend_request(text), public.friend_respond(text, boolean), public.friend_remove(text),
   public.friends_list(), public.friend_cards(text), public.challenge_send(text, text, int, text[], text),

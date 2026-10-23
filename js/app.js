@@ -259,9 +259,12 @@ const fastBonus = (pay, secs, mode) => (secs <= FAST[mode] ? Math.ceil(pay / 2) 
 // ([id, key, pulled ms]) into the game's card object
 const CARD_BY_SKEY = new Map();
 const cardBySkey = key => CARD_BY_SKEY.get(key) || null;
-function serverCard([id, key, pulled]) {
+function serverCard([id, key, pulled, style]) {
   const base = cardBySkey(key);
-  return base ? {...base, pulled: Number(pulled), sid: id, skey: key} : null;
+  if (!base) return null;
+  const c = {...base, pulled: Number(pulled), sid: id, skey: key};
+  if (style && CARD_STYLES[style]) c.style = style;
+  return c;
 }
 // A move for the server; on failure it explains and returns null
 async function serverMove(fn, args) {
@@ -578,8 +581,8 @@ function cardHtml(c, extraClass = "") {
   const pulled = c.pulled ? new Date(c.pulled).toLocaleDateString(undefined, {month: "short", day: "numeric", year: "numeric"}) : "";
   const best = bestStat(c, ranks);
   return `
-    <article class="flipcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
-      aria-label="${esc(c.name)}, ${c.rarity} card, ${cardOvr(c)} overall. Press to flip.">
+    <article class="flipcard ${c.rarity}${c.style ? ` fx fx-${c.style}` : ""} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
+      aria-label="${esc(c.name)}, ${c.style ? CARD_STYLES[c.style].name + " " : ""}${c.rarity} card, ${cardOvr(c)} overall. Press to flip.">
       <div class="flip-inner">
         <div class="pcard">
           <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
@@ -587,6 +590,7 @@ function cardHtml(c, extraClass = "") {
           <img class="pcard-photo${ph.cutout ? "" : " is-photo"}" src="${esc(ph.src)}" alt="" loading="lazy" onerror="imgFail(this)">
           <div class="pcard-top"><span>${RARITY_LABEL[c.rarity] || c.rarity}</span><span>${esc(c.season || "")}</span></div>
           <div class="pcard-ovr" aria-hidden="true"><b>${cardOvr(c)}</b><span>OVR</span></div>
+          ${c.style ? `<div class="fx-layer" aria-hidden="true"></div><div class="fx-tag">${esc(CARD_STYLES[c.style].name)}</div>` : ""}
           <div class="plate">
             <div class="pcard-name">${nameHtml(c.name)}</div>
             <div class="pcard-meta">${esc(c.team)} · ${one(c.ppg)} PTS · ${one(c.rpg)} REB · ${one(c.apg)} AST</div>
@@ -704,6 +708,20 @@ const EVENTS = {
   lockdown: {name: "Lockdown", blurb: "Every card had 1.6+ steals or 1.8+ blocks a game.", has: c => c.spg >= 1.6 || c.bpg >= 1.8},
 };
 const EVENT_ORDER = ["playoff", "bigs", "scorers", "dimes", "lockdown"];
+// A new card finish every week: every card from that weekend's pack comes in
+// it, so each week's style is a limited edition. supabase/game.sql has the
+// same order. The looks are in css/app.css (.fx-<id>).
+const CARD_STYLES = {
+  chrome: {name: "Playoff Chrome"},
+  neon: {name: "Neon Night"},
+  galaxy: {name: "Galaxy"},
+  lava: {name: "Lava"},
+  ice: {name: "Ice Cold"},
+  gold: {name: "Gold Rush"},
+  retro: {name: "Retro '86"},
+  prism: {name: "Prism"},
+};
+const STYLE_ORDER = ["chrome", "neon", "galaxy", "lava", "ice", "gold", "retro", "prism"];
 const EVENT_ODDS = {legendary: 4, epic: 12, rare: 34, common: 50};
 const DAY_MS = 86400000, EVENT_EPOCH = Date.UTC(2026, 9, 19); // a Monday
 function eventAt(now = Date.now()) {
@@ -712,6 +730,7 @@ function eventAt(now = Date.now()) {
   const id = EVENT_ORDER[((week % 5) + 5) % 5], dow = new Date(day).getUTCDay();
   const starts = EVENT_EPOCH + (week * 7 + 4) * DAY_MS;
   return {id, ...EVENTS[id], price: EVENTS[id].price || 4000, odds: EVENTS[id].odds || EVENT_ODDS,
+    style: STYLE_ORDER[((week % STYLE_ORDER.length) + STYLE_ORDER.length) % STYLE_ORDER.length],
     live: dow === 5 || dow === 6 || dow === 0, starts, ends: starts + 3 * DAY_MS};
 }
 // "2d 4h", "5h 12m", "9m"
@@ -782,6 +801,7 @@ function counterHtml(t) {
         ${t.event ? `<p class="event-when${eventAt().live ? " live" : ""}">${eventAt().live ? `Weekend only · ends in ${timeLeft(eventAt().ends - Date.now())}` : `Back Friday · opens in ${timeLeft(eventAt().starts - Date.now())}`}</p>` : ""}
         <h2>${t.name}</h2>
         <p class="muted">${esc(t.blurb())}</p>
+        ${t.event ? `<p class="fx-note">This week every card comes in <strong>${CARD_STYLES[eventAt().style].name}</strong>. Next week brings a new finish.</p>` : ""}
       </div>
       ${chooser}
       <div class="odds-block">
@@ -790,7 +810,7 @@ function counterHtml(t) {
       </div>
       <div class="chase">
         <h3>Chase cards</h3>
-        <div class="chase-row">${chase.map(c => `<span class="chase-card${owned.has(cardKey(c)) ? " owned" : ""}">${miniTile(c)}${owned.has(cardKey(c)) ? `<span class="chase-owned">Owned</span>` : ""}</span>`).join("")}</div>
+        <div class="chase-row">${chase.map(c => `<span class="chase-card${owned.has(cardKey(c)) ? " owned" : ""}">${miniTile(t.event ? {...c, style: eventAt().style} : c)}${owned.has(cardKey(c)) ? `<span class="chase-owned">Owned</span>` : ""}</span>`).join("")}</div>
       </div>
     </div>
     <div class="counter-buy">
@@ -858,6 +878,7 @@ async function buyPack(typeId = "player") {
     while (i < order.length && !(pool = all.filter(c => c.rarity === order[i])).length) i++;
     if (!pool.length) pool = all;
     card = {...pick(pool), pulled: Date.now()};
+    if (type.event) card.style = eventAt().style;
     profile.stats.packs++;
   }
   // The card is saved before the animation, so leaving mid-opening never loses it
@@ -1120,10 +1141,12 @@ const COLL_SORTS = {
 let collSort = COLL_SORTS[load("statstack_coll_sort", "ovr")] ? load("statstack_coll_sort", "ovr") : "ovr";
 let collSearch = "";
 
+// Copies stack by player, season and finish ("Name|Season#neon")
+const groupKey = c => `${cardKey(c)}#${c.style || ""}`;
 function groupCards(list) {
   const groups = new Map();
   for (const c of list) {
-    const k = cardKey(c);
+    const k = groupKey(c);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(c);
   }
@@ -1176,16 +1199,16 @@ function renderColl(r) {
 
 // Remove the newest extra copies, always keeping one of each card
 async function sellCopies(key, howMany) {
-  const copies = ownedCards.filter(c => cardKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
+  const copies = ownedCards.filter(c => groupKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
   if (copies.length < 2) return 0;
   if (Account.ranked()) {
-    const res = await serverMove("sell_copies", {p_card: copies[0].skey, p_count: Math.min(howMany, 1000)});
+    const res = await serverMove("sell_copies", {p_card: copies[0].skey, p_count: Math.min(howMany, 1000), p_style: copies[0].style || null});
     return res ? soldOnServer(res) : 0;
   }
   return sellLocal(key, howMany);
 }
 function sellLocal(key, howMany) {
-  const copies = ownedCards.filter(c => cardKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
+  const copies = ownedCards.filter(c => groupKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
   const sell = copies.slice(0, Math.min(howMany, copies.length - 1));
   if (!sell.length) return 0;
   ownedCards = ownedCards.filter(c => !sell.includes(c));
@@ -1221,9 +1244,21 @@ $("collectionGrid").addEventListener("click", e => {
     if (value) afterSale(value, `Sold a duplicate ${name}.`);
   });
 });
-$("sellAllBtn").addEventListener("click", () => {
+$("sellAllBtn").addEventListener("click", async () => {
   const d = dupeSummary();
-  if (!d.count || !confirm(`Quick sell ${d.count} duplicate card${d.count === 1 ? "" : "s"} for ${d.value.toLocaleString()} coins? You keep one of every card.`)) return;
+  if (!d.count) return;
+  // Show what goes: the extra copies, best first
+  const extras = [...groupCards(ownedCards).values()].filter(c => c.length > 1)
+    .sort((a, b) => cardOvr(b[0]) - cardOvr(a[0])).map(c => ({card: c[0], n: c.length - 1}));
+  const ok = await askConfirm({
+    title: `Quick sell ${d.count} duplicate${d.count === 1 ? "" : "s"}?`,
+    text: "You keep one of every card. Only the extra copies go.",
+    ok: "Sell",
+    extra: `<p class="confirm-coins"><span class="coin" aria-hidden="true"></span>+${d.value.toLocaleString()}</p>
+      <ul class="confirm-cards">${extras.slice(0, 8).map(x => `<li class="chase-card">${miniTile(x.card)}${x.n > 1 ? `<span class="confirm-n">×${x.n}</span>` : ""}</li>`).join("")}</ul>
+      ${extras.length > 8 ? `<p class="muted confirm-more">and ${extras.length - 8} more</p>` : ""}`,
+  });
+  if (!ok) return;
   const done = total => afterSale(total, `Sold ${d.count} duplicate${d.count === 1 ? "" : "s"}. One of every card stays in your collection.`);
   if (Account.ranked()) {
     $("sellAllBtn").disabled = true;
@@ -1680,8 +1715,30 @@ function setMsg(id, text, kind = "") {
   $(id).className = `form-msg${kind ? " " + kind : ""}`;
 }
 const CHECK_ICON = `<span class="toast-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg></span>`;
+// The game's own "are you sure?" window, in place of the browser's. Resolves
+// true for the confirm button, false for Cancel, Escape or a click outside.
+function askConfirm({title, text = "", ok = "OK", cancel = "Cancel", danger = false, extra = ""}) {
+  const d = $("confirmDialog");
+  $("confirmTitle").textContent = title;
+  $("confirmText").textContent = text;
+  $("confirmText").hidden = !text;
+  $("confirmExtra").innerHTML = extra;
+  $("confirmYes").textContent = ok;
+  $("confirmYes").className = `pill ${danger ? "pill-danger" : "pill-solid"}`;
+  $("confirmNo").textContent = cancel;
+  return new Promise(resolve => {
+    d.returnValue = "";
+    d.addEventListener("close", () => resolve(d.returnValue === "yes"), {once: true});
+    d.showModal();
+    (danger ? $("confirmNo") : $("confirmYes")).focus();
+  });
+}
+$("confirmYes").addEventListener("click", () => $("confirmDialog").close("yes"));
+$("confirmNo").addEventListener("click", () => $("confirmDialog").close("no"));
+$("confirmDialog").addEventListener("click", e => { if (e.target === $("confirmDialog")) $("confirmDialog").close("no"); });
+
 async function signOut() {
-  if (!confirm("Sign out? Your progress stays in your account, and this device starts fresh.")) return;
+  if (!(await askConfirm({title: "Sign out?", text: "Your progress stays in your account, and this device starts fresh.", ok: "Sign out"}))) return;
   await Account.signOut();
   toast(`<span class="avatar avatar-md">${GUEST_ICON}</span>`, "Signed out", "Sign in again any time to pick up where you left off.");
 }

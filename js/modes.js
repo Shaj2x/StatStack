@@ -602,7 +602,7 @@ function ownedByKey(key) {
 }
 function miniTile(c) {
   const ph = photoFor(c);
-  return `<span class="mini ${c.rarity}" style="${teamVars(c.team)}">
+  return `<span class="mini ${c.rarity}${c.style ? ` fx fx-${c.style}` : ""}" style="${teamVars(c.team)}">
     <img class="mini-photo${ph.cutout ? "" : " is-photo"}" src="${esc(ph.src)}" alt="" loading="lazy" onerror="imgFail(this)">
     <span class="mini-ovr">${cardOvr(c)}</span>
     <span class="mini-name">${esc(c.name)}</span>
@@ -697,8 +697,9 @@ $("lineupName").addEventListener("input", () => {
   clearTimeout(nameTimer);
   nameTimer = setTimeout(() => { profile.lineup.name = $("lineupName").value.trim().slice(0, 24); progressChanged(); }, 600);
 });
-$("clearLineup").addEventListener("click", () => {
-  if (!profile.lineup.slots.some(Boolean) || !confirm("Clear every spot in your lineup?")) return;
+$("clearLineup").addEventListener("click", async () => {
+  if (!profile.lineup.slots.some(Boolean)) return;
+  if (!(await askConfirm({title: "Clear your lineup?", text: "Every starting and bench spot is emptied. Your cards stay in your collection.", ok: "Clear lineup", danger: true}))) return;
   profile.lineup.slots = profile.lineup.slots.map(() => null);
   progressChanged();
   SCREEN_HOOKS.locker();
