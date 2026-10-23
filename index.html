@@ -16,6 +16,17 @@
     if (t === "team") for (var k in v) r.style.setProperty(k, v[k]);
   } catch (e) {}
 })();
+// Big screens: scale the whole game up, so a large monitor doesn't get a
+// laptop-sized game. The layout is designed for about 1500 × 860.
+(function () {
+  function fit() {
+    var z = Math.min(innerWidth / 1500, innerHeight / 860);
+    z = Math.max(1, Math.min(2.4, Math.floor(z * 20) / 20));
+    document.documentElement.style.setProperty("--z", z);
+  }
+  fit();
+  addEventListener("resize", fit);
+})();
 </script>
 <meta name="description" content="NBA Higher or Lower: guess whose stat is bigger, build a streak, collect player cards.">
 <title>StatStack - NBA Higher or Lower</title>

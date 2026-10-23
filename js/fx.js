@@ -70,7 +70,9 @@ const FX = (() => {
   // FLIP: animate an element from an old on-screen box to where it sits now
   function flipFrom(el, oldRect, duration = 280) {
     const now = el.getBoundingClientRect();
-    const dx = oldRect.left - now.left, dy = oldRect.top - now.top;
+    // Boxes are measured on screen; on big screens the page is zoomed (--z)
+    const z = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--z")) || 1;
+    const dx = (oldRect.left - now.left) / z, dy = (oldRect.top - now.top) / z;
     stop(el);
     if (reduced()) {
       el.animate([{opacity: 0.4}, {opacity: 1}], {duration: 150, easing: "ease"});
