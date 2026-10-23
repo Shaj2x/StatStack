@@ -433,6 +433,21 @@ const WHO_PAY = 25, WHO_PAY_HINT = 12;
 let who = null, whoStreak = 0;
 
 const whoClock = new ShotClock($("whoClock"));
+// Like Higher or Lower, Who Am I? waits for Start before dealing
+let whoStarted = false;
+function whoGate(show) {
+  $("whoGate").hidden = !show;
+  $("whoCard").classList.toggle("gated", show);
+  if (show) {
+    document.querySelectorAll(".gate-clock").forEach(el => { el.textContent = CLOCK[el.dataset.clock]; });
+    $("whoStart").focus({preventScroll: true});
+  }
+}
+$("whoStart").addEventListener("click", () => {
+  whoStarted = true;
+  whoGate(false);
+  newWho();
+});
 let whoBusy = false;
 
 // For signed-in players the server deals the question and keeps the answer
@@ -464,7 +479,10 @@ async function newWho() {
 }
 
 function renderWho() {
-  if (!who) { newWho(); return; }
+  if (!who) {
+    if (whoStarted) newWho(); else whoGate(true);
+    return;
+  }
   const {line, answer, options, hint, picked, done} = who;
   const card = $("whoCard");
   const teamCode = done && answer ? answer.team : hint ? who.team : null;
@@ -583,11 +601,13 @@ SCREEN_HOOKS.seasonChanged = () => {
   who = null;
   whoStreak = 0;
   whoClock.stop();
-  if (currentScreen === "who") newWho();
+  if (currentScreen === "who" && whoStarted) newWho();
 };
 // Signing in or out: questions dealt so far were scored somewhere else
 SCREEN_HOOKS.gameReset = () => {
   who = null;
+  whoStarted = false;
+  if (currentScreen === "who") whoGate(true);
   whoClock.stop();
   dailyClock.stop();
   dailyAsked = null;

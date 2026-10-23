@@ -168,6 +168,15 @@
           <div class="vs" id="vsBadge">VS</div>
         </div>
 
+        <div class="tipoff" id="hlGate" hidden>
+          <div class="tipoff-card">
+            <p class="eyebrow">Higher or Lower</p>
+            <h2 class="display">Ready?</h2>
+            <p class="muted">Is the next player's number higher or lower? You get <strong><span class="gate-clock" data-clock="hl">6</span> seconds</strong> a question, and fast right answers pay a bonus.</p>
+            <button class="pill pill-solid tipoff-go" id="hlStart" type="button">Start game</button>
+            <p class="tipoff-best">Best streak <strong id="hlGateBest">0</strong></p>
+          </div>
+        </div>
         <div class="verdict" id="verdict" hidden>
           <div class="result" id="result" role="status" aria-live="polite"></div>
           <button class="pill pill-solid" id="nextBtn" type="button">Next<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"></path></svg></button>
@@ -253,6 +262,14 @@
     <section class="screen page who" id="screen-who" data-screen="who" aria-labelledby="whoTitle">
       <div class="who-layout">
         <article class="who-card court-art" id="whoCard">
+          <div class="tipoff" id="whoGate" hidden>
+            <div class="tipoff-card">
+              <p class="eyebrow">Who Am I?</p>
+              <h2 class="display">Ready?</h2>
+              <p class="muted">Read a season's stat line and pick the player. You get <strong><span class="gate-clock" data-clock="who">8</span> seconds</strong>. Peek at the team for half the coins.</p>
+              <button class="pill pill-solid tipoff-go" id="whoStart" type="button">Start game</button>
+            </div>
+          </div>
           <div class="who-top">
             <p class="eyebrow" id="whoEyebrow">Who am I?</p>
             <span class="shot-clock" id="whoClock" role="timer"></span>
