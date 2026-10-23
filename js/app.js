@@ -207,14 +207,105 @@ function pickOpponent(base, key) {
   return pool.length ? pick(pool) : randPlayer(base);
 }
 
+// ─── SHOT CLOCK ─────────────────────────────────────────────────────────────
+// Every question has a few seconds on the clock: enough to think, too few to
+// look the answer up. Right answers in the first half pay a bonus. Signed-in
+// accounts are timed by the server too (supabase/game.sql), with the same rules.
+const CLOCK = {hl: 6, who: 8, daily: 8};
+const FAST = {hl: 3, who: 4, daily: 4};
+class ShotClock {
+  // el: the badge to draw in, or a function that finds it (for redrawn screens)
+  constructor(el) { this.find = typeof el === "function" ? el : () => el; this.timer = null; }
+  start(seconds, onExpire, elapsed = 0) {
+    this.stop();
+    this.total = seconds;
+    this.ends = performance.now() + Math.max(0, seconds - elapsed) * 1000;
+    this.onExpire = onExpire;
+    this.lastBeep = null;
+    this.tick();
+    this.timer = setInterval(() => this.tick(), 100);
+  }
+  left() { return this.timer || this.onExpire ? Math.max(0, (this.ends - performance.now()) / 1000) : 0; }
+  elapsed() { return this.total - Math.max(0, (this.ends - performance.now()) / 1000); }
+  tick() {
+    const left = Math.max(0, (this.ends - performance.now()) / 1000), el = this.find();
+    if (el) {
+      el.classList.add("clocking");
+      el.classList.toggle("low", left <= 2.5);
+      el.style.setProperty("--left", String(left / this.total));
+      el.innerHTML = `<b>${Math.ceil(left)}</b><span class="visually-hidden"> seconds left</span>`;
+    }
+    const s = Math.ceil(left);
+    if (s <= 3 && s > 0 && s !== this.lastBeep) { this.lastBeep = s; FX.sound("tick"); }
+    if (left <= 0) {
+      const fn = this.onExpire;
+      this.stop();
+      if (fn) fn();
+    }
+  }
+  stop() {
+    clearInterval(this.timer);
+    this.timer = null;
+    this.onExpire = null;
+    const el = this.find();
+    if (el) el.classList.remove("clocking", "low");
+  }
+  get running() { return !!this.timer; }
+}
+const fastBonus = (pay, secs, mode) => (secs <= FAST[mode] ? Math.ceil(pay / 2) : 0);
+
+// ─── SERVER-SCORED CARDS ────────────────────────────────────────────────────
+// The server names cards "Name|Season|TEAM"; this turns one of its cards
+// ([id, key, pulled ms]) into the game's card object
+const CARD_BY_SKEY = new Map();
+const cardBySkey = key => CARD_BY_SKEY.get(key) || null;
+function serverCard([id, key, pulled]) {
+  const base = cardBySkey(key);
+  return base ? {...base, pulled: Number(pulled), sid: id, skey: key} : null;
+}
+// A move for the server; on failure it explains and returns null
+async function serverMove(fn, args) {
+  const res = await Account.call(fn, args);
+  if (res.error) {
+    toast(`<span class="toast-icon" aria-hidden="true">!</span>`, "That didn't go through", res.error);
+    return null;
+  }
+  return res.data;
+}
+
 // ─── GAME ROUND ─────────────────────────────────────────────────────────────
-function startNewRound() {
+const hlClock = new ShotClock($("vsBadge"));
+let hlRound = null, hlLoading = false;
+
+async function startNewRound() {
+  if (hlLoading) return;
   // Player 2's half slides across to become player 1, so remember where it was
   const carried = player2 && currentScreen === "play" ? $("card2").getBoundingClientRect() : null;
-  roundNumber++;
-  player1 = player2 || randPlayer();
-  currentStat = pick(statTypes);
-  player2 = pickOpponent(player1, currentStat.key);
+  const prev = player2;
+  if (Account.ranked()) {
+    hlLoading = true;
+    $("guessButtons").hidden = true;
+    $("nextBtn").disabled = true;
+    const q = await serverMove("hl_next", {p_season: currentSeasonKey});
+    hlLoading = false;
+    $("nextBtn").disabled = false;
+    if (!q) { $("guessButtons").hidden = !gameActive; return; }
+    hlRound = q;
+    roundNumber = q.round;
+    streak = q.streak;
+    multiplier = Math.floor(streak / 3) + 1;
+    player1 = cardBySkey(q.a);
+    player2 = cardBySkey(q.b);
+    currentStat = statTypes.find(t => t.key === q.stat);
+    updateBoard();
+    if (!player1 || !player2) return toast(`<span class="toast-icon" aria-hidden="true">!</span>`, "Update needed", "Reload the page to get the latest players.");
+  } else {
+    hlRound = null;
+    roundNumber++;
+    player1 = player2 || randPlayer();
+    currentStat = pick(statTypes);
+    player2 = pickOpponent(player1, currentStat.key);
+  }
 
   setPlayer(1, player1);
   setPlayer(2, player2, true);
@@ -227,15 +318,15 @@ function startNewRound() {
   $("verdict").hidden = true;
   $("result").textContent = "";
   $("result").className = "result";
-  $("vsBadge").textContent = "VS";
   $("vsBadge").className = "vs";
   gameActive = true;
 
   placeSeam();
-  if (carried) {
+  if (carried && player1 === prev) {
     FX.flipFrom($("card1"), carried, 420);
     FX.enter($("card2"), {x: 60, y: 0, duration: 320, delay: 120});
   }
+  hlClock.start(hlRound ? hlRound.clock : CLOCK.hl, () => makeGuess("timeout"));
 }
 
 // On phones the halves stack, so the VS badge follows the boundary between them
@@ -284,17 +375,54 @@ function setPlayer(n, p, hide = false) {
   if (!hide) $(`player${n}Stat`).textContent = p[currentStat.key].toFixed(1);
 }
 
-function makeGuess(guess, fromKeyboard = false) {
+async function makeGuess(guess, fromKeyboard = false) {
   if (!gameActive) return;
   gameActive = false;
-  const v1 = player1[currentStat.key], v2 = player2[currentStat.key];
+  const secs = hlClock.elapsed();
+  hlClock.stop();
   const coinsBefore = coins, multiplierBefore = multiplier;
-  const correct = (guess === "higher" && v2 >= v1) || (guess === "lower" && v2 <= v1);
-  profile.stats.rounds++;
-  if (!profile.seasons.includes(currentSeasonKey)) profile.seasons.push(currentSeasonKey);
-
+  const v1 = player1[currentStat.key];
+  let v2 = player2[currentStat.key], correct, earned = 0, bonus = 0;
   $("guessButtons").hidden = true;
   $("swipeHint").hidden = true;
+
+  if (hlRound) {
+    const res = await serverMove("hl_answer", {p_id: hlRound.id, p_guess: guess});
+    if (!res) {
+      $("result").innerHTML = `Not scored<small>Tap next for a new question</small>`;
+      $("result").className = "result incorrect";
+      $("verdict").hidden = false;
+      return;
+    }
+    v2 = res.value;
+    correct = res.ok;
+    earned = res.earned;
+    bonus = res.bonus;
+    coins = res.coins;
+    streak = res.streak;
+    multiplier = correct ? res.mult : 1;
+    bestStreak = res.best;
+    profile.weekly = {week: res.week, best: res.week_best};
+    profile.stats.rounds = res.rounds;
+    profile.stats.correct = res.correct;
+    profile.stats.coinsEarned += earned + bonus;
+  } else {
+    correct = guess !== "timeout" && ((guess === "higher" && v2 >= v1) || (guess === "lower" && v2 <= v1));
+    profile.stats.rounds++;
+    if (correct) {
+      streak++;
+      multiplier = Math.floor(streak / 3) + 1;
+      earned = 10 * multiplier;
+      bonus = fastBonus(earned, secs, "hl");
+      coins += earned + bonus;
+      profile.stats.correct++;
+      profile.stats.coinsEarned += earned + bonus;
+    } else {
+      streak = 0; multiplier = 1;
+    }
+  }
+  if (!profile.seasons.includes(currentSeasonKey)) profile.seasons.push(currentSeasonKey);
+
   $("player2StatLabel").textContent = `${currentStat.label} in ${currentSeasonKey}`;
   $("player2Stat").hidden = false;
   FX.countUp($("player2Stat"), 0, v2);
@@ -302,20 +430,15 @@ function makeGuess(guess, fromKeyboard = false) {
 
   const res = $("result"), vs = $("vsBadge");
   if (correct) {
-    streak++;
-    multiplier = Math.floor(streak / 3) + 1;
-    const earned = 10 * multiplier;
-    coins += earned;
-    profile.stats.correct++;
-    profile.stats.coinsEarned += earned;
-    res.innerHTML = `Correct · +${earned}<small>${pick(wins)}</small>`;
+    res.innerHTML = `Correct · +${earned + bonus}<small>${bonus ? `Fast answer: +${bonus} bonus` : pick(wins)}</small>`;
     res.className = "result correct";
     vs.textContent = "✓";
     vs.className = "vs is-correct";
     FX.feedback("correct");
   } else {
-    streak = 0; multiplier = 1;
-    res.innerHTML = `Wrong · streak reset<small>${pick(fails)}</small>`;
+    res.innerHTML = guess === "timeout"
+      ? `Shot clock · streak reset<small>Answer within ${CLOCK.hl} seconds</small>`
+      : `Wrong · streak reset<small>${pick(fails)}</small>`;
     res.className = "result incorrect";
     vs.textContent = "✗";
     vs.className = "vs is-wrong";
@@ -530,6 +653,7 @@ function fitCardNames(root, min) {
 // ─── PACKS ──────────────────────────────────────────────────────────────────
 // Every card in the game, each tagged with its season
 const ALL_CARDS = SEASON_KEYS.flatMap(k => SEASONS[k].players.map(p => ({...p, season: k})));
+ALL_CARDS.forEach(c => CARD_BY_SKEY.set(`${c.name}|${c.season}|${c.team}`, c));
 // Saved cards keep a copy of their player's photo ID; refresh it from the
 // current data so photo fixes reach cards already pulled. Cards from seasons
 // that have since been re-entered fall back to the player's ID by name.
@@ -637,7 +761,7 @@ function counterHtml(t) {
         <span class="meter"><i style="width:${pool.length ? Math.max(have ? 2 : 0, Math.round(100 * have / pool.length)) : 0}%"></i></span>
       </div>
       <p class="buy-price"><span class="coin" aria-hidden="true"></span>${free ? "Free" : t.price.toLocaleString()}</p>
-      <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} buy-btn" type="button" data-buy="${t.id}"${short || opening ? " disabled" : ""}>${free ? `Open free · ${free} left` : "Open pack"}</button>
+      <button class="pill ${t.id === "elite" ? "pill-gold" : "pill-solid"} buy-btn" type="button" data-buy="${t.id}"${short || opening || buying ? " disabled" : ""}>${free ? `Open free · ${free} left` : "Open pack"}</button>
       ${short ? `<div class="save-up">
         <span class="meter"><i style="width:${Math.round(100 * coins / t.price)}%"></i></span>
         <span><strong>${short.toLocaleString()}</strong> more coins to go</span>
@@ -667,24 +791,40 @@ function selectPack(id, focus) {
   FX.enter($("shop").querySelector(".counter"), {y: 8, duration: 220});
 }
 
-function buyPack(typeId = "player") {
+let buying = false;
+async function buyPack(typeId = "player") {
   const type = PACK_TYPES.find(t => t.id === typeId);
   const free = typeId === "player" && profile.freePacks.player > 0;
-  if (!type || (!free && coins < type.price) || opening) return;
-  const all = type.pool(packChoice[type.choose]);
-  if (!all.length) return;
-  if (free) profile.freePacks.player--;
-  else coins -= type.price;
-  // Fall back a tier at a time if this pool has no card of the rolled rarity
-  const order = ["legendary", "epic", "rare", "common"];
-  let i = order.indexOf(rollRarity(type.odds)), pool = [];
-  while (i < order.length && !(pool = all.filter(c => c.rarity === order[i])).length) i++;
-  if (!pool.length) pool = all;
+  if (!type || (!free && coins < type.price) || opening || buying) return;
+  let card;
+  if (Account.ranked()) {
+    // The server takes the coins and deals the card
+    buying = true;
+    renderShop();
+    const res = await serverMove("open_pack", {p_type: typeId, p_choice: type.choose ? packChoice[type.choose] : null, p_season: currentSeasonKey});
+    buying = false;
+    if (!res) return renderShop();
+    card = serverCard(res.card);
+    coins = res.coins;
+    profile.freePacks.player = res.free_packs;
+    profile.stats.packs = res.packs;
+    if (!card) return renderShop();
+  } else {
+    const all = type.pool(packChoice[type.choose]);
+    if (!all.length) return;
+    if (free) profile.freePacks.player--;
+    else coins -= type.price;
+    // Fall back a tier at a time if this pool has no card of the rolled rarity
+    const order = ["legendary", "epic", "rare", "common"];
+    let i = order.indexOf(rollRarity(type.odds)), pool = [];
+    while (i < order.length && !(pool = all.filter(c => c.rarity === order[i])).length) i++;
+    if (!pool.length) pool = all;
+    card = {...pick(pool), pulled: Date.now()};
+    profile.stats.packs++;
+  }
   // The card is saved before the animation, so leaving mid-opening never loses it
-  const card = {...pick(pool), pulled: Date.now()};
   ownedCards.push(card);
   save('statstack_cards', ownedCards);
-  profile.stats.packs++;
   updateBoard();
   openPack(card, type);
   progressChanged();
@@ -982,7 +1122,16 @@ function renderColl(r) {
 }
 
 // Remove the newest extra copies, always keeping one of each card
-function sellCopies(key, howMany) {
+async function sellCopies(key, howMany) {
+  const copies = ownedCards.filter(c => cardKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
+  if (copies.length < 2) return 0;
+  if (Account.ranked()) {
+    const res = await serverMove("sell_copies", {p_card: copies[0].skey, p_count: Math.min(howMany, 1000)});
+    return res ? soldOnServer(res) : 0;
+  }
+  return sellLocal(key, howMany);
+}
+function sellLocal(key, howMany) {
   const copies = ownedCards.filter(c => cardKey(c) === key).sort((a, b) => (b.pulled || 0) - (a.pulled || 0));
   const sell = copies.slice(0, Math.min(howMany, copies.length - 1));
   if (!sell.length) return 0;
@@ -991,6 +1140,13 @@ function sellCopies(key, howMany) {
   coins += value;
   profile.stats.sold += sell.length;
   return value;
+}
+function soldOnServer(res) {
+  const gone = new Set(res.removed);
+  ownedCards = ownedCards.filter(c => !gone.has(c.sid));
+  coins = res.coins;
+  profile.stats.sold += res.sold;
+  return res.value;
 }
 function afterSale(value, text) {
   save('statstack_cards', ownedCards);
@@ -1006,15 +1162,27 @@ $("collectionGrid").addEventListener("click", e => {
   const btn = e.target.closest("[data-sell]");
   if (!btn) return;
   const name = btn.dataset.sell.split("|")[0];
-  const value = sellCopies(btn.dataset.sell, 1);
-  if (value) afterSale(value, `Sold a duplicate ${name}.`);
+  btn.disabled = true;
+  sellCopies(btn.dataset.sell, 1).then(value => {
+    btn.disabled = false;
+    if (value) afterSale(value, `Sold a duplicate ${name}.`);
+  });
 });
 $("sellAllBtn").addEventListener("click", () => {
   const d = dupeSummary();
   if (!d.count || !confirm(`Quick sell ${d.count} duplicate card${d.count === 1 ? "" : "s"} for ${d.value.toLocaleString()} coins? You keep one of every card.`)) return;
+  const done = total => afterSale(total, `Sold ${d.count} duplicate${d.count === 1 ? "" : "s"}. One of every card stays in your collection.`);
+  if (Account.ranked()) {
+    $("sellAllBtn").disabled = true;
+    serverMove("sell_all_copies", {}).then(res => {
+      $("sellAllBtn").disabled = false;
+      if (res) done(soldOnServer(res));
+    });
+    return;
+  }
   let total = 0;
-  for (const key of groupCards(ownedCards).keys()) total += sellCopies(key, Infinity);
-  afterSale(total, `Sold ${d.count} duplicate${d.count === 1 ? "" : "s"}. One of every card stays in your collection.`);
+  for (const key of groupCards(ownedCards).keys()) total += sellLocal(key, Infinity);
+  done(total);
 });
 
 // ─── INPUT ──────────────────────────────────────────────────────────────────
@@ -1289,10 +1457,56 @@ function applySave(data) {
   if (currentScreen === "packs") renderShop();
   if (SCREEN_HOOKS[currentScreen]) SCREEN_HOOKS[currentScreen]();
 }
+// The server's numbers for a signed-in account. They overrule the save:
+// coins, cards, streaks and records only change through the server's moves.
+function applyGame(st) {
+  coins = Number(st.coins) || 0;
+  bestStreak = st.hl.best;
+  ownedCards = st.cards.map(serverCard).filter(Boolean);
+  Object.assign(profile.stats, st.stats, {rounds: st.hl.rounds, correct: st.hl.correct,
+    whoRounds: st.who.rounds, whoCorrect: st.who.correct, whoBest: st.who.best});
+  profile.weekly = {week: st.hl.week, best: st.hl.week_best};
+  profile.login = {...profile.login, ...st.login};
+  profile.sets = st.sets || {};
+  profile.battle = {...profile.battle, ...st.battle};
+  profile.freePacks = {player: st.free_packs};
+  profile.monthPts = st.month_pts || {};
+  profile.trophies = st.trophies || [];
+  profile.daily = st.daily ? {...profile.daily, ...st.daily} : {num: 0, answers: [], done: false, score: 0};
+  const r = st.rules || {};
+  if (r.hl_clock) Object.assign(CLOCK, {hl: r.hl_clock, who: r.who_clock, daily: r.daily_clock});
+  if (r.hl_fast) Object.assign(FAST, {hl: r.hl_fast, who: r.who_fast, daily: r.daily_fast});
+  save('statstack_coins', coins);
+  save('statstack_bestStreak', bestStreak);
+  save('statstack_cards', ownedCards);
+  save('statstack_profile', profile);
+  // Questions dealt before now were the browser's; the server deals from here
+  hlClock.stop();
+  player1 = player2 = null;
+  hlRound = null;
+  gameActive = false;
+  streak = st.hl.streak;
+  multiplier = Math.floor(streak / 3) + 1;
+  if (SCREEN_HOOKS.gameReset) SCREEN_HOOKS.gameReset();
+  checkBadges(false);
+  updateBoard();
+  renderIdentity();
+  if (currentScreen === "play") startNewRound();
+  if (currentScreen === "profile") renderProfile();
+  if (currentScreen === "collection") { updateCollStats(); renderColl(activeFilter); }
+  if (currentScreen === "packs") renderShop();
+  if (SCREEN_HOOKS[currentScreen]) SCREEN_HOOKS[currentScreen]();
+}
 function resetSave() {
   streak = 0;
   multiplier = 1;
+  hlClock.stop();
+  player1 = player2 = null;
+  hlRound = null;
+  gameActive = false;
+  if (SCREEN_HOOKS.gameReset) SCREEN_HOOKS.gameReset();
   applySave({coins: 0, bestStreak: 0, cards: [], profile: freshProfile(), updatedAt: 0});
+  if (currentScreen === "play") startNewRound();
 }
 
 // ─── ACCOUNT UI ─────────────────────────────────────────────────────────────
@@ -1582,5 +1796,7 @@ document.addEventListener("DOMContentLoaded", () => {
     apply: applySave,
     reset: resetSave,
     rename: name => { profile.name = name; progressChanged(); renderIdentity(); },
+    applyGame,
+    dailyNum: () => dailyNumber(),
   });
 });

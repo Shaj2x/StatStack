@@ -72,11 +72,18 @@ while `js/config.js` has no keys; then everything saves in the browser only.
 Setting up a Supabase project:
 
 1. Create a free project at supabase.com.
-2. In **SQL Editor**, run `supabase/schema.sql`. It makes the `saves` table
-   (each player can only read and write their own row), a check that a
-   username is free, and the `leaderboard` function, which shares only
-   usernames, team colours, scores, showcased cards and record. Running it
-   again is safe, and is how you update an existing project.
+2. In **SQL Editor**, run these three files, in order:
+   - `supabase/schema.sql`: the `saves` table (each player can only read and
+     write their own row) and the check that a username is free.
+   - `supabase/catalog.sql`: every card in the game, for the server to deal
+     packs and grade answers from. Rebuild it with
+     `node scripts/build_catalog.js` whenever `js/data.js` changes, then run
+     it again.
+   - `supabase/game.sql`: the server side of the game (see Fair play below)
+     and the `leaderboard` function, which shares only usernames, team colours,
+     scores, showcased cards and records.
+
+   Running them again is safe, and is how you update an existing project.
 3. Under **Authentication → Sign In / Providers → Email**, keep Email on and
    turn **Confirm email** off, so new accounts can play straight away.
 4. Under **Authentication → URL Configuration**, set the Site URL to
@@ -91,10 +98,28 @@ Supabase's built-in email sender only allows a few emails an hour, which is
 fine for password resets. For more, add your own SMTP under
 **Authentication → Emails**.
 
-When a player signs in, cards from the device and the account are combined;
-coins and settings come from whichever was played most recently, and records
-(best streak, totals, badges) keep the higher value. Signing out leaves the
-progress in the account and resets the device to a fresh guest.
+### Fair play
+
+For signed-in players the server keeps score. Coins, cards, streaks, Daily
+results and battle records live in tables players can't write to, and every
+move goes through a database function in `supabase/game.sql`: the server
+hands out each question, times the answer, grades it and pays for it, deals
+packs, sells duplicates, pays set milestones and login rewards, and decides
+battles. The leaderboards read only those tables, so editing the game in the
+browser changes nothing that counts.
+
+Every question has a shot clock: 6 seconds in Higher or Lower, 8 in Who Am I?
+and the Daily. Right answers in the first half of the clock pay a bonus. Long
+enough to think, too short to look the answer up.
+
+Accounts made before `game.sql` was first run keep their cards and records,
+with coins capped at 50,000. New accounts start fresh: coins and cards earned
+as a guest stay on that device. Until `game.sql` is installed, signed-in
+players keep score in their save as before.
+
+Guests play entirely in the browser, with the same rules and clocks; nothing
+they do reaches the leaderboards. Signing out resets the device to a fresh
+guest.
 
 ## Game modes
 
