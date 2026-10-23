@@ -15,8 +15,12 @@ function yesterdayKey() {
   d.setDate(d.getDate() - 1);
   return dayKey(d);
 }
-const loginDue = () => profile.login.last !== dayKey();
-const nextLoginStreak = () => (profile.login.last === yesterdayKey() ? profile.login.streak + 1 : 1);
+// Signed-in players' days are UTC days, the server's calendar
+const utcKey = d => d.toISOString().slice(0, 10);
+const loginToday = () => (Account.ranked() ? utcKey(new Date()) : dayKey());
+const loginYesterday = () => (Account.ranked() ? utcKey(new Date(Date.now() - 86400000)) : yesterdayKey());
+const loginDue = () => profile.login.last !== loginToday();
+const nextLoginStreak = () => (profile.login.last === loginYesterday() ? profile.login.streak + 1 : 1);
 
 function showLogin() {
   // Wait for a signed-in save to arrive first, so a reward claimed on
@@ -37,14 +41,31 @@ function showLogin() {
   FX.enter($("loginDialog").querySelector(".today"), {y: 6, duration: 260});
 }
 
-function claimLogin() {
+let claiming = false;
+async function claimLogin() {
+  if (claiming) return;
   if (!loginDue()) { $("loginDialog").close(); return; }
-  const n = nextLoginStreak(), reward = LOGIN_REWARDS[(n - 1) % 7];
-  profile.login = {last: dayKey(), streak: n, best: Math.max(profile.login.best, n)};
-  if (reward === "pack") profile.freePacks.player++;
-  else {
-    coins += reward;
-    profile.stats.coinsEarned += reward;
+  let n = nextLoginStreak(), reward = LOGIN_REWARDS[(n - 1) % 7];
+  if (Account.ranked()) {
+    claiming = true;
+    const res = await serverMove("claim_login", {});
+    claiming = false;
+    $("loginDialog").close();
+    if (!res) return;
+    profile.login = res.login;
+    coins = res.coins;
+    profile.freePacks.player = res.free_packs;
+    if (!res.claimed) return updateBoard();
+    n = res.streak;
+    reward = res.reward;
+    if (reward !== "pack") profile.stats.coinsEarned += reward;
+  } else {
+    profile.login = {last: dayKey(), streak: n, best: Math.max(profile.login.best, n)};
+    if (reward === "pack") profile.freePacks.player++;
+    else {
+      coins += reward;
+      profile.stats.coinsEarned += reward;
+    }
   }
   updateBoard();
   progressChanged();
@@ -64,10 +85,10 @@ $("loginDialog").addEventListener("cancel", e => { e.preventDefault(); claimLogi
 // Shown once per account for each update, before the daily reward. Guests
 // never see it. The account remembers it, so other devices skip it too. Bump
 // NEWS_VERSION (and the list in index.html) when there's something new.
-const NEWS_VERSION = "2026-10b";
+const NEWS_VERSION = "2026-10c";
 let newsShownOnce = false; // if storage is blocked, still only show it once per visit
 // A signed-in save has arrived (or can't), so per-account choices are safe to make
-const accountSettled = () => !Account.signedIn() || Account.lastSync() > 0 || Account.sync() === "error";
+const accountSettled = () => Account.settled();
 function newsUnseen() {
   if (newsShownOnce || !Account.signedIn() || !accountSettled()) return false;
   let seenHere = "";
@@ -229,8 +250,39 @@ function setTiersMet(set, have) {
   return SET_KINDS[set.kind].tiers.filter((_, i) => have >= tierGoal(set, i)).length;
 }
 
-// Pay any milestone reached and not yet paid (once per milestone, ever)
+// Pay any milestone reached and not yet paid (once per milestone, ever).
+// For signed-in players the server counts their cards and pays.
+let setsAsked = "", setsBusy = false;
+async function claimSetsOnServer(announce) {
+  const mark = `${ownedCards.length}:${ownedCards.reduce((m, c) => Math.max(m, c.sid || 0), 0)}`;
+  if (setsBusy || mark === setsAsked) return;
+  setsBusy = true;
+  const res = await serverMove("claim_sets", {});
+  setsBusy = false;
+  if (!res) return;
+  setsAsked = mark;
+  coins = res.coins;
+  profile.sets = res.sets;
+  if (!res.paid.length) return;
+  const paid = res.paid.map(p => ({set: SETS.find(x => x.id === p.id), i: p.tier, pay: p.pay})).filter(p => p.set);
+  paid.forEach(p => { profile.stats.coinsEarned += p.pay; });
+  announceSets(paid, announce);
+}
+function announceSets(paid, announce) {
+  updatedAt = Date.now();
+  save('statstack_profile', profile);
+  save('statstack_updated', updatedAt);
+  updateBoard();
+  Account.changed();
+  if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => FX.sound("claim"), 600 + k * 2600));
+  if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => toast(
+    `<span class="toast-icon coin-icon" aria-hidden="true"><span class="coin"></span></span>`,
+    i === 2 ? `Set complete: ${set.name}` : `${set.name} · ${tierGoal(set, i)} card${tierGoal(set, i) === 1 ? "" : "s"}`,
+    `+${pay.toLocaleString()} coins`), 600 + k * 2600));
+  if (currentScreen === "book") renderBook();
+}
 function checkSets(announce) {
+  if (Account.ranked()) { claimSetsOnServer(announce); return; }
   const owned = new Set(ownedCards.map(cardKey));
   const paid = [];
   for (const set of SETS) {
@@ -244,17 +296,7 @@ function checkSets(announce) {
     if (met > done) profile.sets[set.id] = met;
   }
   if (!paid.length) return;
-  updatedAt = Date.now();
-  save('statstack_profile', profile);
-  save('statstack_updated', updatedAt);
-  updateBoard();
-  Account.changed();
-  if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => FX.sound("claim"), 600 + k * 2600));
-  if (announce) paid.forEach(({set, i, pay}, k) => setTimeout(() => toast(
-    `<span class="toast-icon coin-icon" aria-hidden="true"><span class="coin"></span></span>`,
-    i === 2 ? `Set complete: ${set.name}` : `${set.name} · ${tierGoal(set, i)} card${tierGoal(set, i) === 1 ? "" : "s"}`,
-    `+${pay.toLocaleString()} coins`), 600 + k * 2600));
-  if (currentScreen === "book") renderBook();
+  announceSets(paid, announce);
 }
 PROGRESS_HOOKS.push(checkSets);
 
@@ -341,7 +383,21 @@ let lineupChallenge = load('statstack_lineup_challenge', null);
 const starters = () => profile.lineup.slots.slice(0, 5).map(ownedByKey).filter(Boolean);
 const teamOvr = cards => Math.round(cards.reduce((s, c) => s + cardOvr(c), 0) / cards.length);
 
+// Signed-in players get their opponent from the server, which also decides
+// the game; guests make their own
+let opponentLoading = false;
+async function fetchOpponent(level) {
+  if (opponentLoading) return;
+  opponentLoading = true;
+  opponent = {level, loading: true, name: "", cards: []};
+  const res = await serverMove("battle_opponent", {p_level: level, p_keys: starters().map(c => c.skey)});
+  opponentLoading = false;
+  const cards = res ? res.cards.map(cardBySkey) : [];
+  opponent = res && cards.every(Boolean) ? {id: res.id, level, name: res.name, cards} : {level, failed: true, name: "", cards: []};
+  if (currentScreen === "locker") renderBattles();
+}
 function makeOpponent(level) {
+  if (Account.ranked()) { fetchOpponent(level); return opponent; }
   const mine = starters();
   const target = Math.max(70, Math.min(97, teamOvr(mine) + DIFFICULTY.find(d => d.id === level).offset));
   const taken = new Set(mine.map(c => c.name));
@@ -377,7 +433,16 @@ function renderBattles() {
   if (lineupChallenge) {
     const cards = lineupChallenge.keys.map(cardByKey).filter(Boolean);
     opponent = {level: "challenge", challenge: true, name: `${lineupChallenge.from || "Friend"}'s ${lineupChallenge.name || "Five"}`, cards};
-  } else if (!opponent || opponent.challenge || opponent.level !== battleLevel) opponent = makeOpponent(battleLevel);
+  } else if (!opponent || opponent.challenge || opponent.level !== battleLevel || (!!opponent.id !== Account.ranked() && !opponent.loading)) {
+    opponent = makeOpponent(battleLevel);
+  }
+  if (opponent.loading || opponent.failed) {
+    body.innerHTML = `<div class="panel battle-panel"><p class="muted">${opponent.loading ? "Finding an opponent…" : "Couldn't find an opponent."}</p>
+      ${opponent.failed ? `<div class="btn-row"><button class="pill pill-solid pill-sm" type="button" id="newOpponent">Try again</button></div>` : ""}
+      <div id="battleGame"></div></div>`;
+    if (lastResult) showResult(lastResult, false);
+    return;
+  }
   const my = teamOvr(mine), level = DIFFICULTY.find(d => d.id === battleLevel);
   const odds = Math.round(100 / (1 + Math.exp(-(my - teamOvr(opponent.cards)) / 3)));
   body.innerHTML = `<div class="panel battle-panel">
@@ -402,10 +467,11 @@ function renderBattles() {
   if (lastResult) showResult(lastResult, false);
 }
 
-// One game: who wins comes from the OVR gap; the score and box line are dressing
-function simulate(mine, theirs) {
+// One game: who wins comes from the OVR gap (or the server's verdict); the
+// score and box line are dressing
+function simulate(mine, theirs, decided) {
   const gap = teamOvr(mine) - teamOvr(theirs);
-  const win = Math.random() < 1 / (1 + Math.exp(-gap / 3));
+  const win = typeof decided === "boolean" ? decided : Math.random() < 1 / (1 + Math.exp(-gap / 3));
   const margin = 1 + Math.floor(Math.random() ** 1.6 * 22);
   const base = 100 + (teamOvr(mine) + teamOvr(theirs) - 160) * 0.4 + Math.random() * 14;
   const hi = Math.round(base + margin / 2), lo = hi - margin;
@@ -432,7 +498,19 @@ async function playBattle() {
   if (mine.length < 5) return;
   battleBusy = true;
   lastResult = null;
-  const game = simulate(mine, opponent.cards), level = DIFFICULTY.find(d => d.id === battleLevel);
+  const level = DIFFICULTY.find(d => d.id === battleLevel);
+  let verdict = null;
+  if (opponent.id) {
+    document.querySelectorAll("#battleBody button").forEach(b => { b.disabled = true; });
+    verdict = await serverMove("battle_play", {p_id: opponent.id});
+    if (!verdict) {
+      battleBusy = false;
+      opponent = null;
+      renderBattles();
+      return;
+    }
+  }
+  const game = simulate(mine, opponent.cards, verdict ? verdict.win : undefined);
   document.querySelectorAll("#battleBody button").forEach(b => { b.disabled = true; });
   const el = $("battleGame");
   el.innerHTML = `<div class="scoreboard" role="status" aria-live="polite">
@@ -468,7 +546,11 @@ async function playBattle() {
     return;
   }
   const b = profile.battle;
-  if (game.win) {
+  if (verdict) {
+    Object.assign(b, verdict.battle);
+    coins = verdict.coins;
+    profile.stats.coinsEarned += verdict.pay;
+  } else if (game.win) {
     b.w++;
     b.streak++;
     b.best = Math.max(b.best, b.streak);
@@ -533,3 +615,12 @@ BADGES.push(
   {id: "giant-slayer", name: "Giant Slayer", desc: "Beat a Legend team", glyph: "GS", tier: "gold", goal: 1, value: () => profile.battle.legendWins},
   {id: "top-10", name: "Top 10", desc: "Finish a season in the top 10", glyph: "🏆", tier: "gold", goal: 1, value: () => profile.trophies.length},
 );
+
+// Signing in or out: a server opponent can't be played as a guest, or back
+const resetGames = SCREEN_HOOKS.gameReset;
+SCREEN_HOOKS.gameReset = () => {
+  if (resetGames) resetGames();
+  opponent = null;
+  lastResult = null;
+  setsAsked = "";
+};

@@ -17,6 +17,10 @@ const Account = (() => {
   let recovering = false;
   // Username chosen at sign-up, claimed once the account's save is in place
   let pendingName = "";
+  // True once the server keeps this account's score (supabase/game.sql is
+  // installed). Until then the game keeps score in the save, as before.
+  let gameMode = false;
+  let gameChecked = false; // asked the server for this account's game yet
   const listeners = [];
   const emit = () => listeners.forEach(fn => fn());
 
@@ -46,6 +50,7 @@ const Account = (() => {
       const was = user && user.id;
       user = session ? session.user : null;
       phase = user ? "signed-in" : "signed-out";
+      if (!user || user.id !== was) { gameMode = false; gameChecked = false; }
       if (event === "PASSWORD_RECOVERY") recovering = true;
       // Supabase asks that other calls wait until this callback returns
       if (user && user.id !== was) setTimeout(pull, 0);
@@ -132,6 +137,32 @@ const Account = (() => {
       if (!(await claimName(name))) hooks.rename(name);
     }
     await push();
+    await loadGame();
+  }
+
+  // Coins, cards and records from the server, which overrule the save
+  async function loadGame() {
+    if (!user) return;
+    const {data, error} = await client.rpc("game_state", {p_num: hooks.dailyNum()});
+    gameChecked = true;
+    if (error || !data || typeof data !== "object" || !data.hl) {
+      // Not installed yet: carry on keeping score in the save
+      gameMode = false;
+      if (error && !/game_state|PGRST202|42883|schema cache/i.test(`${error.message} ${error.code}`)) setSync("error");
+      emit();
+      return;
+    }
+    gameMode = true;
+    hooks.applyGame(data);
+    emit();
+  }
+
+  // A move for the server to check and score
+  async function call(fn, args = {}) {
+    if (!client) return {error: "Accounts are off."};
+    const {data, error} = await client.rpc(fn, args);
+    if (error) return {error: friendly(error)};
+    return {data};
   }
 
   async function push() {
@@ -164,6 +195,7 @@ const Account = (() => {
     if (/password should be|weak password|at least/i.test(m)) return m;
     if (/rate limit|too many/i.test(m)) return "Too many tries. Wait a minute and try again.";
     if (/fetch|network/i.test(m)) return "Couldn't reach the server. Check your connection.";
+    if (/JWT|not authenticated|Sign in to play/i.test(m)) return "Your session ended. Sign in again.";
     return m || "Something went wrong. Try again.";
   }
 
@@ -213,6 +245,7 @@ const Account = (() => {
     if (pushTimer) await push();
     await client.auth.signOut();
     user = null;
+    gameMode = false;
     phase = "signed-out";
     hooks.reset();
     emit();
@@ -227,7 +260,11 @@ const Account = (() => {
     lastSync: () => lastSync,
     email: () => (user ? user.email : ""),
     signedIn: () => !!user,
+    // The server keeps score for this account
+    ranked: () => !!user && gameMode,
+    // Signed out, or the account's coins and records have arrived
+    settled: () => !user || gameChecked || sync === "error",
     recovering: () => recovering,
-    leaderboard, changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge,
+    leaderboard, changed, signIn, signUp, sendReset, updatePassword, claimName, signOut, merge, call, loadGame,
   };
 })();

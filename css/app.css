@@ -1621,6 +1621,7 @@ dialog.news-dialog { width: min(720px, calc(100% - 32px)); }
 .news-list strong { font-size: 15px; }
 .news-list li div span { font-size: 13px; color: var(--muted); }
 .news-icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 12px; font-family: var(--display); font-weight: var(--display-w); font-size: 18px; color: var(--ink-0); }
+.n-clock { background: var(--bad); color: #fff; }
 .n-daily { background: var(--gold); }
 .n-who { background: var(--r-epic); }
 .n-packs { background: linear-gradient(160deg, #0e2240 0%, #13305a 50%, #005a91 50%, #003a5e 100%); }
@@ -1966,7 +1967,7 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 
 /* ─── Who Am I? ─── */
 .who-card { background: radial-gradient(90% 110% at 100% 0%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 55%), var(--ink-1); }
-.who-card > .who-mystery { position: absolute; z-index: 0; right: clamp(8px, 5%, 56px); top: 5%; width: min(24%, 190px); aspect-ratio: 200 / 220; pointer-events: none; }
+.who-card > .who-mystery { position: absolute; z-index: 0; right: clamp(8px, 5%, 56px); top: 14%; width: min(24%, 190px); aspect-ratio: 200 / 220; pointer-events: none; }
 .who-mystery svg { width: 100%; height: 100%; fill: color-mix(in srgb, var(--text) 9%, transparent); }
 .who-mystery span { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); font-family: var(--display); font-weight: 900; font-size: clamp(48px, 7vw, 96px); line-height: 1; color: var(--gold); text-shadow: 0 0 40px color-mix(in srgb, var(--gold) 60%, transparent); animation: who-pulse 2.4s ease-in-out infinite; }
 @keyframes who-pulse { 50% { opacity: 0.55; } }
@@ -2116,3 +2117,22 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 /* "All sets" splits the grid with a heading per kind */
 .set-group { grid-column: 1 / -1; padding-top: 12px; }
 .set-group:first-child { padding-top: 0; }
+
+/* ─── Shot clock: the ring empties as time runs out ─── */
+.clocking {
+  --left: 1;
+  background:
+    radial-gradient(closest-side, var(--ink-0) calc(100% - 7px), transparent calc(100% - 6px)),
+    conic-gradient(var(--clock, var(--gold)) calc(var(--left) * 360deg), color-mix(in srgb, var(--text) 16%, transparent) 0) !important;
+  border-color: transparent !important;
+  color: var(--text) !important;
+}
+.clocking b { font-family: var(--mono); font-weight: 700; font-size: 0.85em; line-height: 1; font-variant-numeric: tabular-nums; }
+.clocking.low { --clock: var(--bad); animation: clock-pulse 0.5s ease-in-out infinite alternate; }
+.clocking.low b { color: var(--bad); }
+@keyframes clock-pulse { to { scale: 1.07; } }
+@media (prefers-reduced-motion: reduce) { .clocking.low { animation: none; } }
+.shot-clock { display: none; width: 54px; height: 54px; flex: none; border-radius: 50%; place-items: center; font-size: 22px; margin-left: auto; }
+.shot-clock.clocking { display: grid; }
+.who-top { gap: 12px; }
+.auth-note { font-size: 13px; color: var(--muted); }

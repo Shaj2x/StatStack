@@ -57,15 +57,38 @@ function dailyPuzzle(num) {
   return questions;
 }
 
+// Puzzles come from the server, which keeps one per day for everyone and
+// grades signed-in players against it. The browser's own generator is the
+// fallback for guests when the server can't be reached.
 const puzzleCache = new Map();
+const serverPuzzles = new Map(); // num → questions, "loading" or "failed"
 function puzzleFor(num) {
+  const sp = serverPuzzles.get(num);
+  if (Array.isArray(sp)) return sp;
   if (!puzzleCache.has(num)) puzzleCache.set(num, dailyPuzzle(num));
   return puzzleCache.get(num);
 }
-let dailyCache = {num: 0, questions: []};
+// "ready", "loading", or "failed" (only the server's puzzle counts for coins)
+function puzzleStatus(num) {
+  if (!Account.enabled) return "ready";
+  const sp = serverPuzzles.get(num);
+  if (Array.isArray(sp)) return "ready";
+  if (sp === "failed") return Account.ranked() ? "failed" : "ready";
+  loadPuzzle(num);
+  return "loading";
+}
+async function loadPuzzle(num) {
+  if (serverPuzzles.has(num) || Account.phase() === "loading") return;
+  serverPuzzles.set(num, "loading");
+  const res = await Account.call("daily_puzzle", {p_num: num});
+  const qs = Array.isArray(res.data) ? res.data.map(q => ({a: cardBySkey(q.a), b: cardBySkey(q.b), stat: q.stat})) : [];
+  serverPuzzles.set(num, qs.length === DAILY_LENGTH && qs.every(q => q.a && q.b) ? qs : "failed");
+  if (currentScreen === "daily") renderDaily();
+}
+let dailyCache = {num: 0};
 function todaysPuzzle() {
   const num = dailyNumber();
-  if (dailyCache.num !== num) dailyCache = {num, questions: puzzleFor(num)};
+  dailyCache = {num, questions: puzzleFor(num)};
   return dailyCache;
 }
 const statInfo = key => statTypes.find(s => s.key === key);
@@ -74,6 +97,10 @@ const emojiGrid = answers => answers.map(ok => (ok ? "🟩" : "🟥")).join("");
 const monthKey = (d = new Date()) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 let dailyRevealed = false; // showing the answer to the question just guessed
 let dailyTimer = null;
+const dailyClock = new ShotClock(() => $("dailyBody").querySelector(".daily-vs"));
+let dailyAsked = null;     // the question whose shot clock is running
+let dailyAnswering = false;
+let dailyLast = null;      // how the last answer went: {late, fast}
 
 // A friend's challenge on an older Daily is played as a separate run that
 // pays nothing and doesn't touch today's Daily. Friends' scores to beat on
@@ -157,7 +184,7 @@ function renderDaily() {
       <h2 class="panel-title">${esc(d.from || "A friend")} scored ${rival ? rival.score : "?"}/10</h2>
       <p>Play the same 10 matchups from Daily #${num}. Challenges pay no coins and don't change today's Daily. It's just for bragging rights.</p>
       <div class="btn-row">
-        <button class="pill pill-solid" id="dailyStart" type="button">Take the challenge</button>
+        ${dailyStartBtn("Take the challenge", num)}
         <button class="pill pill-ghost" id="dailyDrop" type="button">Back to today's Daily</button>
       </div>
     </div>` : `<div class="daily-hero court-art">
@@ -167,7 +194,7 @@ function renderDaily() {
         <h2 class="daily-hero-title">Today's ${DAILY_LENGTH} matchups</h2>
         <ol class="daily-tickets" aria-hidden="true">${Array.from({length: DAILY_LENGTH}, (_, i) => `<li><span>${i + 1}</span></li>`).join("")}</ol>
         <div class="daily-cta">
-          <button class="pill pill-solid" id="dailyStart" type="button">Start Daily #${num}</button>
+          ${dailyStartBtn(`Start Daily #${num}`, num)}
           <span class="daily-resets">New puzzle in <strong id="dailyCountdown">—</strong></span>
         </div>
       </div>
@@ -190,12 +217,14 @@ function renderDaily() {
   if (state === "playing" || dailyRevealed) {
     const i = dailyRevealed ? d.answers.length - 1 : d.answers.length;
     const q = questions[i], info = statInfo(q.stat);
+    const said = !d.answers[i] && dailyLast && dailyLast.late ? "Out of time" : d.answers[i] ? "Right" : "Wrong";
+    const fast = d.answers[i] && dailyLast && dailyLast.fast ? ` · fast answer +${dailyLast.fast}` : "";
     const verdict = dailyRevealed
-      ? `<p class="daily-verdict ${d.answers[i] ? "ok" : "miss"}" role="status">${d.answers[i] ? "Right" : "Wrong"} · ${esc(q.b.name)} averaged ${one(q.b[q.stat])}, ${q.b[q.stat] > q.a[q.stat] ? "more" : "fewer"} than ${one(q.a[q.stat])}</p>
+      ? `<p class="daily-verdict ${d.answers[i] ? "ok" : "miss"}" role="status">${said}${fast} · ${esc(q.b.name)} averaged ${one(q.b[q.stat])}, ${q.b[q.stat] > q.a[q.stat] ? "more" : "fewer"} than ${one(q.a[q.stat])}</p>
          <button class="pill pill-solid daily-next" id="dailyNext" type="button">${d.done ? "See your result" : "Next matchup"}</button>`
       : `<div class="daily-actions">
-           <button class="pill pill-solid" type="button" data-daily="higher">Higher</button>
-           <button class="pill pill-ghost" type="button" data-daily="lower">Lower</button>
+           <button class="pill pill-solid" type="button" data-daily="higher"${dailyClock.running ? "" : " disabled"}>Higher</button>
+           <button class="pill pill-ghost" type="button" data-daily="lower"${dailyClock.running ? "" : " disabled"}>Lower</button>
          </div>`;
     body.innerHTML = `<div class="daily-q">
       <p class="daily-ask">Matchup ${i + 1} of ${DAILY_LENGTH} · Did <strong>${esc(q.b.name)}</strong> average more or fewer <strong>${info.label}</strong>?</p>
@@ -207,13 +236,15 @@ function renderDaily() {
       ${verdict}
     </div>`;
     body.querySelectorAll(".daily-name").forEach(el => fitName(el, 18));
+    if (dailyClock.running) dailyClock.tick();
+    else if (!dailyRevealed) armDailyClock(run, i);
     const focus = body.querySelector("#dailyNext, [data-daily]");
     if (focus) focus.focus({preventScroll: true});
     return;
   }
 
   // Done: score, share, countdown, and how everyone else did
-  const reward = run.challenge ? 0 : d.score * 50 + (d.score === DAILY_LENGTH ? 250 : 0);
+  const reward = run.challenge ? 0 : d.score * 50 + (d.score === DAILY_LENGTH ? 250 : 0) + (d.bonus || 0);
   body.innerHTML = `<div class="daily-done">
     <div class="panel daily-result court-art">
       <p class="eyebrow">${run.challenge ? "Challenge result" : "Your score"}</p>
@@ -254,41 +285,96 @@ function tickCountdown() {
   el.textContent = `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+function dailyStartBtn(label, num) {
+  const status = puzzleStatus(num);
+  if (status === "failed") return `<button class="pill pill-solid" id="dailyRetry" type="button">Couldn't load the puzzle · Try again</button>`;
+  return `<button class="pill pill-solid" id="dailyStart" type="button"${status === "ready" ? "" : " disabled"}>${status === "ready" ? label : "Loading the puzzle…"}</button>`;
+}
+
 function startDaily() {
   const run = activeRun();
+  if (puzzleStatus(run.num) !== "ready") return;
   if (run.challenge) {
     challengeRun.started = true;
     saveChallenge();
   } else {
-    profile.daily = {num: run.num, answers: [], done: false, score: 0};
+    profile.daily = {num: run.num, answers: [], done: false, score: 0, bonus: 0};
     progressChanged();
   }
   dailyRevealed = false;
   renderDaily();
 }
 
-function answerDaily(guess) {
+// Start the shot clock on question i. For a signed-in Daily the server starts
+// its own clock too, and says how long the question has already been up.
+async function armDailyClock(run, i) {
+  const key = `${run.challenge ? "c" : "d"}${run.num}:${i}`;
+  if (dailyAsked === key) return;
+  dailyAsked = key;
+  let elapsed = 0;
+  if (!run.challenge && Account.ranked()) {
+    const n = await serverMove("daily_next", {p_num: run.num});
+    if (dailyAsked !== key) return;
+    if (!n) { dailyAsked = null; return; }
+    if (n.done || n.index !== i) { dailyAsked = null; await Account.loadGame(); return; }
+    elapsed = n.elapsed;
+  }
+  dailyClock.start(CLOCK.daily, () => answerDaily("timeout"), elapsed);
+  $("dailyBody").querySelectorAll("[data-daily]").forEach(b => { b.disabled = false; });
+}
+
+async function answerDaily(guess) {
   const run = activeRun();
-  if (dailyState(run) !== "playing" || dailyRevealed) return;
+  if (dailyState(run) !== "playing" || dailyRevealed || dailyAnswering) return;
+  const secs = dailyClock.elapsed();
+  dailyClock.stop();
+  dailyAsked = null;
   const {questions, d} = run;
-  const q = questions[d.answers.length], ok = isRight(q, guess);
-  d.answers.push(ok);
-  if (d.answers.length === DAILY_LENGTH) {
-    d.done = true;
-    d.score = d.answers.filter(Boolean).length;
-    if (!run.challenge) {
-      const reward = d.score * 50 + (d.score === DAILY_LENGTH ? 250 : 0);
-      coins += reward;
-      profile.stats.coinsEarned += reward;
+  const q = questions[d.answers.length];
+  let ok, fast = 0;
+  if (!run.challenge && Account.ranked()) {
+    dailyAnswering = true;
+    const res = await serverMove("daily_answer", {p_num: run.num, p_guess: guess});
+    dailyAnswering = false;
+    if (!res) { await Account.loadGame(); return renderDaily(); }
+    ok = res.ok;
+    fast = res.fast;
+    d.answers = res.answers;
+    d.bonus = res.bonus;
+    if (res.done) {
+      d.done = true;
+      d.score = res.score;
+      coins = res.coins;
+      profile.stats.coinsEarned += res.reward;
       profile.stats.dailies++;
       if (d.score === DAILY_LENGTH) profile.stats.dailyPerfect++;
-      // Season points: every Daily score this month adds up
       const mk = monthKey();
       profile.monthPts[mk] = (profile.monthPts[mk] || 0) + d.score;
-      Object.keys(profile.monthPts).sort().slice(0, -12).forEach(k => delete profile.monthPts[k]);
       updateBoard();
     }
+  } else {
+    ok = guess !== "timeout" && isRight(q, guess);
+    if (ok && !run.challenge && secs <= FAST.daily) fast = 25;
+    d.answers.push(ok);
+    d.bonus = (d.bonus || 0) + fast;
+    if (d.answers.length === DAILY_LENGTH) {
+      d.done = true;
+      d.score = d.answers.filter(Boolean).length;
+      if (!run.challenge) {
+        const reward = d.score * 50 + (d.score === DAILY_LENGTH ? 250 : 0) + d.bonus;
+        coins += reward;
+        profile.stats.coinsEarned += reward;
+        profile.stats.dailies++;
+        if (d.score === DAILY_LENGTH) profile.stats.dailyPerfect++;
+        // Season points: every Daily score this month adds up
+        const mk = monthKey();
+        profile.monthPts[mk] = (profile.monthPts[mk] || 0) + d.score;
+        Object.keys(profile.monthPts).sort().slice(0, -12).forEach(k => delete profile.monthPts[k]);
+        updateBoard();
+      }
+    }
   }
+  dailyLast = {late: guess === "timeout", fast};
   dailyRevealed = true;
   FX.feedback(ok ? "correct" : "wrong");
   if (run.challenge) saveChallenge(); else progressChanged();
@@ -331,6 +417,7 @@ $("dailyBody").addEventListener("click", e => {
   const guess = e.target.closest("[data-daily]");
   if (guess) answerDaily(guess.dataset.daily);
   else if (e.target.closest("#dailyStart")) startDaily();
+  else if (e.target.closest("#dailyRetry")) { serverPuzzles.delete(activeRun().num); renderDaily(); }
   else if (e.target.closest("#dailyNext")) { dailyRevealed = false; renderDaily(); }
   else if (e.target.closest("#dailyShare")) shareDaily();
   else if (e.target.closest("#dailyDrop")) dropChallenge();
@@ -344,43 +431,64 @@ const WHO_SCALE = {ppg: 5, rpg: 2, apg: 1.5, spg: 0.4, bpg: 0.4};
 const WHO_PAY = 25, WHO_PAY_HINT = 12;
 let who = null, whoStreak = 0;
 
-function newWho() {
-  const pool = currentPlayers.filter(p => p.ppg >= 4);
-  const answer = pick(pool);
-  const dist = p => statTypes.reduce((sum, s) => sum + Math.abs(p[s.key] - answer[s.key]) / WHO_SCALE[s.key], 0);
-  const near = pool.filter(p => p.name !== answer.name).sort((x, y) => dist(x) - dist(y)).slice(0, 7);
-  const decoys = near.sort(() => Math.random() - 0.5).slice(0, 3);
-  const options = [answer, ...decoys].sort(() => Math.random() - 0.5);
-  who = {answer, options, hint: false, picked: null};
+const whoClock = new ShotClock($("whoClock"));
+let whoBusy = false;
+
+// For signed-in players the server deals the question and keeps the answer
+// until it's given; guests deal their own
+async function newWho() {
+  whoClock.stop();
+  if (Account.ranked()) {
+    if (whoBusy) return;
+    whoBusy = true;
+    const r = await serverMove("who_next", {p_season: currentSeasonKey});
+    whoBusy = false;
+    if (!r) return;
+    const options = r.options.map(cardBySkey);
+    if (options.some(o => !o)) return toast(`<span class="toast-icon" aria-hidden="true">!</span>`, "Update needed", "Reload the page to get the latest players.");
+    who = {id: r.id, line: r.line, options, answer: null, team: null, hint: false, picked: null, done: false};
+    whoStreak = r.streak;
+  } else {
+    const pool = currentPlayers.filter(p => p.ppg >= 4);
+    const answer = pick(pool);
+    const dist = p => statTypes.reduce((sum, s) => sum + Math.abs(p[s.key] - answer[s.key]) / WHO_SCALE[s.key], 0);
+    const near = pool.filter(p => p.name !== answer.name).sort((x, y) => dist(x) - dist(y)).slice(0, 7);
+    const decoys = near.sort(() => Math.random() - 0.5).slice(0, 3);
+    const options = [answer, ...decoys].sort(() => Math.random() - 0.5);
+    who = {id: null, line: answer, options, answer, team: answer.team, hint: false, picked: null, done: false};
+  }
+  $("whoResult").textContent = "";
   renderWho();
+  whoClock.start(CLOCK.who, () => answerWho(-1));
 }
 
 function renderWho() {
-  if (!who) return newWho();
-  const {answer, options, hint, picked} = who, done = picked !== null;
+  if (!who) { newWho(); return; }
+  const {line, answer, options, hint, picked, done} = who;
   const card = $("whoCard");
-  if (hint || done) paint(card, answer.team);
+  const teamCode = done && answer ? answer.team : hint ? who.team : null;
+  if (teamCode) paint(card, teamCode);
   else ["--team-bg", "--team-bg2", "--team-accent"].forEach(v => card.style.removeProperty(v));
-  card.classList.toggle("revealed", done);
-  card.classList.toggle("tinted", hint || done);
+  card.classList.toggle("revealed", done && !!answer);
+  card.classList.toggle("tinted", !!teamCode);
   $("whoSeason").textContent = `${currentSeasonKey} season`;
-  $("whoTitle").innerHTML = done ? nameHtml(answer.name) : "Who am I?";
-  if (done) fitName($("whoTitle"), 28);
+  $("whoTitle").innerHTML = done && answer ? nameHtml(answer.name) : "Who am I?";
+  if (done && answer) fitName($("whoTitle"), 28);
   else $("whoTitle").style.fontSize = "";
   const img = $("whoPhoto");
-  if (done) setImg(img, answer); else img.removeAttribute("src");
-  img.hidden = !done;
+  if (done && answer) setImg(img, answer); else img.removeAttribute("src");
+  img.hidden = !(done && answer);
   // Each stat shows where it ranks among this season's players: a clue in itself
   $("whoStats").innerHTML = statTypes.map(s => {
-    const rank = currentPlayers.filter(p => p[s.key] > answer[s.key]).length + 1;
+    const rank = currentPlayers.filter(p => p[s.key] > line[s.key]).length + 1;
     const fill = Math.round(100 * (1 - (rank - 1) / Math.max(currentPlayers.length, 1)));
-    return `<div><dt>${s.short}</dt><dd>${one(answer[s.key])}</dd>
+    return `<div><dt>${s.short}</dt><dd>${one(line[s.key])}</dd>
       <span class="who-bar" aria-hidden="true"><i style="width:${fill}%"></i></span>
       <span class="who-rank">${ordinal(rank)}<span class="who-of"> of ${currentPlayers.length}</span></span></div>`;
   }).join("");
   $("whoHint").hidden = hint || done;
-  $("whoTeam").hidden = !(hint || done);
-  $("whoTeam").textContent = team(answer.team).name || answer.team;
+  $("whoTeam").hidden = !teamCode;
+  $("whoTeam").textContent = teamCode ? team(teamCode).name || teamCode : "";
   $("whoOptions").innerHTML = options.map((p, i) => {
     const cls = !done ? "" : p === answer ? " ok" : p === picked ? " miss" : " dim";
     return `<button class="who-option${cls}" type="button" data-who="${i}"${done ? " disabled" : ""}><span class="who-key" aria-hidden="true">${i + 1}</span>${esc(p.name)}</button>`;
@@ -394,27 +502,46 @@ function renderWho() {
   $("whoAccNum").textContent = profile.stats.whoRounds ? `${acc}%` : "—";
 }
 
-function answerWho(i) {
-  if (!who || who.picked !== null) return;
-  const choice = who.options[i];
-  if (!choice) return;
-  who.picked = choice;
-  const ok = choice === who.answer;
-  profile.stats.whoRounds++;
-  if (ok) {
-    const pay = who.hint ? WHO_PAY_HINT : WHO_PAY;
-    coins += pay;
-    profile.stats.coinsEarned += pay;
-    profile.stats.whoCorrect++;
-    whoStreak++;
-    profile.stats.whoBest = Math.max(profile.stats.whoBest, whoStreak);
-    $("whoResult").textContent = `Right · +${pay} coins`;
-    $("whoResult").className = "who-result ok";
+// i is 0–3, or -1 when the shot clock runs out
+async function answerWho(i) {
+  if (!who || who.done || whoBusy) return;
+  const secs = whoClock.elapsed();
+  whoClock.stop();
+  let ok, pay = 0, bonus = 0;
+  if (who.id) {
+    whoBusy = true;
+    const res = await serverMove("who_answer", {p_id: who.id, p_pick: i});
+    whoBusy = false;
+    if (!res) { who = null; return newWho(); }
+    ok = res.ok;
+    pay = res.pay;
+    bonus = res.bonus;
+    who.answer = cardBySkey(res.answer);
+    coins = res.coins;
+    whoStreak = res.streak;
+    Object.assign(profile.stats, {whoBest: res.best, whoRounds: res.rounds, whoCorrect: res.correct});
+    profile.stats.coinsEarned += pay + bonus;
   } else {
-    whoStreak = 0;
-    $("whoResult").textContent = `It was ${who.answer.name}`;
-    $("whoResult").className = "who-result miss";
+    ok = i >= 0 && who.options[i] === who.answer;
+    profile.stats.whoRounds++;
+    if (ok) {
+      pay = who.hint ? WHO_PAY_HINT : WHO_PAY;
+      bonus = fastBonus(pay, secs, "who");
+      coins += pay + bonus;
+      profile.stats.coinsEarned += pay + bonus;
+      profile.stats.whoCorrect++;
+      whoStreak++;
+      profile.stats.whoBest = Math.max(profile.stats.whoBest, whoStreak);
+    } else {
+      whoStreak = 0;
+    }
   }
+  who.picked = i >= 0 ? who.options[i] : null;
+  who.done = true;
+  const name = who.answer ? who.answer.name : "someone else";
+  $("whoResult").textContent = ok ? `Right · +${pay + bonus} coins${bonus ? ` (fast answer +${bonus})` : ""}`
+    : i < 0 ? `Out of time · it was ${name}` : `It was ${name}`;
+  $("whoResult").className = `who-result ${ok ? "ok" : "miss"}`;
   FX.feedback(ok ? "correct" : "wrong");
   updateBoard();
   progressChanged();
@@ -428,20 +555,42 @@ $("whoOptions").addEventListener("click", e => {
   const b = e.target.closest("[data-who]");
   if (b) answerWho(Number(b.dataset.who));
 });
-$("whoHint").addEventListener("click", () => { if (who && who.picked === null) { who.hint = true; renderWho(); } });
-$("whoNext").addEventListener("click", () => { $("whoResult").textContent = ""; newWho(); $("whoOptions").querySelector("button").focus({preventScroll: true}); });
+$("whoHint").addEventListener("click", async () => {
+  if (!who || who.done || who.hint) return;
+  if (who.id) {
+    const res = await serverMove("who_hint", {p_id: who.id});
+    if (!res || who.done) return;
+    who.team = res.team;
+  }
+  who.hint = true;
+  renderWho();
+});
+$("whoNext").addEventListener("click", async () => {
+  await newWho();
+  const first = $("whoOptions").querySelector("button");
+  if (first) first.focus({preventScroll: true});
+});
 document.addEventListener("keydown", e => {
   if (currentScreen !== "who" || e.metaKey || e.ctrlKey || e.altKey || e.target.matches("input, select, textarea")) return;
   if (document.querySelector("dialog[open]")) return;
-  if (/^[1-4]$/.test(e.key) && who && who.picked === null) answerWho(Number(e.key) - 1);
-  else if (e.key.toLowerCase() === "t" && who && who.picked === null) $("whoHint").click();
-  else if (e.key === "Enter" && who && who.picked !== null && !e.target.closest("button")) $("whoNext").click();
+  if (/^[1-4]$/.test(e.key) && who && !who.done) answerWho(Number(e.key) - 1);
+  else if (e.key.toLowerCase() === "t" && who && !who.done) $("whoHint").click();
+  else if (e.key === "Enter" && who && who.done && !e.target.closest("button")) $("whoNext").click();
 });
 SCREEN_HOOKS.who = () => renderWho();
 SCREEN_HOOKS.seasonChanged = () => {
   who = null;
   whoStreak = 0;
-  if (currentScreen === "who") { $("whoResult").textContent = ""; newWho(); }
+  whoClock.stop();
+  if (currentScreen === "who") newWho();
+};
+// Signing in or out: questions dealt so far were scored somewhere else
+SCREEN_HOOKS.gameReset = () => {
+  who = null;
+  whoClock.stop();
+  dailyClock.stop();
+  dailyAsked = null;
+  dailyRevealed = false;
 };
 
 // ─── LOCKER ─────────────────────────────────────────────────────────────────
@@ -714,5 +863,6 @@ Account.on(() => {
   if (Account.phase() === lastPhase) return;
   lastPhase = Account.phase();
   if (currentScreen === "ranks") renderRanks();
-  if (currentScreen === "daily" && dailyState() === "done") loadBoard("daily", $("dailyBoard") || document.createElement("div"), 10);
+  // The Daily waits for the account connection to fetch the server's puzzle
+  if (currentScreen === "daily") renderDaily();
 });

@@ -228,6 +228,7 @@
         <article class="who-card court-art" id="whoCard">
           <div class="who-top">
             <p class="eyebrow" id="whoEyebrow">Who am I?</p>
+            <span class="shot-clock" id="whoClock" role="timer"></span>
             <span class="who-season" id="whoSeason"></span>
           </div>
           <h1 class="display who-title" id="whoTitle">Who am I?</h1>
@@ -441,6 +442,7 @@
           </span>
           <small class="field-hint" data-modes="signup newpass">At least 8 characters.</small>
         </label>
+        <p class="auth-note" data-modes="signup">Accounts keep score on the server, so the leaderboards stay fair. Your account starts fresh: coins and cards earned as a guest stay on this device.</p>
         <p class="form-msg" id="authMsg" role="status" aria-live="polite"></p>
         <button class="pill pill-solid auth-submit" id="authSubmit" type="submit">Sign in</button>
         <button class="link-btn auth-link" id="forgotBtn" type="button" data-modes="signin">Forgot password?</button>
@@ -490,6 +492,7 @@
         </button>
       </div>
       <ul class="news-list" id="newsList">
+        <li><span class="news-icon n-clock" aria-hidden="true">8</span><div><strong>Shot clock and fair play</strong><span>Answer in 6–8 seconds; fast right answers pay a bonus. The server now keeps every account's coins, cards and scores, so the leaderboards are fair.</span></div><a class="news-go" href="#play">Play</a></li>
         <li><span class="news-icon n-daily" aria-hidden="true">10</span><div><strong>Daily Challenge</strong><span>Ten hard matchups a day, the same for everyone. Share your score to challenge friends.</span></div><a class="news-go" href="#daily">Play</a></li>
         <li><span class="news-icon n-locker" aria-hidden="true">99</span><div><strong>Locker and Lineup Battles</strong><span>Build a five with 2K-style ratings, play for coins, or challenge a friend's five.</span></div><a class="news-go" href="#locker">Build</a></li>
         <li><span class="news-icon n-ranks" aria-hidden="true">#1</span><div><strong>Ranks and seasons</strong><span>Monthly seasons with a trophy for the top 10. Tap any name to see their cards.</span></div><a class="news-go" href="#ranks">Ranks</a></li>
