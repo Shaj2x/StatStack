@@ -186,7 +186,9 @@ $("friendsBody").addEventListener("click", async e => {
     else if (act === "accept") await friendAction("friend_respond", {p_name: name, p_accept: true}, () => toast(CHECK_ICON, "You're friends now", `${name} is on your list.`));
     else if (act === "decline") await friendAction("friend_respond", {p_name: name, p_accept: false});
     else if (act === "remove") {
-      if (confirm(`Remove ${name}? Any open trades between you are called off.`)) await friendAction("friend_remove", {p_name: name});
+      if (await askConfirm({title: `Remove ${name}?`, text: "Any open trades between you are called off. You can add each other again later.", ok: "Remove", danger: true})) {
+        await friendAction("friend_remove", {p_name: name});
+      }
     } else if (act === "daily") {
       await friendAction("challenge_send", {p_name: name, p_kind: "daily", p_num: profile.daily.num, p_keys: null, p_lineup: null},
         () => toast(CHECK_ICON, "Challenge sent", `${name} gets your Daily #${profile.daily.num} score to beat.`));

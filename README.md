@@ -168,6 +168,14 @@ better odds. The theme rotates weekly: Playoff Heroes, Glass Cleaners
 Lockdown (1.6+ steals or 1.8+ blocks). The schedule is in both
 `supabase/game.sql` and `js/app.js`.
 
+Cards from the weekend pack come in that week's card finish, a different one
+every week on an eight-week rotation: Playoff Chrome, Neon Night, Galaxy,
+Lava, Ice Cold, Gold Rush, Retro '86 and Prism. The finish is saved with the
+card (`owned_cards.style`), travels with it in trades, and quick-sell keeps a
+finished copy apart from plain ones. The looks are the `.fx-<name>` rules in
+`css/app.css`; to add one, add it there, to `CARD_STYLES` and `STYLE_ORDER`
+in `js/app.js`, and to the style list in `_event()` in `supabase/game.sql`.
+
 Guests play entirely in the browser, with the same rules and clocks; nothing
 they do reaches the leaderboards. Signing out resets the device to a fresh
 guest.

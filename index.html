@@ -506,6 +506,18 @@
     </div>
   </dialog>
 
+  <dialog class="settings confirm-dialog" id="confirmDialog" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+    <div class="settings-inner">
+      <h2 id="confirmTitle">Are you sure?</h2>
+      <p class="muted" id="confirmText"></p>
+      <div id="confirmExtra"></div>
+      <div class="confirm-row">
+        <button class="pill pill-ghost" id="confirmNo" type="button">Cancel</button>
+        <button class="pill pill-solid" id="confirmYes" type="button">OK</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog class="settings challenge-dialog" id="challengeDialog" aria-labelledby="challengeTitle">
     <div class="settings-inner">
       <p class="eyebrow">Challenge</p>
@@ -530,6 +542,8 @@
         </button>
       </div>
       <ul class="news-list" id="newsList">
+        <li><span class="news-icon n-fx" aria-hidden="true">★</span><div><strong>Weekly card finishes</strong><span>Every weekend pack card comes in that week's special finish: Playoff Chrome, Neon Night, Galaxy and more. A new one every week, so each is a limited edition.</span></div><a class="news-go" href="#packs">Shop</a></li>
+        <li><span class="news-icon n-ovr" aria-hidden="true">99</span><div><strong>Ratings on the front</strong><span>Every card shows its OVR up front, based on real NBA 2K ratings. Sort your collection by OVR, newest, name or team, and search it.</span></div><a class="news-go" href="#collection">Cards</a></li>
         <li><span class="news-icon n-friends" aria-hidden="true">+1</span><div><strong>Friends and trades</strong><span>Add friends by username, see their records, send them your Daily score or lineup to beat, and swap cards.</span></div><a class="news-go" href="#friends">Friends</a></li>
         <li><span class="news-icon n-event" aria-hidden="true">!</span><div><strong>Weekend packs</strong><span>A limited pack every Friday to Sunday with a new theme each week. This weekend: Playoff Heroes.</span></div><a class="news-go" href="#packs">Shop</a></li>
         <li><span class="news-icon n-clock" aria-hidden="true">8</span><div><strong>Shot clock and fair play</strong><span>Answer in 6–8 seconds; fast right answers pay a bonus. The server now keeps every account's coins, cards and scores, so the leaderboards are fair.</span></div><a class="news-go" href="#play">Play</a></li>
