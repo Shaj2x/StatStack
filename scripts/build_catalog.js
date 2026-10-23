@@ -4,8 +4,8 @@
 //
 //   node scripts/build_catalog.js
 //
-// The rules below (franchises, eras, OVR) mirror js/app.js; the game checks
-// on load that the server's OVR matches its own.
+// The rules below (franchises, eras, OVR) mirror js/app.js, and OVR uses the
+// real 2K ratings in js/ratings.js (scripts/build_ratings.js).
 
 const fs = require("fs");
 const path = require("path");
@@ -26,19 +26,21 @@ const ERAS = [
   {id: "modern", seasons: k => parseInt(k) >= 2021},
 ];
 const PRODUCTION = c => c.ppg + 1.2 * c.rpg + 1.5 * c.apg + 3 * c.spg + 3 * c.bpg;
-const OVR_CURVE = [[1, 97], [2, 95], [5, 92], [10, 89], [20, 85], [40, 81], [60, 78], [90, 74], [120, 70]];
-const RARITY_BUMP = {legendary: [2, 90], epic: [1, 85], rare: [0, 0], common: [0, 0]};
+const OVR_FIT = {base: 99.5, slope: 4.07, star: {legendary: 0.4, epic: 2.45, rare: 2.45, common: 0}};
+const OVR_FLOOR = {legendary: 90, epic: 85, rare: 0, common: 0};
+const rctx = {};
+vm.createContext(rctx);
+vm.runInContext(fs.readFileSync(path.join(root, "js/ratings.js"), "utf8") + ";this.REAL_OVR = REAL_OVR;", rctx);
+const REAL_OVR = rctx.REAL_OVR;
 
 function seasonOvrs(season) {
   const players = SEASONS[season].players.slice().sort((a, b) => PRODUCTION(b) - PRODUCTION(a));
   const scale = 120 / Math.max(players.length, 1);
   const map = new Map();
   players.forEach((p, i) => {
-    const r = (i + 1) * scale;
-    let k = OVR_CURVE.findIndex(([rank]) => rank >= r);
-    if (k < 1) k = k === 0 ? 1 : OVR_CURVE.length - 1;
-    const [r0, o0] = OVR_CURVE[k - 1], [r1, o1] = OVR_CURVE[k];
-    map.set(p.name, Math.round(o0 + (o1 - o0) * Math.min(1, Math.max(0, (r - r0) / (r1 - r0)))));
+    const real = REAL_OVR[`${p.name}|${season}`];
+    const est = OVR_FIT.base - OVR_FIT.slope * Math.log((i + 1) * scale) + (OVR_FIT.star[p.rarity] || 0);
+    map.set(p.name, real || Math.min(99, Math.max(70, OVR_FLOOR[p.rarity] || 0, Math.round(est))));
   });
   return map;
 }
@@ -50,8 +52,7 @@ let ord = 0;
 for (const season of SEASON_KEYS) {
   const ovrs = seasonOvrs(season);
   for (const c of SEASONS[season].players) {
-    const [bump, floor] = RARITY_BUMP[c.rarity] || [0, 0];
-    const ovr = Math.min(99, Math.max(floor, (ovrs.get(c.name) || 70) + bump));
+    const ovr = ovrs.get(c.name) || 75;
     const era = ERAS.find(e => e.seasons(season)).id;
     rows.push(`(${q(`${c.name}|${season}|${c.team}`)},${ord++},${q(c.name)},${q(season)},${q(c.team)},${q(FRANCHISE[c.team] || c.team)},${q(era)},${q(c.rarity)},${num(c.ppg)},${num(c.rpg)},${num(c.apg)},${num(c.spg)},${num(c.bpg)},${ovr})`);
   }

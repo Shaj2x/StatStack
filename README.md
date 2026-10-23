@@ -77,6 +77,25 @@ scripts, so updates show up straight away; `.vercelignore` leaves the
 scripts and SQL out of the deploy. Every push to `main` deploys again.
 Challenge links use whichever address the game is opened on.
 
+## Overall ratings (OVR)
+
+Cards show a real NBA 2K rating where one exists (marked **2K** on the card
+back): NBA 2K26's end-of-season ratings for the 2025-26 season, and 2K's
+Classic team ratings (for example the 1995-96 Bulls) for earlier seasons.
+That's 208 of the 2,400 cards. They come from
+[nba2kapi](https://github.com/wkoverfield/nba2kapi), whose data is from
+2kratings.com, and are built into `js/ratings.js` by
+`node scripts/build_ratings.js <path to an nba2kapi clone>`.
+
+Every other card shows an estimate (marked **OVR**) fitted to those real
+ratings: players are ranked within their season by production (points +
+1.2×rebounds + 1.5×assists + 3×steals + 3×blocks) and
+OVR = 99.5 − 4.07 × ln(rank), plus 2.5 for rare and epic players, with
+floors of 90 for legendary and 85 for epic cards. On the cards with a real
+rating this lands within about 2.5 points of 2K. After rebuilding the
+ratings, run `node scripts/build_catalog.js` and re-run
+`supabase/catalog.sql` so the server's battles use the same numbers.
+
 ## Accounts and cloud sync
 
 Players get a profile (username, team-colour avatar, lifetime stats and

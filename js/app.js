@@ -518,12 +518,17 @@ function bestStat(c, ranks) {
   return {title: `#${best.r} in ${best.word}`, sub: `${one(c[best.k])} per game in ${c.season}`};
 }
 
-// Overall rating on an NBA 2K-style scale. Players are ranked within their
-// season by all-round production, then the rank maps onto 2K's usual spread:
-// the season's best player is about 97, the top five are 92+, the top twenty
-// around 85+, a typical starter about 80 and the last rotation players ~70.
+// Overall ratings. Cards with a real NBA 2K rating use it (js/ratings.js:
+// NBA 2K26's end-of-season ratings for 2025-26, and 2K's Classic teams for
+// earlier seasons). Every other card gets an estimate fitted to those real
+// ratings: players are ranked within their season by all-round production,
+// and OVR = 99.5 − 4.07 × ln(rank) (rank on a 120-player scale), plus 2.5 for
+// rare and epic players. That lands within about 2.5 of 2K on the cards that
+// have a real rating. scripts/build_catalog.js copies this for the server.
 const PRODUCTION = c => c.ppg + 1.2 * c.rpg + 1.5 * c.apg + 3 * c.spg + 3 * c.bpg;
-const OVR_CURVE = [[1, 97], [2, 95], [5, 92], [10, 89], [20, 85], [40, 81], [60, 78], [90, 74], [120, 70]];
+const OVR_FIT = {base: 99.5, slope: 4.07, star: {legendary: 0.4, epic: 2.45, rare: 2.45, common: 0}};
+// Stars never drop below these, the way 2K keeps its big names high
+const OVR_FLOOR = {legendary: 90, epic: 85, rare: 0, common: 0};
 const ovrCache = {};
 function seasonOvrs(season) {
   if (ovrCache[season]) return ovrCache[season];
@@ -531,21 +536,16 @@ function seasonOvrs(season) {
   const scale = 120 / Math.max(players.length, 1);
   const map = new Map();
   players.forEach((p, i) => {
-    const r = (i + 1) * scale;
-    let k = OVR_CURVE.findIndex(([rank]) => rank >= r);
-    if (k < 1) k = k === 0 ? 1 : OVR_CURVE.length - 1;
-    const [r0, o0] = OVR_CURVE[k - 1], [r1, o1] = OVR_CURVE[k];
-    map.set(p.name, Math.round(o0 + (o1 - o0) * Math.min(1, Math.max(0, (r - r0) / (r1 - r0)))));
+    const real = REAL_OVR[`${p.name}|${season}`];
+    const est = OVR_FIT.base - OVR_FIT.slope * Math.log((i + 1) * scale) + (OVR_FIT.star[p.rarity] || 0);
+    map.set(p.name, real || Math.min(99, Math.max(70, OVR_FLOOR[p.rarity] || 0, Math.round(est))));
   });
   return (ovrCache[season] = map);
 }
-// Like 2K, the game's stars get a little extra beyond the box score
-const RARITY_BUMP = {legendary: [2, 90], epic: [1, 85], rare: [0, 0], common: [0, 0]};
 function cardOvr(c) {
-  const base = seasonOvrs(c.season).get(c.name) || 70;
-  const [bump, floor] = RARITY_BUMP[c.rarity] || [0, 0];
-  return Math.min(99, Math.max(floor, base + bump));
+  return seasonOvrs(c.season).get(c.name) || 75;
 }
+const hasRealOvr = c => !!REAL_OVR[`${c.name}|${c.season}`];
 
 // A pentagon of season ranks: every player's card back has its own shape
 function statRadar(c, ranks) {
@@ -602,7 +602,7 @@ function cardHtml(c, extraClass = "") {
               <div class="pback-name">${nameHtml(c.name)}</div>
               <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
             </div>
-            ${ranks ? `<div class="pback-no" aria-label="Overall rating ${cardOvr(c)}"><span>OVR</span><b>${cardOvr(c)}</b></div>` : ""}
+            ${ranks ? `<div class="pback-no" aria-label="${hasRealOvr(c) ? "NBA 2K rating" : "Overall rating"} ${cardOvr(c)}" title="${hasRealOvr(c) ? "Real NBA 2K rating" : "Estimated from this season's stats"}"><span>${hasRealOvr(c) ? "2K" : "OVR"}</span><b>${cardOvr(c)}</b></div>` : ""}
           </div>
           ${ranks ? statRadar(c, ranks) : ""}
           ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}

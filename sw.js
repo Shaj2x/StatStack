@@ -2,7 +2,7 @@
 // App files load fresh whenever the network answers, so updates show straight
 // away; the saved copy is used offline or when the network is too slow.
 // Bump VERSION when the SHELL list changes to drop the old cache.
-const VERSION = "v15";
+const VERSION = "v16";
 const NETWORK_TIMEOUT = 4000; // ms before falling back to the saved copy
 const SHELL_CACHE = `statstack-shell-${VERSION}`;
 const IMAGE_CACHE = "statstack-headshots";
@@ -17,6 +17,7 @@ const SHELL = [
   "css/app.css",
   "js/config.js",
   "js/data.js",
+  "js/ratings.js",
   "js/teams.js",
   "js/photos.js",
   "js/fx.js",
