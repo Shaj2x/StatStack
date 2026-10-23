@@ -545,7 +545,6 @@ function seasonOvrs(season) {
 function cardOvr(c) {
   return seasonOvrs(c.season).get(c.name) || 75;
 }
-const hasRealOvr = c => !!REAL_OVR[`${c.name}|${c.season}`];
 
 // A pentagon of season ranks: every player's card back has its own shape
 function statRadar(c, ranks) {
@@ -580,13 +579,14 @@ function cardHtml(c, extraClass = "") {
   const best = bestStat(c, ranks);
   return `
     <article class="flipcard ${c.rarity} ${extraClass}" style="${teamVars(c.team)}" tabindex="0" role="button" aria-pressed="false"
-      aria-label="${esc(c.name)}, ${c.rarity} card. Press to flip.">
+      aria-label="${esc(c.name)}, ${c.rarity} card, ${cardOvr(c)} overall. Press to flip.">
       <div class="flip-inner">
         <div class="pcard">
           <div class="shard s1"></div><div class="shard s2"></div><div class="shard s3"></div><div class="shard s4"></div>
           <div class="lines"></div><div class="holo"></div>
           <img class="pcard-photo${ph.cutout ? "" : " is-photo"}" src="${esc(ph.src)}" alt="" loading="lazy" onerror="imgFail(this)">
           <div class="pcard-top"><span>${RARITY_LABEL[c.rarity] || c.rarity}</span><span>${esc(c.season || "")}</span></div>
+          <div class="pcard-ovr" aria-hidden="true"><b>${cardOvr(c)}</b><span>OVR</span></div>
           <div class="plate">
             <div class="pcard-name">${nameHtml(c.name)}</div>
             <div class="pcard-meta">${esc(c.team)} · ${one(c.ppg)} PTS · ${one(c.rpg)} REB · ${one(c.apg)} AST</div>
@@ -602,7 +602,7 @@ function cardHtml(c, extraClass = "") {
               <div class="pback-name">${nameHtml(c.name)}</div>
               <div class="pback-team">${esc(team(c.team).name || c.team)} · <span class="nw">${esc(c.season || "")}</span></div>
             </div>
-            ${ranks ? `<div class="pback-no" aria-label="${hasRealOvr(c) ? "NBA 2K rating" : "Overall rating"} ${cardOvr(c)}" title="${hasRealOvr(c) ? "Real NBA 2K rating" : "Estimated from this season's stats"}"><span>${hasRealOvr(c) ? "2K" : "OVR"}</span><b>${cardOvr(c)}</b></div>` : ""}
+            ${ranks ? `<div class="pback-no" aria-label="Overall rating ${cardOvr(c)}"><span>OVR</span><b>${cardOvr(c)}</b></div>` : ""}
           </div>
           ${ranks ? statRadar(c, ranks) : ""}
           ${best ? `<div class="pback-plate"><strong>${best.title}</strong><span>${esc(best.sub)}</span></div>` : ""}
@@ -1107,6 +1107,18 @@ document.addEventListener("keydown", e => {
 const SELL_VALUE = {common: 150, rare: 400, epic: 1000, legendary: 3000};
 const cardKey = c => `${c.name}|${c.season}`;
 let activeFilter = "all";
+// Highest overall first unless the player picks another order (remembered)
+const COLL_SORTS = {
+  "ovr": ["Highest OVR", (a, b) => cardOvr(b.card) - cardOvr(a.card) || b.newest - a.newest],
+  "ovr-low": ["Lowest OVR", (a, b) => cardOvr(a.card) - cardOvr(b.card) || b.newest - a.newest],
+  "new": ["Newest", (a, b) => b.newest - a.newest],
+  "old": ["Oldest", (a, b) => a.newest - b.newest],
+  "name": ["Name A–Z", (a, b) => a.card.name.localeCompare(b.card.name) || b.card.season.localeCompare(a.card.season)],
+  "season": ["Newest season", (a, b) => parseInt(b.card.season) - parseInt(a.card.season) || cardOvr(b.card) - cardOvr(a.card)],
+  "team": ["Team", (a, b) => team(a.card.team).name.localeCompare(team(b.card.team).name) || cardOvr(b.card) - cardOvr(a.card)],
+};
+let collSort = COLL_SORTS[load("statstack_coll_sort", "ovr")] ? load("statstack_coll_sort", "ovr") : "ovr";
+let collSearch = "";
 
 function groupCards(list) {
   const groups = new Map();
@@ -1140,12 +1152,15 @@ function renderColl(r) {
   activeFilter = r;
   document.querySelectorAll(".filter-btn").forEach(b => b.classList.toggle("active", b.dataset.filter === r));
   const g = $("collectionGrid");
+  const words = collSearch.trim().toLowerCase();
   const groups = [...groupCards(ownedCards).entries()]
     .filter(([, copies]) => r === "all" || copies[0].rarity === r)
-    .map(([key, copies]) => ({key, copies, newest: Math.max(...copies.map(c => c.pulled || 0))}))
-    .sort((a, b) => b.newest - a.newest);
+    .filter(([, [c]]) => !words || `${c.name} ${c.season} ${c.team} ${team(c.team).name}`.toLowerCase().includes(words))
+    .map(([key, copies]) => ({key, copies, card: copies[0], newest: Math.max(...copies.map(c => c.pulled || 0))}))
+    .sort(COLL_SORTS[collSort][1]);
+  $("collSort").value = collSort;
   if (!groups.length) {
-    g.innerHTML = `<p class="empty">${r === "all" ? "No cards yet. Earn 2,000 coins and open a pack." : `No ${r} cards yet.`}</p>`;
+    g.innerHTML = `<p class="empty">${words ? `No cards match “${esc(collSearch.trim())}”.` : r === "all" ? "No cards yet. Earn 2,000 coins and open a pack." : `No ${r} cards yet.`}</p>`;
     return;
   }
   g.innerHTML = groups.map(({key, copies}) => {
@@ -1849,3 +1864,12 @@ document.addEventListener("DOMContentLoaded", () => {
     dailyNum: () => dailyNumber(),
   });
 });
+
+// Collection sort order and search
+$("collSort").innerHTML = Object.entries(COLL_SORTS).map(([k, [label]]) => `<option value="${k}">${label}</option>`).join("");
+$("collSort").addEventListener("change", e => {
+  collSort = e.target.value;
+  save("statstack_coll_sort", collSort);
+  renderColl(activeFilter);
+});
+$("collSearch").addEventListener("input", e => { collSearch = e.target.value; renderColl(activeFilter); });
