@@ -1275,6 +1275,16 @@ $("volumeSlider").addEventListener("input", e => {
 });
 $("volumeSlider").addEventListener("change", () => FX.sound("coin"));
 
+// Size: bigger or smaller than the automatic size, remembered per device
+const sizeNow = () => { try { return parseFloat(localStorage.getItem("statstack_size")) || 1; } catch { return 1; } };
+$("sizeSlider").value = Math.round(sizeNow() * 100);
+$("sizeOut").textContent = `${$("sizeSlider").value}%`;
+$("sizeSlider").addEventListener("input", e => {
+  $("sizeOut").textContent = `${e.target.value}%`;
+  try { localStorage.setItem("statstack_size", String(e.target.value / 100)); } catch { /* this visit only */ }
+  window.fitSize();
+});
+
 // ─── THEMES ─────────────────────────────────────────────────────────────────
 // Dark is the original look; cards, duel halves and packs keep their own
 // colours in every theme. "My team" is built from the avatar team's colours.
