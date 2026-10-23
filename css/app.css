@@ -2296,3 +2296,16 @@ dialog.confirm-dialog { width: min(460px, calc(100% - 32px)); }
 .confirm-n { position: absolute; z-index: 3; bottom: 6px; right: 6px; padding: 2px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.7); color: #fff; font-size: 11px; font-weight: 800; }
 .confirm-more { font-size: 13px; }
 .confirm-row .pill { white-space: nowrap; }
+
+/* ─── Start screen over Higher or Lower and Who Am I? ─── */
+.tipoff { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--ink-0) 55%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.tipoff[hidden] { display: none; }
+.tipoff-card { width: min(440px, 100%); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 26px; border-radius: 26px; text-align: center; background: var(--ink-1); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); }
+.tipoff-card h2 { font-size: clamp(52px, 8vw, 76px); line-height: 0.9; }
+.tipoff-card .muted strong { color: var(--text); }
+.tipoff-go { width: 100%; min-height: 56px; font-size: 18px; animation: buy-pulse 2.6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .tipoff-go { animation: none; } }
+.tipoff-best { font-size: 13px; color: var(--muted); }
+.tipoff-best strong { color: var(--gold); }
+.duel.gated .side-text, .duel.gated .vs, .duel.gated .side-photo, .who-card.gated > :not(.tipoff) { visibility: hidden; }
+.who-card > .tipoff { position: absolute; z-index: 20; border-radius: inherit; }

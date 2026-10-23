@@ -164,7 +164,7 @@ function showScreen(name) {
   if (name === "packs") renderShop();
   if (name === "collection") { updateCollStats(); renderColl(activeFilter); }
   if (name === "profile") renderProfile();
-  if (name === "play" && !player1) startNewRound();
+  if (name === "play" && !player1) { if (hlStarted) startNewRound(); else hlGate(true); }
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", () => showScreen(location.hash.slice(1)));
@@ -181,7 +181,7 @@ function changeSeason() {
   setSeason($("seasonSelect").value);
   roundNumber = 0; streak = 0; multiplier = 1; player1 = player2 = null;
   updateBoard();
-  if (currentScreen === "play") startNewRound();
+  if (currentScreen === "play" && hlStarted) startNewRound();
   if (currentScreen === "packs") renderShop();
   if (SCREEN_HOOKS.seasonChanged) SCREEN_HOOKS.seasonChanged();
 }
@@ -279,6 +279,21 @@ async function serverMove(fn, args) {
 // ─── GAME ROUND ─────────────────────────────────────────────────────────────
 const hlClock = new ShotClock($("vsBadge"));
 let hlRound = null, hlLoading = false;
+// Nothing is dealt and no clock runs until the player presses Start
+let hlStarted = false;
+function hlGate(show) {
+  $("hlGate").hidden = !show;
+  $("duel").classList.toggle("gated", show);
+  if (!show) return;
+  $("hlGateBest").textContent = bestStreak;
+  document.querySelectorAll(".gate-clock").forEach(el => { el.textContent = CLOCK[el.dataset.clock]; });
+  $("hlStart").focus({preventScroll: true});
+}
+$("hlStart").addEventListener("click", () => {
+  hlStarted = true;
+  hlGate(false);
+  startNewRound();
+});
 
 async function startNewRound() {
   if (hlLoading) return;
@@ -1287,7 +1302,7 @@ document.addEventListener("keydown", e => {
   const k = e.key.toLowerCase();
   if (gameActive && (k === "arrowup" || k === "h")) { e.preventDefault(); makeGuess("higher", true); }
   else if (gameActive && (k === "arrowdown" || k === "l")) { e.preventDefault(); makeGuess("lower", true); }
-  else if (!gameActive && k === "enter") { e.preventDefault(); nextRound(); }
+  else if (!gameActive && hlStarted && k === "enter") { e.preventDefault(); nextRound(); }
 });
 
 // ─── SWIPE TO GUESS ─────────────────────────────────────────────────────────
@@ -1590,7 +1605,9 @@ function applyGame(st) {
   checkBadges(false);
   updateBoard();
   renderIdentity();
-  if (currentScreen === "play") startNewRound();
+  // Wait for Start again: the clock never runs on a page nobody's looking at
+  hlStarted = false;
+  if (currentScreen === "play") hlGate(true);
   if (currentScreen === "profile") renderProfile();
   if (currentScreen === "collection") { updateCollStats(); renderColl(activeFilter); }
   if (currentScreen === "packs") renderShop();
@@ -1605,7 +1622,8 @@ function resetSave() {
   gameActive = false;
   if (SCREEN_HOOKS.gameReset) SCREEN_HOOKS.gameReset();
   applySave({coins: 0, bestStreak: 0, cards: [], profile: freshProfile(), updatedAt: 0});
-  if (currentScreen === "play") startNewRound();
+  hlStarted = false;
+  if (currentScreen === "play") hlGate(true);
 }
 
 // ─── ACCOUNT UI ─────────────────────────────────────────────────────────────
