@@ -61,6 +61,22 @@ Basketball-Reference) against each player's stats.nba.com career record. It
 prints every mismatch with both values and saves the full report to
 `data/stat_check.txt`. Differences of 0.1 are rounding.
 
+## Hosting on Vercel
+
+The game is plain files with no build step, so Vercel serves it as is.
+
+1. At vercel.com, **Add New → Project**, import `Shaj2x/StatStack`.
+2. Framework preset **Other**. Leave the build command and output
+   directory empty (the root is the site). Deploy.
+3. In Supabase, **Authentication → URL Configuration**, add the Vercel address
+   (for example `https://statstack.vercel.app/**`) to the Redirect URLs, so
+   password-reset emails can come back to it.
+
+`vercel.json` stops browsers caching the service worker, the page and the
+scripts, so updates show up straight away; `.vercelignore` leaves the
+scripts and SQL out of the deploy. Every push to `main` deploys again.
+Challenge links use whichever address the game is opened on.
+
 ## Accounts and cloud sync
 
 Players get a profile (username, team-colour avatar, lifetime stats and

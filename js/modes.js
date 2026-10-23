@@ -1,7 +1,8 @@
 // Daily Challenge, Who Am I?, the Locker and the leaderboards. Loaded after
 // js/app.js and uses its game state (coins, profile, ownedCards…) and helpers.
 
-const SITE_URL = "https://shaj2x.github.io/StatStack/";
+// Challenge links point at whichever copy of the site this is (Vercel or GitHub Pages)
+const SITE_URL = location.origin + location.pathname.replace(/[^/]*$/, "");
 
 // ─── DAILY CHALLENGE ────────────────────────────────────────────────────────
 // Everyone gets the same 10 matchups on the same calendar day: the puzzle is
