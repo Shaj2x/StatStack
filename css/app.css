@@ -2096,7 +2096,7 @@ button.news-go { background: none; font: inherit; font-size: 13px; font-weight: 
 .buy-price { display: flex; align-items: center; gap: 10px; margin-top: auto; font-family: var(--display); font-weight: var(--display-w); font-size: 44px; line-height: 1; color: var(--gold); font-variant-numeric: tabular-nums; }
 .buy-price .coin { width: 32px; height: 32px; }
 .buy-btn { width: 100%; min-width: 0; }
-.buy-btn:not(:disabled) { animation: buy-pulse 2.6s ease-in-out infinite; }
+.buy-btn:not(:disabled) { box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 22%, transparent); }
 @keyframes buy-pulse { 50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--gold) 22%, transparent); } }
 @media (prefers-reduced-motion: reduce) { .buy-btn:not(:disabled) { animation: none; } }
 .save-up { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
@@ -2298,14 +2298,18 @@ dialog.confirm-dialog { width: min(460px, calc(100% - 32px)); }
 .confirm-row .pill { white-space: nowrap; }
 
 /* ─── Start screen over Higher or Lower and Who Am I? ─── */
-.tipoff { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--ink-0) 55%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.tipoff { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: color-mix(in srgb, var(--ink-0) 82%, transparent); }
 .tipoff[hidden] { display: none; }
 .tipoff-card { width: min(440px, 100%); display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 30px 26px; border-radius: 26px; text-align: center; background: var(--ink-1); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); }
 .tipoff-card h2 { font-size: clamp(52px, 8vw, 76px); line-height: 0.9; }
 .tipoff-card .muted strong { color: var(--text); }
-.tipoff-go { width: 100%; min-height: 56px; font-size: 18px; animation: buy-pulse 2.6s ease-in-out infinite; }
+.tipoff-go { width: 100%; min-height: 56px; font-size: 18px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 22%, transparent); }
 @media (prefers-reduced-motion: reduce) { .tipoff-go { animation: none; } }
 .tipoff-best { font-size: 13px; color: var(--muted); }
 .tipoff-best strong { color: var(--gold); }
 .duel.gated .side-text, .duel.gated .vs, .duel.gated .side-photo, .who-card.gated > :not(.tipoff) { visibility: hidden; }
 .who-card > .tipoff { position: absolute; z-index: 20; border-radius: inherit; }
+
+/* ─── Speed: cards off screen skip layout and painting ─── */
+.card-cell { content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.coll-more { grid-column: 1 / -1; display: flex; justify-content: center; padding: 8px 0 24px; }
