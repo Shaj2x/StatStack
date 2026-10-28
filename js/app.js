@@ -1201,16 +1201,44 @@ function renderColl(r) {
     g.innerHTML = `<p class="empty">${words ? `No cards match “${esc(collSearch.trim())}”.` : r === "all" ? "No cards yet. Earn 2,000 coins and open a pack." : `No ${r} cards yet.`}</p>`;
     return;
   }
-  g.innerHTML = groups.map(({key, copies}) => {
-    const n = copies.length, card = copies[n - 1], value = SELL_VALUE[card.rarity];
-    return `<div class="card-cell">${cardHtml(card)}${n > 1 ? `<div class="cell-foot">
-      <span class="dupe-chip" title="${n} copies">×${n}</span>
-      <button class="sell-btn" type="button" data-sell="${esc(key)}" aria-label="Quick sell one ${esc(card.name)} for ${value} coins">Quick sell · <span class="coin" aria-hidden="true"></span>${value.toLocaleString()}</button>
-    </div>` : ""}</div>`;
-  }).join("");
-  fitCardNames(g, 14);
-  [...g.children].slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
+  // Big collections draw 40 cards at a time, the next 40 as you scroll near
+  // the end, so a 2,000-card collection opens as fast as a small one
+  collGroups = groups;
+  collShown = 0;
+  g.innerHTML = "";
+  moreCards(true);
 }
+const COLL_PAGE = 40;
+let collGroups = [], collShown = 0;
+function cellHtml({key, copies}) {
+  const n = copies.length, card = copies[n - 1], value = SELL_VALUE[card.rarity];
+  return `<div class="card-cell">${cardHtml(card)}${n > 1 ? `<div class="cell-foot">
+    <span class="dupe-chip" title="${n} copies">×${n}</span>
+    <button class="sell-btn" type="button" data-sell="${esc(key)}" aria-label="Quick sell one ${esc(card.name)} for ${value} coins">Quick sell · <span class="coin" aria-hidden="true"></span>${value.toLocaleString()}</button>
+  </div>` : ""}</div>`;
+}
+function moreCards(first = false) {
+  const g = $("collectionGrid");
+  const next = collGroups.slice(collShown, collShown + COLL_PAGE);
+  if (!next.length) return;
+  const sentinel = $("collMore");
+  if (sentinel) sentinel.remove();
+  const holder = document.createElement("div");
+  holder.innerHTML = next.map(cellHtml).join("");
+  const cells = [...holder.children];
+  g.append(...cells);
+  collShown += next.length;
+  cells.forEach(cell => fitCardNames(cell, 14));
+  if (first) cells.slice(0, 12).forEach((el, i) => FX.enter(el, {duration: 220, delay: i * 40}));
+  if (collShown < collGroups.length) {
+    g.insertAdjacentHTML("beforeend", `<div class="coll-more" id="collMore"><button class="pill pill-ghost pill-sm" type="button" id="collMoreBtn">Show more · ${(collGroups.length - collShown).toLocaleString()} left</button></div>`);
+    collObserver.observe($("collMore"));
+  }
+}
+const collObserver = "IntersectionObserver" in window
+  ? new IntersectionObserver(entries => { if (entries.some(e => e.isIntersecting)) moreCards(); }, {rootMargin: "800px 0px"})
+  : {observe() {}};
+document.addEventListener("click", e => { if (e.target.closest("#collMoreBtn")) moreCards(); });
 
 // Remove the newest extra copies, always keeping one of each card
 async function sellCopies(key, howMany) {

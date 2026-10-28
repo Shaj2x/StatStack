@@ -683,13 +683,16 @@ function renderPicker() {
     .filter(c => !q || c.name.toLowerCase().includes(q) || (team(c.team).name || "").toLowerCase().includes(q) || c.season.includes(q))
     .map(c => ({c, ovr: cardOvr(c)}))
     .sort((a, b) => b.ovr - a.ovr);
-  $("pickerList").innerHTML = cards.length ? cards.map(({c}) => {
+  // Long collections: the best 80 matches; searching narrows it down
+  const shown = cards.slice(0, 80);
+  $("pickerList").innerHTML = (shown.length ? shown.map(({c}) => {
     const key = cardKey(c), used = taken.has(c.name);
     return `<li><button class="pick-row" type="button" data-pick="${esc(key)}"${used ? " disabled" : ""}>
       ${miniTile(c)}
       <span class="pick-text"><strong>${esc(c.name)}</strong><span>${esc(team(c.team).name || c.team)} · ${esc(c.season)}${used ? " · already picked" : ""}</span></span>
     </button></li>`;
-  }).join("") : `<li class="muted picker-empty">${ownedCards.length ? "No cards match." : "No cards yet. Open a pack first."}</li>`;
+  }).join("") : `<li class="muted picker-empty">${ownedCards.length ? "No cards match." : "No cards yet. Open a pack first."}</li>`)
+    + (cards.length > shown.length ? `<li class="muted picker-empty">Showing the top ${shown.length} of ${cards.length.toLocaleString()}. Search to find the rest.</li>` : "");
 }
 function setSlot(key) {
   picking.list[picking.index] = key;
